@@ -1,33 +1,67 @@
-# Oasis architecture
+# Architecture
 
-## Request and payment flow
+The Strategy Agent is a runtime state machine, not a fixed demo script. Each stage is a
+deterministic step whose output feeds the next, and LLM output is treated as a hypothesis,
+never as authority: paid Agent charges and execution remain controlled by policy and risk guards.
 
-1. The user approves a strategy charter with a market, risk limits, and research budget.
-2. The agent selects a service based on price, relevance, and remaining budget.
-3. The x402-gated service responds with HTTP 402 payment requirements.
-4. The agent signs a Hedera HBAR payment intent.
-5. A facilitator verifies and settles the payment.
-6. The service returns its market signal or risk challenge.
-7. The decision engine produces a trade or no-trade recommendation.
-8. Oasis stores the payment transaction, strategy version, and decision summary in its audit trail; HCS is the intended immutable evidence layer.
+## Implementation Map
 
-## Components
+| Concern | Module |
+| --- | --- |
+| Strategy Agent Runtime state machine | `apps/agent/src/strategy/StrategyAgent.mjs` |
+| Structured schemas and validation | `apps/agent/src/strategy/schemas.mjs` |
+| LLM Reasoning Layer | `apps/agent/src/strategy/LLMReasoner.mjs` |
+| Model provider adapters | `apps/agent/src/strategy/ModelProviders.mjs` |
+| Market Context system | `apps/agent/src/strategy/MarketContextBuilder.mjs` |
+| Tool Planner | `apps/agent/src/strategy/ToolPlanner.mjs` |
+| Policy Guard + Billing Guard | `apps/agent/src/strategy/PolicyPaymentGuard.mjs` |
+| x402/Hedera paid Agent settlement | `apps/agent/src/strategy/X402PaidToolClient.mjs` |
+| Market Agent | `apps/agent/src/market/MarketResearchAgent.mjs` |
+| Risk Agent | `apps/agent/src/risk/RiskAgent.mjs` |
+| Evidence Synthesizer | `apps/agent/src/strategy/EvidenceSynthesizer.mjs` |
+| Risk-Aware Decision Composer | `apps/agent/src/strategy/DecisionComposer.mjs` |
+| Execution Agent (simulation only) | `apps/agent/src/execution/ExecutionAgent.mjs` |
+| Decision Memory | `apps/agent/src/strategy/MemoryManager.mjs` |
+| Multi-agent collaboration protocol | `apps/agent/src/strategy/protocols.mjs` |
+| HCS audit wrapper | `apps/agent/src/strategy/AuditLogger.mjs` |
+| Observability and evaluation metrics | `apps/agent/src/strategy/Observability.mjs` |
+| Paid Agent pricing model | `packages/shared/src/pricing.mjs` |
+| Budget and policy engine | `packages/policy/src/index.mjs` |
+| Hedera/x402 adapter (real + mock) | `packages/hedera/src/index.mjs` |
 
-- **Web app:** charter setup, budget visibility, payment status, decision replay.
-- **Agent:** policy enforcement, service selection, x402 client, recommendation orchestration.
-- **Market signal service:** paid market evidence API.
-- **Risk challenge service:** paid independent counterargument API.
-- **Hedera:** HBAR settlement through x402; HCS audit records.
+## Runtime Flow
 
-## Non-negotiable safeguards
+```text
+load_user_policy
+build_market_context
+retrieve_memory
+generate_hypothesis
+plan_evidence_needed
+plan_tool_calls
+execute_paid_research
+synthesize_evidence
+compose_strategy_decision
+final_policy_risk_check
+execution_agent_review
+write_audit
+persist_memory
+emit_observability
+```
 
-- The agent cannot change the user-set budget.
-- The agent cannot expand position size, daily loss limit, or asset whitelist.
-- The MVP does not submit real trades.
-- No-trade is a valid, successful recommendation.
+## LLM Reasoning Layer
 
-## First integration
+`LLMReasoner.mjs` uses a provider adapter selected by the frontend or by `STRATEGY_AGENT_PROVIDER`.
+Supported providers are OpenAI, DeepSeek, Claude, and GLM.
 
-Start from Hedera's x402 inference pay-per-request proof of concept, then replace its paid inference route with the Oasis market-signal route.
+Frontend strategy runs send `requireLlm: true`, so missing provider credentials fail clearly instead
+of pretending to be a real agent. Tests and explicit offline demos can set `OASIS_LLM_MODE=rule` to use
+the deterministic `RuleBasedStrategyReasoner`.
 
-- https://github.com/hedera-dev/x402-inference-pay-per-request-poc
+LLM output is a hypothesis, not authority. Paid Agent charges and execution are still controlled by
+deterministic policy and risk guards.
+
+## Market Context
+
+`MarketContextBuilder.mjs` uses live Binance public market data by default (with a CoinGecko fallback)
+and computes the current signal for the requested asset/timeframe. The old ETH snapshot is retained only
+through `OASIS_MARKET_DATA_MODE=fixture` for deterministic tests.
