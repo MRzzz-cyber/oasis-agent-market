@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
-const state = { goal: "", strategy: null, run: null, strategies: [], model: "GPT-5.6", committee: ["GPT-5.6", "Claude Sonnet", "Gemini"], conversation: [] };
+const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "create", "strategies", "policy"];
-const MODEL_OPTIONS = ["GPT-5.6", "Claude Sonnet", "Gemini", "DeepSeek"];
+let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
   $("toast").classList.add("active");
@@ -126,22 +126,83 @@ function node(tag, cls, text) {
   const el = document.createElement(tag); if (cls) el.className = cls;
   if (text != null) el.textContent = String(text); return el;
 }
-function getSelectedCommittee() {
-  return [...document.querySelectorAll('input[name="committee-model"]:checked')].map(x => x.value);
+function getSelectedCommittee() { return []; }
+function selectedModel() {
+  const id = $("model-primary").value;
+  return availableModels.find(item => item.id === id) || null;
+}
+function formatModelPrice(value) {
+  if (value == null) return "价格未知";
+  if (value === 0) return "免费";
+  return "$" + value.toFixed(value >= 1 ? 2 : 4) + " / 百万 Token";
 }
 function updateModelLabels() {
-  state.model = $("model-primary").value;
-  state.committee = getSelectedCommittee();
-  $("active-model-label").textContent = state.model;
-  $("policy-model").textContent = state.model + (state.committee.length ? " + " + state.committee.length + " 个协作模型" : "");
+  const model = selectedModel();
+  state.model = model?.id || "";
+  state.modelName = model?.name || "";
+  state.committee = [];
+  $("active-model-label").textContent = model ? model.name : "未选择模型";
+  $("policy-model").textContent = model ? model.name + "（OpenRouter）" : "未选择模型";
+  $("model-meta").textContent = model
+    ? model.provider + " · 上下文 " + (model.contextLength ? model.contextLength.toLocaleString("zh-CN") : "未知") +
+      " · 输入 " + formatModelPrice(model.inputPricePerMillion) + " · 输出 " + formatModelPrice(model.outputPricePerMillion)
+    : "请选择一个模型";
+}
+function renderModelOptions() {
+  const query = $("model-search").value.trim().toLowerCase();
+  const matches = availableModels.filter(model =>
+    !query || (model.name + " " + model.id + " " + model.provider).toLowerCase().includes(query)
+  );
+  const visible = query ? matches.slice(0, 150) : matches.slice(0, 60);
+  const select = $("model-primary");
+  const current = select.value || state.model;
+  select.replaceChildren();
+  for (const model of visible) {
+    const option = document.createElement("option");
+    option.value = model.id;
+    option.textContent = model.name + " · " + model.provider + (model.isFree ? " · 免费" : "");
+    select.appendChild(option);
+  }
+  if (visible.some(model => model.id === current)) select.value = current;
+  else if (visible.length) select.value = visible[0].id;
+  select.disabled = visible.length === 0;
+  $("model-status").textContent = query
+    ? "找到 " + matches.length + " 个模型" + (matches.length > visible.length ? " · 当前显示前 " + visible.length + " 个" : "")
+    : "OpenRouter · " + availableModels.length + " 个模型 · 显示最新 60 个，可搜索全部";
+  updateModelLabels();
+}
+async function loadModels() {
+  const status = $("model-status");
+  const select = $("model-primary");
+  status.textContent = "正在获取 OpenRouter 模型目录…";
+  select.disabled = true;
+  try {
+    const response = await fetch("/api/ai/models", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "模型目录获取失败");
+    if (!Array.isArray(payload.models) || !payload.models.length) throw new Error("OpenRouter 暂无可用模型");
+    availableModels = payload.models;
+    renderModelOptions();
+    $("ai-runtime-status").textContent = "已连接 OpenRouter · " + availableModels.length + " 个可选模型";
+    return payload;
+  } catch (error) {
+    status.textContent = error.message;
+    select.replaceChildren(new Option("模型目录加载失败", ""));
+    select.disabled = true;
+    $("model-meta").textContent = "请检查 Cloudflare Worker 部署和 OpenRouter 模型目录接口";
+    $("ai-runtime-status").textContent = "OpenRouter 模型目录不可用";
+    throw error;
+  }
 }
 function addChat(role, content) {
   state.conversation.push({ role, content });
   const box = $("chat-messages");
   const msg = node("div", "chat-message " + role);
   msg.appendChild(node("span", "chat-role", role === "user" ? "你" : "Oasis"));
-  msg.appendChild(node("p", "", content)); box.appendChild(msg);
+  const paragraph = node("p", "", content);
+  msg.appendChild(paragraph); box.appendChild(msg);
   box.scrollTop = box.scrollHeight;
+  return paragraph;
 }
 function makeDraftSummary() {
   const goal = state.goal;
@@ -170,12 +231,16 @@ async function checkAiStatus() {
     const res = await fetch("/api/ai/status", { cache: "no-store" });
     if (!res.ok) throw Error("API 未部署");
     const status = await res.json();
-    const configured = Object.entries(status.models || {}).filter(([, enabled]) => enabled).map(([name]) => name);
-    $("ai-runtime-status").textContent = configured.length ? "真实 API 已接通：" + configured.join("、") : "尚未配置模型密钥";
+    $("ai-runtime-status").textContent = status.openRouterConfigured
+      ? "OpenRouter API Key 已配置"
+      : "模型目录可浏览，但管理员尚未配置 OpenRouter API Key";
     if (!status.enabled) $("ai-usage").textContent = "管理员尚未设置 OASIS_DEMO_ACCESS_CODE，真实调用暂不可用。";
+    await loadModels();
+    if (!status.openRouterConfigured) $("model-status").textContent += " · 等待配置 API Key";
     return status;
-  } catch {
-    $("ai-runtime-status").textContent = "真实模型接口尚未部署";
+  } catch (error) {
+    $("ai-runtime-status").textContent = "OpenRouter 尚未连接";
+    $("model-status").textContent = error.message;
     return null;
   }
 }
@@ -183,9 +248,10 @@ async function sendToRealModel() {
   if (chatBusy || !state.conversation.length) return;
   const code = $("ai-access-code").value.trim();
   if (!code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
+  if (!state.model) { $("ai-usage").textContent = "请先返回总览，选择一个 OpenRouter 模型。"; return; }
   chatBusy = true;
   const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
-  $("ai-usage").textContent = "正在调用 " + state.model + "，本次为真实 API 请求。";
+  $("ai-usage").textContent = "正在调用 " + (state.modelName || state.model) + " · 实时流式响应";
   try {
     const messages = state.conversation.slice(-12).map(({ role, content }) => ({ role, content }));
     const response = await fetch("/api/ai/chat", {
@@ -193,12 +259,46 @@ async function sendToRealModel() {
       headers: { "content-type": "application/json", "x-oasis-access-code": code },
       body: JSON.stringify({ model: state.model, messages })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "模型调用失败");
-    addChat("assistant", data.text);
-    const parts = ["真实响应", data.provider, data.model];
-    if (data.usage?.inputTokens != null) parts.push("输入 " + data.usage.inputTokens + " tokens");
-    if (data.usage?.outputTokens != null) parts.push("输出 " + data.usage.outputTokens + " tokens");
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload.error || "模型调用失败（HTTP " + response.status + "）");
+    }
+    if (!response.body) throw new Error("浏览器未收到模型流式响应");
+    const assistantText = addChat("assistant", "");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "", fullText = "", usage = null, returnedModel = state.model;
+    const consume = (line) => {
+      if (!line.startsWith("data:")) return;
+      const raw = line.slice(5).trim();
+      if (!raw || raw === "[DONE]") return;
+      let chunk;
+      try { chunk = JSON.parse(raw); } catch { return; }
+      if (chunk.error?.message) throw new Error(chunk.error.message);
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) {
+        fullText += delta;
+        assistantText.textContent = fullText;
+        $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
+      }
+      if (chunk.model) returnedModel = chunk.model;
+      if (chunk.usage) usage = chunk.usage;
+    };
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || "";
+      for (const line of lines) consume(line);
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer.trim());
+    if (!fullText.trim()) throw new Error("模型没有返回文本，请更换模型或重试");
+    state.conversation[state.conversation.length - 1].content = fullText;
+    const parts = ["真实模型", returnedModel];
+    if (usage?.prompt_tokens != null) parts.push("输入 " + usage.prompt_tokens + " tokens");
+    if (usage?.completion_tokens != null) parts.push("输出 " + usage.completion_tokens + " tokens");
     $("ai-usage").textContent = parts.join(" · ");
   } catch (error) {
     $("ai-usage").textContent = "调用失败：" + error.message + "。没有生成模拟回答，可以重试。";
@@ -314,7 +414,7 @@ document.querySelectorAll("[data-tab]").forEach(button => button.addEventListene
 document.querySelectorAll("[data-example]").forEach(button => button.addEventListener("click", () => { $("goal").value = button.dataset.example; $("goal").focus(); }));
 $("goal-form").addEventListener("submit", event => { event.preventDefault(); beginConversation(); });
 $("model-primary").addEventListener("change", updateModelLabels);
-document.querySelectorAll('input[name="committee-model"]').forEach(input => input.addEventListener("change", updateModelLabels));
+$("model-search").addEventListener("input", renderModelOptions);
 $("change-model").addEventListener("click", () => { showTab("overview"); $("model-primary").focus(); });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
@@ -329,7 +429,7 @@ $("chat-form").addEventListener("submit", event => {
 $("create-strategy").addEventListener("click", async () => {
   try {
     updateModelLabels();
-    const result = await request("/api/strategies", { method: "POST", body: JSON.stringify({ goal: state.goal, budget: $("budget").value, model: state.model, committee: state.committee }) });
+    const result = await request("/api/strategies", { method: "POST", body: JSON.stringify({ goal: state.goal, budget: $("budget").value, model: state.modelName, modelId: state.model, committee: state.committee }) });
     state.strategy = result; toast("策略已保存"); showTab("strategies");
   } catch (error) { toast(error.message); }
 });
