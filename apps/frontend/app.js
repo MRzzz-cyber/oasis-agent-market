@@ -69,11 +69,11 @@ async function browserDemoRequest(path, options = {}) {
     const goal = body.goal?.trim();
     if (typeof goal !== "string" || goal.length < 4 || goal.length > 2000) demoError("请输入 4–2000 字的投资目标");
     const raw = String(body.budget ?? "5");
-    if (!/^\\d+(\\.\\d{1,6})?$/.test(raw)) demoError("预算格式不正确");
+    if (!/^\d+(\.\d{1,6})?$/.test(raw)) demoError("预算格式不正确");
     const [whole, decimals = ""] = raw.split(".");
     const atomic = BigInt(whole) * 1000000n + BigInt(decimals.padEnd(6, "0") || "0");
     if (atomic < 100000n || atomic > 100000000n) demoError("研究预算必须在 0.10–100 USDC");
-    const asset = /\\bBTC\\b|比特币/i.test(goal) ? "BTC" : /\\bSOL\\b|索拉纳/i.test(goal) ? "SOL" : "ETH";
+    const asset = /\bBTC\b|比特币/i.test(goal) ? "BTC" : /\bSOL\b|索拉纳/i.test(goal) ? "SOL" : "ETH";
     const strategy = {
       id: crypto.randomUUID(), goal, asset, budgetAtomic: atomic.toString(),
       maxPurchaseAtomic: "100000", mode: "simulation", needsApproval: true,
