@@ -45,3 +45,9 @@ Cloudflare Workers Builds 的 Root directory 决定命令执行位置。对于 m
 - https://developers.cloudflare.com/workers/ci-cd/builds/advanced-setups/
 - https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
 - https://developers.cloudflare.com/workers/wrangler/configuration/
+
+## 真实模型 API（新版）
+
+前端静态资源由 Cloudflare 托管；`apps/frontend/worker.js` 处理 `/api/ai/chat` 与 `/api/ai/status`。部署后必须在 Cloudflare Settings > Variables and Secrets 中以 **Secret** 类型设置私人体验码 `OASIS_DEMO_ACCESS_CODE` 和至少一个模型供应商 API Key。
+
+详细说明：[真实模型接入](live-llm.md)。没有配置 Key 时会明确提示错误，绝不提供伪造的模型回复。网站的模型委员会、数据采购及订单依旧是模拟模块，不要将其宣传为已上线真实交易。
