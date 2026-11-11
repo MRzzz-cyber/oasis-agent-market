@@ -78,8 +78,11 @@ The Base Sepolia variables are target configuration; they are not yet consumed b
 ## Development status
 
 - Existing Agent runtime, model adapters, market/risk agents and simulation flow are retained.
-- Base Sepolia / USDC integer amount primitives are added under packages/evm.
-- Full x402 EVM payment integration, policy migration and end-to-end testnet payment are still pending.
+- Base Sepolia / USDC integer amount primitives are implemented under `packages/evm`.
+- A separate, fail-closed USDC policy and single-process budget reservation ledger is implemented under `packages/policy/src/usdc.mjs`.
+- A policy-gated purchase coordinator is implemented under `packages/evm/src/purchase.mjs`. It requires an injected, verified payment transport, and **cannot send a live payment itself**.
+- GitHub Actions now runs the test suite on pull requests. The legacy Hedera code stays intact while the Base implementation is migrated.
+- Full x402 EVM client/server, durable ledger, existing StrategyAgent integration, and end-to-end Base Sepolia settlement are **still pending**.
 
 See Technical Stack (docs/technical-stack.md) and Roadmap (docs/roadmap.md).
 
