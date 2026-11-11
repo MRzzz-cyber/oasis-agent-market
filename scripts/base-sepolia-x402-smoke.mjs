@@ -36,7 +36,8 @@ const transport = createX402EvmTransport({
       payTo
     }
   },
-  privateKey
+  privateKey,
+  allowLocalhost: process.env.OASIS_ALLOW_LOCALHOST_X402_SERVICE === "YES_LOCAL_TEST"
 });
 const coordinator = new PurchaseCoordinator({ policy, transport });
 const quote = {
