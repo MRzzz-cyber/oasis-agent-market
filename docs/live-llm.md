@@ -1,72 +1,44 @@
-# Oasis 真实模型对话接入（Cloudflare Workers）
+# Oasis · OpenRouter 统一模型网关
 
-> 目标：用户在 Oasis 里选择模型并真正与其多轮对话；API Key 留在 Cloudflare，不进入网页。模型调用是付费 API；当前仍然是模拟投资策略和模拟订单。
+Oasis 现在支持优先使用一把 OpenRouter Key 调用所选模型。Cloudflare Worker 接收前端聊天消息，校验私人体验码，再调用 OpenRouter API。不会在浏览器中暴露供应商 Key。
 
-## 当前支持的模型
+## 现在你要做什么
 
-| 前端显示 | API 供应商 | Cloudflare Secret | 默认模型 ID（可覆盖） |
-|---|---|---|---|
-| GPT-5.6 | OpenAI | OPENAI_API_KEY | gpt-5.6-sol |
-| Claude Sonnet | Anthropic | ANTHROPIC_API_KEY | claude-sonnet-4-6 |
-| Gemini | Google | GEMINI_API_KEY | gemini-3.8-flash |
-| DeepSeek | DeepSeek | DEEPSEEK_API_KEY | deepseek-flash |
+1. 打开 OpenRouter → Keys，点击 New key，创建 `oasis-ai-demo` 独立密钥。建议设置低额度上限，例如 $5。不要复用 Hermes Key。
+2. 第一次可以不充值：Oasis 默认选择 `免费模型`，后端调用模型 ID `openrouter/free`（有每日/每分钟请求限制）。
+3. 打开 Cloudflare → Workers & Pages → **oasis-agent-market** → Settings → Variables and Secrets。
+4. 添加两个 **Secret**：
+   - `OPENROUTER_API_KEY`：新创建的 OpenRouter Key。
+   - `OASIS_DEMO_ACCESS_CODE`：你自己创建的私人体验码（较长且随机，不要泄漏）。
+5. 按 Cloudflare 提示保存并部署最新 `refactor/simple-base-mvp` 分支。
+6. 访问 `https://oasis-agent-market.zqsanjingshou.workers.dev`，选择 **免费模型**，输入自然语言策略需求；进入聊天后输入私人体验码，点击 **连接并重试**。
+7. 查看模型回复及 token 使用量。可以去 OpenRouter 的 Activity/Logs 检查真实请求。
 
-模型 ID 是可更新的，若账户不具备某个模型的访问权限，请通过 Worker 环境变量 OPENAI_MODEL / ANTHROPIC_MODEL / GEMINI_MODEL / DEEPSEEK_MODEL 设置该账户实际可用的模型 ID。请对照各供应商最新文档确认模型可用性。
+## 模型映射与可选环境变量
 
-## 你的 Cloudflare 配置步骤
+| 前端显示 | 默认 OpenRouter ID | 可覆盖环境变量 |
+|---|---|---|
+| 免费模型 | `openrouter/free` | `OPENROUTER_FREE_MODEL` |
+| GPT-5.6 | `openai/gpt-5.6-sol` | `OPENROUTER_GPT_MODEL` |
+| Claude Sonnet | `anthropic/claude-sonnet-4.6` | `OPENROUTER_CLAUDE_MODEL` |
+| Gemini | `google/gemini-2.5-flash` | `OPENROUTER_GEMINI_MODEL` |
+| DeepSeek | `deepseek/deepseek-chat` | `OPENROUTER_DEEPSEEK_MODEL` |
 
-1. 进入 Cloudflare Dashboard → Workers & Pages → **oasis-agent-market**（当前 Worker）→ **Settings**。
-2. 找到 **Variables and Secrets** → **Add variable**。
-3. 类型选 **Secret**，新增 **OASIS_DEMO_ACCESS_CODE**，值为自己设置的随机且较长的体验码。不要把体验码提交到 GitHub 或发到公开聊天。
-4. 再新增至少一家模型供应商的 Secret，例如 **OPENAI_API_KEY**，值填对应平台创建的 API Key。四家无需一次全部配置，可逐个接入。
-5. 保存并按照 Dashboard 提示部署（Deploy）。
-6. 进入 **Deployments**，确认最新 GitHub 重构分支部署成功。
-7. 打开 Oasis 公网网址，选择已经配置 Key 的模型，输入投资目标。在创建策略的对话界面填入体验码，点击「连接并重试」或发送下一条消息。
-8. 检查真实模型回复与 Token 统计。Worker API 的 `/api/ai/status` 可显示哪些供应商的 Key 已配置，但不会返回 Secret 值。
+模型 ID 和可用性可能变化；如返回 404，请先到 OpenRouter 模型目录确认实际 ID，再设置对应环境变量。付费模型通常需要充值。
 
-**重点**：ChatGPT Plus / Pro 会员并不等于 OpenAI API 额度。需要通过 OpenAI API 平台单独创建 API Key，并根据 API 使用量付费。
+## 安全和产品状态
 
-## 如何确认是真实调用
+- 网页不接触 API Key，Cloudflare Secret 只在服务端读取。
+- 公开 Demo 仍需要私人体验码；它不是完整的用户认证或严格限速。下一阶段需接入真正的 rate limiting、每用户额度和费用告警，才能允许更多人使用。
+- 单轮消息最多 2000 字，最多带 12 条消息历史，限制每次输出 token。
+- 模型对话为真实 API（配置好 Key 后），**多模型委员会投票仍是演示结果**，不能当成多模型真实判断。
+- 交易、数据服务采购及订单仍是模拟，不会发起链上付款。
+- 旧四家直连适配暂时保留作为后备；优先使用 OpenRouter，一旦配置 `OPENROUTER_API_KEY` 即路由至 OpenRouter。
 
-1. 设置某一家有效 API Key + 体验码。
-2. 新版前端显示“真实 API 已接通：供应商名称”。
-3. 与模型进行两轮对话，模型回复内容应随输入变化。
-4. 回复下方出现 provider、model ID、输入/输出 token 数（如供应商提供）。
-5. 若 Key 不存在，页面将明确显示“尚未配置 API Key”，**不会生成假的 AI 回复**。
+## 官方资源
 
-## 安全注意事项
-
-- 只能在 Cloudflare **Secret** 类型中存储 Key；不要填到浏览器、GitHub、Figma、普通变量或对话里。
-- Worker 的 POST /api/ai/chat 要求同源 Origin + 私人体验码；即使访问者知道公开 Worker URL，没有体验码也不能调用付费模型。
-- 每次请求最多带 12 条消息，每条最多 2000 字，模型输出有固定 token 上限，防止意外高额调用。
-- 体验码不等于完整的用户认证和严格速率限制；**建议仅供小范围内测**，公开运营前应再加 Cloudflare Access、WAF Rate Limiting、账户级调用额度和费用告警。
-- 客户端不会持久存储体验码；每次刷新需要重新输入。
-- Worker 不执行交易、不调用真实钱包、不自动购买任何数据服务。
-- 当前策略草案仍通过本地规则辅助生成；实时 AI 对话已接入，但真实策略结构化提取、三模型并行委员会和实时行情尚待下一阶段。
-
-## 本地调试
-
-在 `apps/frontend/.dev.vars` 添加本地专用 Secret（**不要提交文件**）：
-
-```dotenv
-OASIS_DEMO_ACCESS_CODE=your-long-random-test-code
-OPENAI_API_KEY=your-test-api-key
-```
-
-运行：
-
-```bash
-cd apps/frontend
-npx wrangler dev
-```
-
-浏览器打开 Wrangler 提供的地址。配置好以后模型 API 会按实际供应商计费。
-
-## 官方文档
-
-- Cloudflare Secrets: https://developers.cloudflare.com/workers/configuration/secrets/
-- Cloudflare Worker + Static Assets: https://developers.cloudflare.com/workers/static-assets/binding/
-- OpenAI Responses API: https://developers.openai.com/api/reference/resources/responses/methods/create
-- Anthropic Messages API: https://platform.claude.com/docs/en/api/messages/create
-- Gemini API: https://ai.google.dev/gemini-api/docs
-- DeepSeek API: https://api-docs.deepseek.com/
+- OpenRouter 模型列表：https://openrouter.ai/models
+- OpenRouter 免费模型：https://openrouter.ai/collections/free-models
+- OpenRouter API Keys：https://openrouter.ai/settings/keys
+- OpenRouter 充值：https://openrouter.ai/settings/credits
+- OpenRouter API 文档：https://openrouter.ai/docs/quickstart
