@@ -1,6 +1,6 @@
 {
   "name": "oasis-agent-trading",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "dependencies": {
@@ -8,15 +8,17 @@
     "@x402/hedera": "^2.25.0"
   },
   "scripts": {
-    "demo": "NODE_USE_ENV_PROXY=1 node apps/agent/src/demo.mjs",
-    "demo:check-real": "NODE_USE_ENV_PROXY=1 node apps/agent/src/check-real-config.mjs",
-    "demo:create-hcs-topic": "NODE_USE_ENV_PROXY=1 node apps/agent/src/create-hcs-topic.mjs",
-    "demo:real-payment": "NODE_USE_ENV_PROXY=1 node apps/agent/src/real-payment-smoke.mjs",
-    "demo:web": "NODE_USE_ENV_PROXY=1 node apps/demo-api/src/server.mjs",
-    "demo:frontend": "NODE_USE_ENV_PROXY=1 node apps/demo-api/src/server.mjs",
-    "demo:service": "NODE_USE_ENV_PROXY=1 node apps/market-signal-api/src/server.mjs",
-    "demo:risk-service": "NODE_USE_ENV_PROXY=1 node apps/risk-challenge-api/src/server.mjs",
-    "test": "node --test"
+    "dev": "node apps/demo-api/src/server.mjs",
+    "start": "node apps/demo-api/src/server.mjs",
+    "demo": "node apps/agent/src/demo.mjs",
+    "demo:web": "node apps/demo-api/src/server.mjs",
+    "demo:service": "node apps/market-signal-api/src/server.mjs",
+    "demo:risk-service": "node apps/risk-challenge-api/src/server.mjs",
+    "demo:check-real": "node apps/agent/src/check-real-config.mjs",
+    "demo:create-hcs-topic": "node apps/agent/src/create-hcs-topic.mjs",
+    "demo:real-payment": "node apps/agent/src/real-payment-smoke.mjs",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
   },
   "engines": {
     "node": ">=20"
