@@ -16,10 +16,10 @@
 
 安装 Node.js 22 或更新版本：
 
-\`\`\`bash
+```bash
 npm install
 npm run dev
-\`\`\`
+```
 
 打开 **http://127.0.0.1:3000**
 
@@ -29,9 +29,9 @@ npm run dev
 
 ## 测试
 
-\`\`\`bash
+```bash
 npm test
-\`\`\`
+```
 
 测试覆盖自然语言策略创建、API、预算限制、权限白名单、预留账本、重复处理、x402 报价匹配，以及模拟订单不能重复执行。
 
@@ -47,7 +47,7 @@ npm test
 
 ## 目录
 
-\`\`\`text
+```text
 apps/
   api/                  本地 HTTP API
   agent/                最小 Agent 模拟闭环
@@ -57,7 +57,7 @@ packages/
   policy/               独立付款授权与预算账本
 scripts/                 独立 x402 测试网 seller/buyer
 docs/                    架构、测试指南及待办
-\`\`\`
+```
 
 ## 当前限制
 
