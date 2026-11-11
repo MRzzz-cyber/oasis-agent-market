@@ -7,15 +7,19 @@ Agent 能在用户预先设定的权限和预算内，自主发现并购买一�
 ## Phase 1 — Base Sepolia payment loop
 
 - [x] Base Sepolia / USDC 基础常量和整数金额工具。
-- [ ] x402 v2 client/server adapter。
+- [x] 独立 USDC Policy Engine：网络、资产、服务商、服务、收款人、单笔上限、任务预算。
+- [x] 单进程预算预留、幂等报价与结算状态（模拟 Transport）。
+- [x] 将 Agent 采购意图与可信支付 Transport 隔离。
+- [x] GitHub Actions CI 与新旧代码测试。
+- [ ] 官方 x402 v2 EVM client/server adapter。
 - [ ] 独立 Agent 测试钱包 signer。
-- [ ] Policy Engine：网络、资产、服务商、服务、单笔上限、任务预算。
-- [ ] Budget reservation + idempotency。
-- [ ] Market Signal API 的 x402 付费闭环。
-- [ ] 记录支付摘要、结算状态、交易哈希和账本事件。
-- [ ] 超预算、错误资产、错误网络、重放和并发测试。
+- [ ] 持久化账本与跨进程安全的预留/幂等。
+- [ ] Market Signal API 的真实 x402 付费闭环。
+- [ ] 签名和链上结算回执验证。
+- [ ] 将当前 Hedera StrategyAgent 路径迁移到 USDC。
+- [ ] 超预算、错误资产、错误网络、重放和并发测试网集成测试。
 
-验收：Agent 购买一次 0.10 USDC 的测试数据服务，服务返回数据，账本状态和交易哈希可查。
+验收：Agent 购买一次 0.10 USDC 的测试数据服务，服务返回数据，账本状态和交易哈希可查。当前尚未达到此验收标准。
 
 ## Phase 2 — Agent decision quality
 
