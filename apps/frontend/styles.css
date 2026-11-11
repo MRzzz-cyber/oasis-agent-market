@@ -7,3 +7,13 @@
 #ai-usage{line-height:1.7;margin:10px 0 0}
 #chat-submit:disabled{opacity:.55;cursor:wait}
 @media(max-width:750px){.access-row input{width:100%}}
+
+.model-picker{display:grid;gap:9px;min-width:min(100%,520px);flex:1}
+.model-picker>label{font-size:13px;color:#b8cbd0;font-weight:650}
+.model-picker input,.model-picker select{width:100%;min-height:42px;padding:10px 12px;border:1px solid #38535c;border-radius:9px;background:#0d1a23;color:#edf8f4}
+.model-picker select{max-height:260px}
+.model-picker select:disabled{opacity:.65}
+.model-meta{margin:0;color:#91aeb5;font-size:12px;line-height:1.6}
+.model-toolbar{align-items:flex-start}
+.model-toolbar>.demo-tag{align-self:flex-start}
+.committee-note{width:100%;font-size:12px;color:#78949c;line-height:1.6}
