@@ -164,6 +164,47 @@ function makeDraftSummary() {
   }
   $("draft-panel").classList.remove("hidden");
 }
+let chatBusy = false;
+async function checkAiStatus() {
+  try {
+    const res = await fetch("/api/ai/status", { cache: "no-store" });
+    if (!res.ok) throw Error("API 未部署");
+    const status = await res.json();
+    const configured = Object.entries(status.models || {}).filter(([, enabled]) => enabled).map(([name]) => name);
+    $("ai-runtime-status").textContent = configured.length ? "真实 API 已接通：" + configured.join("、") : "尚未配置模型密钥";
+    if (!status.enabled) $("ai-usage").textContent = "管理员尚未设置 OASIS_DEMO_ACCESS_CODE，真实调用暂不可用。";
+    return status;
+  } catch {
+    $("ai-runtime-status").textContent = "真实模型接口尚未部署";
+    return null;
+  }
+}
+async function sendToRealModel() {
+  if (chatBusy || !state.conversation.length) return;
+  const code = $("ai-access-code").value.trim();
+  if (!code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
+  chatBusy = true;
+  const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
+  $("ai-usage").textContent = "正在调用 " + state.model + "，本次为真实 API 请求。";
+  try {
+    const messages = state.conversation.slice(-12).map(({ role, content }) => ({ role, content }));
+    const response = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-oasis-access-code": code },
+      body: JSON.stringify({ model: state.model, messages })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "模型调用失败");
+    addChat("assistant", data.text);
+    const parts = ["真实响应", data.provider, data.model];
+    if (data.usage?.inputTokens != null) parts.push("输入 " + data.usage.inputTokens + " tokens");
+    if (data.usage?.outputTokens != null) parts.push("输出 " + data.usage.outputTokens + " tokens");
+    $("ai-usage").textContent = parts.join(" · ");
+  } catch (error) {
+    $("ai-usage").textContent = "调用失败：" + error.message + "。没有生成模拟回答，可以重试。";
+    toast(error.message);
+  } finally { chatBusy = false; button.disabled = false; button.textContent = "发送给真实模型"; }
+}
 function beginConversation() {
   state.goal = $("goal").value.trim();
   if (!state.goal) return;
@@ -171,7 +212,7 @@ function beginConversation() {
   state.conversation = [];
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
-  addChat("assistant", "我先把你的想法整理成策略条件。你可以继续补充投资周期、单次金额、最大回撤或暂停条件；如果暂时没有，也可以直接生成策略草案。");
+  sendToRealModel();
   makeDraftSummary();
   $("draft-panel").classList.remove("hidden");
   $("chat-input").value = "";
@@ -276,10 +317,14 @@ $("model-primary").addEventListener("change", updateModelLabels);
 document.querySelectorAll('input[name="committee-model"]').forEach(input => input.addEventListener("change", updateModelLabels));
 $("change-model").addEventListener("click", () => { showTab("overview"); $("model-primary").focus(); });
 $("chat-form").addEventListener("submit", event => {
-  event.preventDefault(); const value = $("chat-input").value.trim(); if (!value) return;
+  event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
+  if (state.conversation.at(-1)?.role === "user") {
+    sendToRealModel();
+    return;
+  }
   addChat("user", value); state.goal += "；补充要求：" + value; $("chat-input").value = "";
-  addChat("assistant", "收到。我已把这条补充加入策略草案。你可以继续补充，也可以查看下面的草案并确认关键条件。");
   makeDraftSummary();
+  sendToRealModel();
 });
 $("create-strategy").addEventListener("click", async () => {
   try {
@@ -288,3 +333,5 @@ $("create-strategy").addEventListener("click", async () => {
     state.strategy = result; toast("策略已保存"); showTab("strategies");
   } catch (error) { toast(error.message); }
 });
+
+checkAiStatus();
