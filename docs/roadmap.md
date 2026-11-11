@@ -1,48 +1,24 @@
-# Oasis MVP Roadmap
+# Oasis MVP 迭代计划
 
-## MVP 要证明什么
+## 已完成
+- [x] 删除 Hedera 运行时、依赖与专用脚本。
+- [x] 官网 → AI 工作台 → 创建策略 → 运行记录 → 用户确认模拟交易。
+- [x] Base Sepolia / USDC Policy + 单进程预算预留账本。
+- [x] x402 SDK 客户端/卖方的代码与 mock 级测试。
+- [x] API 级别集成测试、CI。
 
-Agent 能在用户预先设定的权限和预算内，自主发现并购买一项数据服务，完成分析并给出可解释的交易建议。任何真实交易仍由用户确认；MVP 只生成模拟订单。
+## 下一阶段
+- [ ] 确认 SDK 真实 server + client 在 Base Sepolia 的兼容性与 facilitator 支持。
+- [ ] 真实测试 USDC 付款交易，保存 explorer 哈希。
+- [ ] 支付账本持久化及重启后的 reconciliation。
+- [ ] 接入真实的链上/行情数据提供商。
+- [ ] 接入真实 OpenAI、Claude、Gemini 模型调用和统计。
+- [ ] 三模型并行委员会，用同一份 Market Snapshot，记录分歧与成本。
+- [ ] Agent 自主服务采购选择（固定白名单），不改变签名授权边界。
+- [ ] 登录、用户身份和服务器存储（如果需公网部署）。
 
-## Phase 1 — Base Sepolia payment loop
-
-- [x] Base Sepolia / USDC 基础常量和整数金额工具。
-- [x] 独立 USDC Policy Engine：网络、资产、服务商、服务、收款人、单笔上限、任务预算。
-- [x] 单进程预算预留、幂等报价与结算状态（模拟 Transport）。
-- [x] 将 Agent 采购意图与可信支付 Transport 隔离。
-- [x] GitHub Actions CI 与新旧代码测试。
-- [ ] 官方 x402 v2 EVM client/server adapter。
-- [ ] 独立 Agent 测试钱包 signer。
-- [ ] 持久化账本与跨进程安全的预留/幂等。
-- [ ] Market Signal API 的真实 x402 付费闭环。
-- [ ] 签名和链上结算回执验证。
-- [ ] 将当前 Hedera StrategyAgent 路径迁移到 USDC。
-- [ ] 超预算、错误资产、错误网络、重放和并发测试网集成测试。
-
-验收：Agent 购买一次 0.10 USDC 的测试数据服务，服务返回数据，账本状态和交易哈希可查。当前尚未达到此验收标准。
-
-## Phase 2 — Agent decision quality
-
-- [ ] 保留 StrategyAgent / Market Agent / Risk Agent。
-- [ ] 三个模型独立并行分析同一份 MarketSnapshot。
-- [ ] 结构化输出、证据 ID、置信度、反方观点和模型成本。
-- [ ] 聚合器展示共识与分歧；高分歧默认 HOLD / NO_TRADE。
-- [ ] Risk Engine 最终复核，不把模型多数票当作安全授权。
-
-## Phase 3 — Product demo
-
-- [ ] 显示策略与预算设置。
-- [ ] 显示服务发现、报价和 Policy 决策。
-- [ ] 显示 x402 支付和结算状态。
-- [ ] 显示模型委员会意见和证据。
-- [ ] 显示用户确认与模拟订单。
-- [ ] 展示 Economic Ledger 和完整 Agent Activity。
-
-## Explicitly out of scope
-
-- Base Mainnet 和真实资金。
-- Agent 自主真实下单。
-- 多链钱包抽象。
-- 微服务、Kubernetes、复杂消息队列。
-- 开放式第三方服务市场。
-- 过早引入 LangGraph、Next.js 或大型数据库。
+## 禁止
+- 主网和真实交易。
+- 让 HTTP 客户端调用钱包私钥。
+- 让 LLM 生成可执行的付款政策。
+- 将示例模型结果伪装成真实市场观点。

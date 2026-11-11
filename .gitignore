@@ -1,12 +1,10 @@
 node_modules/
-.pnpm-store/
-.DS_Store
 .env
 .env.*
 !.env.example
-dist/
-build/
+.DS_Store
+*.log
 coverage/
-.next/
-.tmp-tests/
-data/decisions/
+data/local/
+*.sqlite
+*.sqlite-*

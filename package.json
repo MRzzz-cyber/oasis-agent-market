@@ -1,26 +1,24 @@
 {
   "name": "oasis-agent-trading",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@hiero-ledger/sdk": "2.85.0",
-    "@x402/hedera": "^2.25.0"
+  "engines": {
+    "node": ">=22"
   },
   "scripts": {
-    "dev": "node apps/demo-api/src/server.mjs",
-    "start": "node apps/demo-api/src/server.mjs",
-    "demo": "node apps/agent/src/demo.mjs",
-    "demo:web": "node apps/demo-api/src/server.mjs",
-    "demo:service": "node apps/market-signal-api/src/server.mjs",
-    "demo:risk-service": "node apps/risk-challenge-api/src/server.mjs",
-    "demo:check-real": "node apps/agent/src/check-real-config.mjs",
-    "demo:create-hcs-topic": "node apps/agent/src/create-hcs-topic.mjs",
-    "demo:real-payment": "node apps/agent/src/real-payment-smoke.mjs",
+    "dev": "node apps/api/server.mjs",
+    "start": "node apps/api/server.mjs",
     "test": "node --test",
-    "test:watch": "node --test --watch"
+    "smoke:x402": "node scripts/base-sepolia-x402-smoke.mjs",
+    "seller:x402": "node scripts/base-sepolia-market-server.mjs"
   },
-  "engines": {
-    "node": ">=20"
+  "dependencies": {
+    "@x402/core": "2.30.0",
+    "@x402/evm": "2.30.0",
+    "@x402/fetch": "2.30.0",
+    "@x402/express": "2.30.0",
+    "viem": "^2.38.0",
+    "express": "^5.1.0"
   }
 }

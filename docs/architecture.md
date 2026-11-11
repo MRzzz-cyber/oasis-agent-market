@@ -1,55 +1,39 @@
-# Architecture
+# Oasis · 最小化产品架构
 
-## Product boundary
+\`\`\`text
+Browser (official website / workspace)
+        │
+Node.js HTTP API — apps/api/server.mjs
+        │
+apps/agent/core.mjs (demo strategy + execution timeline)
+        │
+Policy Engine — packages/policy/src/usdc.mjs
+        │
+ ┌──────┴────────┐
+│ demo preview   │ trusted x402 CLI transport (manual only)
+│ no payments    │ Base Sepolia + USDC
+└────────────────┘
+\`\`\`
 
-Oasis has one backend process and one browser frontend. The backend owns the Agent runtime, policy checks, payment signer and audit/ledger events. The browser never signs service payments and never receives wallet secrets.
+## 用户路径
 
-## Runtime flow
+官网 → 开始使用 → 总览对话 → 创建策略 → 我的策略运行 → Agent Activity → 用户确认模拟订单。
 
-```text
-User goal + budget
-  -> Strategy Agent
-  -> market context
-  -> identify evidence gap
-  -> discover approved service
-  -> receive quote
-  -> Policy Engine
-  -> reserve budget
-  -> x402 payment
-  -> Market / Risk analysis
-  -> Committee synthesis
-  -> final Risk check
-  -> user confirmation
-  -> simulated order
-  -> activity + economic ledger
-```
+## 授权边界
 
-## Module map
+只有 server-side trusted code 可以创建 Policy、指定 Service Registry、读取钱包私钥。用户的文本目标不能控制上述任何配置。网页 API 永远不签名、不付款。
 
-| Responsibility | Location |
-|---|---|
-| Strategy state machine | apps/agent/src/strategy/StrategyAgent.mjs |
-| LLM provider adapters | apps/agent/src/strategy/ModelProviders.mjs |
-| Market context | apps/agent/src/strategy/MarketContextBuilder.mjs |
-| Service planning | apps/agent/src/strategy/ToolPlanner.mjs |
-| Policy guard | apps/agent/src/strategy/PolicyPaymentGuard.mjs |
-| Market Agent | apps/agent/src/market/MarketResearchAgent.mjs |
-| Risk Agent | apps/agent/src/risk/RiskAgent.mjs |
-| Simulation executor | apps/agent/src/execution/ExecutionAgent.mjs |
-| Deterministic policy | packages/policy/src/index.mjs |
-| Base/USDC primitives | packages/evm/src/config.mjs |
-| Shared utilities | packages/shared/src/ |
-| Single API server | apps/demo-api/src/server.mjs |
-| Browser UI | apps/frontend/ |
+## 当前真实状态
 
-## Important migration note
+- 演示链路：可运行的本地模拟 UI + API + Agent Activity + 审批。
+- 真实 x402：独立 CLI 买方/卖方代码存在，需通过测试网实际结算验收。
+- 目前没有持久化交易账本，不应部署带资金的无人值守服务。
+- 未来可以把目前 fixtures 与示例模型替换为实时数据、真实多模型委员会，并把事件持久化。
 
-The currently runnable Agent and payment client still depend on Hedera/HBAR. The new packages/evm module currently contains Base Sepolia and USDC primitives only. The x402 EVM client/server, USDC Policy migration and settlement ledger are the next implementation steps. Do not treat the target flow as production-ready or testnet-complete yet.
+## 保留的代码
 
-## Design rules
+\`packages/policy/src/usdc.mjs\`：独立 USDC Policy Engine 和单进程预算预留账本。
 
-- LLM output is a hypothesis, never permission.
-- Policy is deterministic and independent from model output.
-- Payment signing is isolated from Agent orchestration.
-- Execution Agent only creates simulated orders.
-- All money uses integer atomic units.
+\`packages/evm/src/x402-transport.mjs\`：SDK 支付客户端和链上 Transfer 验证。
+
+\`scripts/base-sepolia-market-server.mjs\` + \`scripts/base-sepolia-x402-smoke.mjs\`：独立真实测试网付费试验。

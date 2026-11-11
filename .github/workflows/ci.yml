@@ -1,35 +1,29 @@
-name: Oasis CI
-
+name: Oasis MVP CI
 on:
-  push:
-    branches:
-      - main
-      - refactor/simple-base-mvp
   pull_request:
-    branches:
-      - main
-
+  push:
+    branches: [main, "refactor/simple-base-mvp"]
 permissions:
   contents: read
-
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Run tests
-        env:
-          HEDERA_PAYMENT_MODE: mock
-          OASIS_MARKET_DATA_MODE: fixture
-          OASIS_LLM_MODE: rule
-        run: pnpm test
+      - name: Install x402 dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Verify source imports
+        run: |
+          node --check apps/api/server.mjs
+          node --check apps/agent/core.mjs
+          node --check apps/frontend/app.js
+          node --check packages/evm/src/x402-transport.mjs
+          node --check scripts/base-sepolia-market-server.mjs
+      - name: Run automated tests
+        run: npm test
+      - name: Verify x402 SDK entrypoints
+        run: node -e "Promise.all([import('@x402/fetch'), import('@x402/core/server'), import('@x402/evm/exact/client'), import('@x402/evm/exact/server'), import('@x402/express'), import('viem')]).then(()=>console.log('x402 SDK imports OK'))"

@@ -1,91 +1,70 @@
-# Oasis
+# Oasis AI
 
-**Oasis is a budget-bounded AI agent that can discover, purchase and use external services before producing an explainable trading decision.**
+**让 AI 帮你做投资。** Oasis 是一个以自然语言为入口、预算受限的 AI 投资 Agent MVP。
 
-MVP target: Base Sepolia + USDC + x402 v2. Agent payments are policy-controlled; trading remains simulation-only.
+> 当前可运行的网页演示只使用 **示例市场信息 + 示例模型观点 + 模拟交易**。不会调用真实模型、不会付款、不会自动发起真实交易。真正的 x402 测试支付仅在单独的、显式授权的命令行脚本中运行，仍需测试网验证。
 
-## Product loop
+## 技术栈
 
-1. User defines an objective and budget.
-2. Strategy Agent identifies missing evidence.
-3. Agent discovers an approved service and receives a quote.
-4. Policy Engine checks permissions and reserves budget.
-5. Agent pays for the service through x402.
-6. Market/Risk agents and the model committee analyze the result.
-7. Risk Engine reviews the proposal.
-8. User confirms; Oasis creates a simulated order only.
+- Node.js 22 / 原生 HTTP API / HTML + CSS + JavaScript
+- Base Sepolia / USDC / x402 v2 (测试支付)
+- 确定性 Policy Engine + USDC 原子单位预算账本
+- 不需要 React、数据库或 LangGraph 就能启动 Demo
+- 不保留旧的 Hedera 运行模块
 
-## Architecture
+## 启动
 
-| Area | Choice |
-|---|---|
-| Runtime | Node.js 22, ESM |
-| Package manager | pnpm |
-| Backend | Node native HTTP |
-| Frontend | Vanilla HTML/CSS/JavaScript |
-| Agent orchestration | Existing StrategyAgent state machine |
-| Models | Provider adapters (OpenAI, Claude, Gemini, DeepSeek as configured) |
-| Payments | x402 v2 + EVM exact |
-| Chain | Base Sepolia (eip155:84532) |
-| Asset | USDC (6 decimals) |
-| EVM library | viem |
-| Tests | node:test |
+安装 Node.js 22 或更新版本：
 
-No microservices, Kubernetes, LangGraph, React migration or production database is required for the first MVP.
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
 
-## Repository map
+打开 **http://127.0.0.1:3000**
 
-```text
+进入官网 → 点击「开始使用」→ 输入投资目标 → 创建策略 → 我的策略 → 运行策略 → 查看 Agent Activity → 确认模拟交易。
+
+默认无需钱包、API Key 或外部网络服务（首次 npm install 除外）。
+
+## 测试
+
+\`\`\`bash
+npm test
+\`\`\`
+
+测试覆盖自然语言策略创建、API、预算限制、权限白名单、预留账本、重复处理、x402 报价匹配，以及模拟订单不能重复执行。
+
+## 支付隔离
+
+- 网页 API **没有** 触发真实支付的接口。
+- 只有显式授权的 CLI 脚本可以使用隔离的 Base Sepolia 测试钱包。
+- Policy Engine 严格限定收款方、网络、Token、报价和预算。
+- x402 Transport SDK 只允许可信注册表中的服务端点。
+- 所有真实结算必须验证链上交易信息。
+
+如需进行单独测试网付款，请阅读 [x402 开发说明](docs/base-sepolia-x402-dev.md)。
+
+## 目录
+
+\`\`\`text
 apps/
-  agent/                 Agent runtime and domain agents
-  demo-api/              Single API server and frontend host
-  frontend/              Browser UI
-  market-signal-api/     Paid market data service
-  risk-challenge-api/    Paid risk challenge service
+  api/                  本地 HTTP API
+  agent/                最小 Agent 模拟闭环
+  frontend/             官网 + 工作台
 packages/
-  evm/                   Base Sepolia and USDC primitives (new)
-  policy/                Deterministic budget and permission checks
-  shared/                Shared utilities and pricing
-  hedera/                Legacy hackathon adapter; migration only
-docs/
-  technical-stack.md     Technology decisions and boundaries
-  roadmap.md             MVP milestones and acceptance criteria
-  architecture.md        Current implementation map
-  payment-flow.md        Current/target payment flow
-```
+  evm/                  Base Sepolia、USDC、x402 客户端
+  policy/               独立付款授权与预算账本
+scripts/                 独立 x402 测试网 seller/buyer
+docs/                    架构、测试指南及待办
+\`\`\`
 
-## Quick start (current legacy demo)
+## 当前限制
 
-The currently runnable end-to-end demo still uses the original Hedera adapter. The Base Sepolia payment migration is in progress and must not be mistaken for a completed integration.
+- 示例模型委员会不是实际的三模型 API 并行推理。
+- 示例市场数据不是实时行情。
+- 网页账本当前为单进程内存状态，重启即清空。
+- 真实 x402 支付尚未完成 Base Sepolia smoke test。
+- 不支持真实交易或主网资金。
 
-```bash
-pnpm install
-HEDERA_PAYMENT_MODE=mock OASIS_MARKET_DATA_MODE=fixture OASIS_LLM_MODE=rule pnpm demo:web
-```
-
-Run tests:
-
-```bash
-pnpm test
-```
-
-## Configuration
-
-Copy .env.example to .env. Do not commit private keys, seed phrases, API keys or funded wallet credentials.
-
-The Base Sepolia variables are target configuration; they are not yet consumed by the legacy payment runtime.
-
-## Development status
-
-- Existing Agent runtime, model adapters, market/risk agents and simulation flow are retained.
-- Base Sepolia / USDC integer amount primitives are implemented under `packages/evm`.
-- A separate, fail-closed USDC policy and single-process budget reservation ledger is implemented under `packages/policy/src/usdc.mjs`.
-- A policy-gated purchase coordinator is implemented under `packages/evm/src/purchase.mjs`. It requires an injected, verified payment transport, and **cannot send a live payment itself**.
-- GitHub Actions now runs the test suite on pull requests. The legacy Hedera code stays intact while the Base implementation is migrated.
-- Full x402 EVM client/server, durable ledger, existing StrategyAgent integration, and end-to-end Base Sepolia settlement are **still pending**.
-
-See Technical Stack (docs/technical-stack.md) and Roadmap (docs/roadmap.md).
-
-## License
-
-MIT
+See [Architecture](docs/architecture.md) and [Roadmap](docs/roadmap.md).
