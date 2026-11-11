@@ -255,6 +255,7 @@ async function sendToRealModel() {
   chatBusy = true;
   const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
   $("ai-usage").textContent = "正在调用 " + (state.modelName || state.model) + " · 实时流式响应";
+  let assistantText = null;
   try {
     const messages = state.conversation.slice(-12).map(({ role, content }) => ({ role, content }));
     const response = await fetch("/api/ai/chat", {
@@ -267,7 +268,7 @@ async function sendToRealModel() {
       throw new Error(errorPayload.error || "模型调用失败（HTTP " + response.status + "）");
     }
     if (!response.body) throw new Error("浏览器未收到模型流式响应");
-    const assistantText = addChat("assistant", "");
+    assistantText = addChat("assistant", "");
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "", fullText = "", usage = null, returnedModel = state.model;
@@ -304,6 +305,13 @@ async function sendToRealModel() {
     if (usage?.completion_tokens != null) parts.push("输出 " + usage.completion_tokens + " tokens");
     $("ai-usage").textContent = parts.join(" · ");
   } catch (error) {
+    if (assistantText && !assistantText.textContent.trim()) {
+      assistantText.closest(".chat-message")?.remove();
+      if (state.conversation.at(-1)?.role === "assistant") state.conversation.pop();
+    } else if (assistantText) {
+      assistantText.textContent += "\\n（响应中断，请检查网络后重试）";
+      if (state.conversation.at(-1)?.role === "assistant") state.conversation.at(-1).content = assistantText.textContent;
+    }
     $("ai-usage").textContent = "调用失败：" + error.message + "。没有生成模拟回答，可以重试。";
     toast(error.message);
   } finally { chatBusy = false; button.disabled = false; button.textContent = "发送给真实模型"; }
