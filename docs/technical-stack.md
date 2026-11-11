@@ -54,12 +54,23 @@
 
 - [x] 建立 Base Sepolia 网络与 USDC 常量。
 - [x] 建立无浮点金额换算与基础支付校验。
-- [ ] 接入官方 x402 v2 EVM client。
-- [ ] 将 Policy Engine 从 tinybar/HBAR 迁移为 USDC atomic units。
-- [ ] 完成预算预留、幂等和结算对账。
-- [ ] 将 Market/Risk 服务接入 x402 v2。
-- [ ] 通过 Base Sepolia 测试网端到端付款。
+- [x] 新增独立 USDC Policy Engine：授权开关、服务商/服务/收款人白名单、网络/Token、额度、报价过期检查。
+- [x] 新增单进程内存预算预留账本：重复报价防护、预留、已结算、失败与待对账状态。
+- [x] 新增 PurchaseCoordinator：支付前强制授权，支付结果需绑定报价信息并由可信 transport 报告验证结果。
+- [x] 新增 CI 工作流，对新旧模块运行 node:test。
+- [ ] 使用官方 x402 SDK 接入真实 EVM client/server/Facilitator（当前 coordinator 只支持注入可信 transport）。
+- [ ] 将现有 StrategyAgent 的旧 tinybar/HBAR 路径迁移到新 USDC API。
+- [ ] 为账本引入持久化和跨进程原子预留；当前内存账本不得用于有资金风险的部署。
+- [ ] 接入真实签名及结算凭证验证，完成 Base Sepolia 测试网端到端付款。
 - [ ] 移除 Hedera 运行时依赖和过时配置。
+
+## 本轮代码边界
+
+- `packages/policy/src/usdc.mjs`：USDC 原子单位的 Policy 与独立账本。
+- `packages/evm/src/purchase.mjs`：Policy → 预留 → 可信支付 Transport → 结算/待对账的流程。
+- 未配置 Transport 时默认拒绝。不要向 Agent 暴露签名器。
+- 测试中的 `transport.pay` 是模拟的依赖注入，不是官方 x402 实际链上支付。
+- 只有收到匹配报价且经过可信 Transport 验证的结算结果，才可标记账本为已结算。
 
 ## 官方依据
 
