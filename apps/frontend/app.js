@@ -68,7 +68,8 @@ async function browserDemoRequest(path, options = {}) {
     const asset = /\bBTC\b|比特币/i.test(goal) ? "BTC" : /\bSOL\b|索拉纳/i.test(goal) ? "SOL" : "ETH";
     const strategy = {
       id: crypto.randomUUID(), goal, asset, budgetAtomic: atomic.toString(), budget: raw,
-      model: body.model || "GPT-5.6", committee: Array.isArray(body.committee) ? body.committee : [],
+      model: body.model || "OpenRouter model", modelId: body.modelId || null,
+      committee: Array.isArray(body.committee) ? body.committee : [],
       mode: "simulation", needsApproval: true, status: "draft", createdAt: new Date().toISOString()
     };
     db.strategies.push(strategy); writeDemoState(db); return strategy;
