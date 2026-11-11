@@ -47,9 +47,9 @@
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">模拟对话</span></div>
           <div class="conversation panel">
-            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">GPT-5.6</b></span></div><button class="ghost" id="change-model">更换模型</button></div>
+            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">GPT-5.6</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="由 Cloudflare 管理员设置的体验码"/><span class="note">API Key 保存在 Cloudflare，永不输入到网页</span></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
-            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" type="submit">发送</button></form>
+            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送给真实模型</button></form><p id="ai-usage" class="note">真实模型需要在 Cloudflare 中配置密钥和体验码。失败不会产生模拟 AI 回复。</p>
           </div>
           <div id="draft-panel" class="panel draft-panel hidden">
             <div class="draft-head"><div><span class="eyebrow">STRATEGY DRAFT</span><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
