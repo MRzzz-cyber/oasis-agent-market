@@ -6,11 +6,11 @@
 
 在 Windows PowerShell 或 macOS Terminal 中执行：
 
-\`\`\`bash
+```bash
 git checkout refactor/simple-base-mvp
 npm install
 npm run dev
-\`\`\`
+```
 
 浏览器打开 http://127.0.0.1:3000 ，按如下路径操作：
 
@@ -18,9 +18,9 @@ npm run dev
 
 运行自动化测试：
 
-\`\`\`bash
+```bash
 npm test
-\`\`\`
+```
 
 成功标准：创建策略、生成模拟研究事件、用户确认、显示模拟订单；**实际支付金额始终为零**，前端不会接触钱包私钥。
 
@@ -31,10 +31,10 @@ npm test
 - Payee：独立测试商户钱包；只需要接收地址。
 - 私钥只能保存在本地环境变量，不能粘贴到网页、聊天或提交到 Git。
 
-Base Sepolia：\`eip155:84532\`，USDC：\`0x036CbD53842c5426634e7929541eC2318f3dCF7e\`。
+Base Sepolia：`eip155:84532`，USDC：`0x036CbD53842c5426634e7929541eC2318f3dCF7e`。
 
 环境变量：
-\`\`\`text
+```text
 OASIS_TEST_SERVICE_RECIPIENT=0xYourSeparateTestMerchantAddress
 OASIS_AGENT_WALLET_PRIVATE_KEY=0xYourDedicatedTestWalletPrivateKey
 OASIS_TEST_FACILITATOR_URL=https://x402.org/facilitator
@@ -42,21 +42,21 @@ OASIS_TEST_SERVICE_URL=http://127.0.0.1:8787/market-signal
 OASIS_ALLOW_LOCALHOST_X402_SERVICE=YES_LOCAL_TEST
 OASIS_ENABLE_TESTNET_PAYMENTS=YES_I_AUTHORIZE_TEST_USDC_SPEND
 BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
-\`\`\`
+```
 
 在 PowerShell 中可以按示例设置**非敏感**环境变量：
-\`\`\`powershell
+```powershell
 $env:OASIS_TEST_SERVICE_URL="http://127.0.0.1:8787/market-signal"
 $env:OASIS_ALLOW_LOCALHOST_X402_SERVICE="YES_LOCAL_TEST"
-\`\`\`
+```
 
 不要把私钥写在 shell 历史、终端截图或聊天中。建议使用临时、隔离的 shell 环境，并在测试后清除环境变量。
 
 两个终端分别运行：
-\`\`\`bash
+```bash
 npm run seller:x402
 npm run smoke:x402
-\`\`\`
+```
 
 测试脚本只有在明确授权开关存在时才会尝试付款；支付上限固定为 **0.10 测试 USDC**。任何错误或无法验证的支付都不能直接算作已完成结算。
 
