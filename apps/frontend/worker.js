@@ -8,6 +8,7 @@ const SYSTEM_PROMPT = [
 ].join("\n");
 
 export const PROVIDERS = Object.freeze({
+  "免费模型": { secret: "OPENROUTER_API_KEY", modelEnv: "OPENROUTER_FREE_MODEL", defaultModel: "openrouter/free", kind: "openrouter" },
   "GPT-5.6": { secret: "OPENAI_API_KEY", modelEnv: "OPENAI_MODEL", defaultModel: "gpt-5.6-sol", endpoint: "https://api.openai.com/v1/responses", kind: "openai" },
   "Claude Sonnet": { secret: "ANTHROPIC_API_KEY", modelEnv: "ANTHROPIC_MODEL", defaultModel: "claude-sonnet-4-6", endpoint: "https://api.anthropic.com/v1/messages", kind: "anthropic" },
   Gemini: { secret: "GEMINI_API_KEY", modelEnv: "GEMINI_MODEL", defaultModel: "gemini-3.8-flash", endpoint: "https://generativelanguage.googleapis.com/v1beta/models", kind: "gemini" },
@@ -45,7 +46,64 @@ function extractOutput(data, kind) {
   return data.choices?.[0]?.message?.content || "";
 }
 
+export const OPENROUTER_MODELS = Object.freeze({
+  "免费模型": { env: "OPENROUTER_FREE_MODEL", model: "openrouter/free" },
+  "GPT-5.6": { env: "OPENROUTER_GPT_MODEL", model: "openai/gpt-5.6-sol" },
+  "Claude Sonnet": { env: "OPENROUTER_CLAUDE_MODEL", model: "anthropic/claude-sonnet-4.6" },
+  Gemini: { env: "OPENROUTER_GEMINI_MODEL", model: "google/gemini-2.5-flash" },
+  DeepSeek: { env: "OPENROUTER_DEEPSEEK_MODEL", model: "deepseek/deepseek-chat" }
+});
+
+export async function invokeOpenRouter({ model, messages, env, fetchImpl = fetch }) {
+  const key = env.OPENROUTER_API_KEY;
+  if (!key) return { error: "OpenRouter Key 未配置，请在 Cloudflare Secrets 中添加 OPENROUTER_API_KEY", status: 503 };
+  const choice = OPENROUTER_MODELS[model];
+  if (!choice) return { error: "不支持该模型", status: 400 };
+  const modelId = env[choice.env] || choice.model;
+  let response;
+  try {
+    response = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "authorization": "Bearer " + key,
+        "content-type": "application/json",
+        "HTTP-Referer": "https://oasis-agent-market.zqsanjingshou.workers.dev",
+        "X-Title": "Oasis AI"
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        max_tokens: 650, stream: false
+      }),
+      signal: AbortSignal.timeout(25000)
+    });
+  } catch (error) {
+    return { error: error?.name === "TimeoutError" ? "OpenRouter 模型响应超时" : "OpenRouter 连接失败，请检查网络", status: 502 };
+  }
+  if (!response.ok) {
+    const detail = response.status === 401 ? "API Key 不正确或已失效" :
+      response.status === 402 ? "账户余额不足，或所选付费模型需要先充值" :
+      response.status === 404 ? "模型 ID 不可用，请在 Cloudflare 配置对应的 OPENROUTER_*_MODEL" :
+      response.status === 429 ? "免费额度或请求频率已达上限" : "HTTP " + response.status;
+    return { error: "OpenRouter 调用失败：" + detail, status: response.status === 429 ? 429 : 502 };
+  }
+  let data;
+  try { data = await response.json(); } catch { return { error: "OpenRouter 返回无效 JSON", status: 502 }; }
+  const text = data.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text.trim()) return { error: "模型没有返回可展示的文本", status: 502 };
+  return {
+    text: text.trim().slice(0, 6000),
+    model: data.model || modelId,
+    provider: "openrouter",
+    usage: {
+      inputTokens: data.usage?.prompt_tokens ?? null,
+      outputTokens: data.usage?.completion_tokens ?? null
+    }
+  };
+}
+
 export async function invokeModel({ model, messages, env, fetchImpl = fetch }) {
+  if (env.OPENROUTER_API_KEY || model === "免费模型") return invokeOpenRouter({ model, messages, env, fetchImpl });
   const spec = PROVIDERS[model];
   const apiKey = env[spec.secret];
   if (!apiKey) return { error: model + " 尚未配置 API Key，请在 Cloudflare Secrets 配置 " + spec.secret, status: 503 };
@@ -109,7 +167,7 @@ export default {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (request.method === "GET" && url.pathname === "/api/ai/status") {
-      return respond({ enabled: Boolean(env.OASIS_DEMO_ACCESS_CODE), models: Object.fromEntries(Object.entries(PROVIDERS).map(([name, spec]) => [name, Boolean(env[spec.secret])])) });
+      return respond({ enabled: Boolean(env.OASIS_DEMO_ACCESS_CODE), models: Object.fromEntries(Object.entries(PROVIDERS).map(([name, spec]) => [name, Boolean(env.OPENROUTER_API_KEY || env[spec.secret])])) });
     }
     if (request.method !== "POST" || url.pathname !== "/api/ai/chat") return respond({ error: "接口不存在" }, 404);
     if (!env.OASIS_DEMO_ACCESS_CODE) return respond({ error: "模型 API 尚未开放：管理员需先配置 OASIS_DEMO_ACCESS_CODE" }, 503);
