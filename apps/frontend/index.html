@@ -34,6 +34,12 @@
             <label for="model-primary">主模型</label>
             <select id="model-primary"><option>GPT-5.6</option><option>Claude Sonnet</option><option>Gemini</option><option>DeepSeek</option></select>
             <span class="demo-tag">演示选择 · 尚未连接真实模型 API</span>
+            <fieldset class="committee-picker"><legend>参与策略讨论的模型（可多选）</legend>
+              <label><input type="checkbox" name="committee-model" value="GPT-5.6" checked/> GPT-5.6</label>
+              <label><input type="checkbox" name="committee-model" value="Claude Sonnet" checked/> Claude Sonnet</label>
+              <label><input type="checkbox" name="committee-model" value="Gemini" checked/> Gemini</label>
+              <label><input type="checkbox" name="committee-model" value="DeepSeek"/> DeepSeek</label>
+            </fieldset>
           </div>
           <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
           <form id="goal-form" class="prompt"><label for="goal">你想和 AI 讨论什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><span>先聊想法，不必一次说清所有参数</span><button class="primary" type="submit">开始讨论 →</button></div></form>
