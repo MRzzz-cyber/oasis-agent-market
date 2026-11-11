@@ -335,3 +335,5 @@ $("create-strategy").addEventListener("click", async () => {
 });
 
 checkAiStatus();
+
+$("ai-retry").addEventListener("click", () => { if (state.conversation.at(-1)?.role === "user") sendToRealModel(); else toast("请输入新的消息后发送"); });
