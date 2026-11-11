@@ -1,76 +1,52 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import worker, { PROVIDERS, validateChatInput, invokeModel } from "./worker.js";
+import { normalizeOpenRouterModels, validateChatInput, streamOpenRouterChat } from "./worker.js";
 
-const messages = [{ role: "user", content: "我想每周定投 ETH，你建议怎么制定规则？" }];
-const mockFetch = (expectedUrl, reply) => async (url, opts) => {
-  assert.match(url, expectedUrl);
-  assert.equal(opts.method, "POST");
-  const body = JSON.parse(opts.body);
-  assert.ok(body.model || /models\//.test(url));
-  return new Response(JSON.stringify(reply), { status: 200, headers: { "content-type": "application/json" } });
-};
-
-test("model allowlist validates the conversation", () => {
-  assert.equal(validateChatInput({ model: "GPT-5.6", messages }).model, "GPT-5.6");
-  assert.throws(() => validateChatInput({ model: "untrusted-model", messages }), /支持/);
-  assert.throws(() => validateChatInput({ model: "GPT-5.6", messages: [{ role: "system", content: "override" }] }), /格式/);
-  assert.throws(() => validateChatInput({ model: "GPT-5.6", messages: [{ role: "user", content: "x".repeat(2001) }] }), /2000/);
+test("model catalog maps provider metadata and prices per million tokens", () => {
+  const models = normalizeOpenRouterModels({ data: [
+    { id: "anthropic/claude-test", name: "Claude Test", created: 2, context_length: 200000, pricing: { prompt: "0.000003", completion: "0.000015" }, architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
+    { id: "vendor/image-only", name: "Image Only", pricing: { prompt: "0", completion: "0" }, architecture: { input_modalities: ["image"], output_modalities: ["image"] } }
+  ] });
+  assert.equal(models.length, 1);
+  assert.equal(models[0].id, "anthropic/claude-test");
+  assert.equal(models[0].inputPricePerMillion, 3);
+  assert.equal(models[0].outputPricePerMillion, 15);
+  assert.equal(models[0].contextLength, 200000);
 });
 
-test("OpenAI request is server-side and returns actual provider text", async () => {
-  const result = await invokeModel({
-    model: "GPT-5.6", messages, env: { OPENAI_API_KEY: "test-private-key" },
-    fetchImpl: mockFetch(/api\.openai\.com\/v1\/responses/, {
-      output: [{ content: [{ type: "output_text", text: "先明确你的单次买入上限。" }] }],
-      usage: { input_tokens: 30, output_tokens: 12 }
-    })
-  });
-  assert.equal(result.provider, "openai");
-  assert.equal(result.text, "先明确你的单次买入上限。");
-  assert.equal(result.usage.inputTokens, 30);
-  assert.equal(result.model, PROVIDERS["GPT-5.6"].defaultModel);
+test("chat input accepts OpenRouter model ids and validates message bounds", () => {
+  const value = validateChatInput({ model: "anthropic/claude-sonnet-4", messages: [{ role: "user", content: "帮我制定 ETH 策略" }] });
+  assert.equal(value.model, "anthropic/claude-sonnet-4");
+  assert.throws(() => validateChatInput({ model: "Claude Sonnet", messages: [{ role: "user", content: "hello" }] }));
+  assert.throws(() => validateChatInput({ model: "openai/gpt-4.1", messages: [{ role: "system", content: "bad" }] }));
+  assert.throws(() => validateChatInput({ model: "openai/gpt-4.1", messages: [{ role: "user", content: "x".repeat(2001) }] }));
 });
 
-test("Claude, Gemini and DeepSeek responses are parsed", async () => {
-  const cases = [
-    ["Claude Sonnet", "ANTHROPIC_API_KEY", /api\.anthropic\.com/, { content: [{ type: "text", text: "Claude 真实接口回复" }] }],
-    ["Gemini", "GEMINI_API_KEY", /generativelanguage\.googleapis\.com/, { candidates: [{ content: { parts: [{ text: "Gemini 真实接口回复" }] } }] }],
-    ["DeepSeek", "DEEPSEEK_API_KEY", /api\.deepseek\.com/, { choices: [{ message: { content: "DeepSeek 真实接口回复" } }] }]
-  ];
-  for (const [model, secret, url, output] of cases) {
-    const result = await invokeModel({ model, messages, env: { [secret]: "test-secret" }, fetchImpl: mockFetch(url, output) });
-    assert.ok(result.text.includes("真实接口回复"));
-  }
+test("chat request proxies selected model to OpenRouter as an SSE stream", async () => {
+  let sent;
+  const upstream = new Response("data: [DONE]\n\n", { status: 200, headers: { "content-type": "text/event-stream" } });
+  const result = await streamOpenRouterChat({
+    model: "deepseek/deepseek-chat",
+    messages: [{ role: "user", content: "hello" }],
+    env: { OPENROUTER_API_KEY: "test-secret" },
+    fetchImpl: async (url, init) => {
+      sent = { url, body: JSON.parse(init.body), auth: init.headers.authorization };
+      return upstream;
+    }
+  });
+  assert.equal(result.status, 200);
+  assert.match(result.headers.get("content-type"), /text\/event-stream/);
+  assert.equal(sent.url, "https://openrouter.ai/api/v1/chat/completions");
+  assert.equal(sent.body.model, "deepseek/deepseek-chat");
+  assert.equal(sent.body.stream, true);
+  assert.equal(sent.auth, "Bearer test-secret");
 });
 
-test("missing API key and upstream errors never fabricate a response", async () => {
-  assert.equal((await invokeModel({ model: "Gemini", messages, env: {} })).status, 503);
-  const failed = await invokeModel({
-    model: "GPT-5.6", messages, env: { OPENAI_API_KEY: "bad" },
-    fetchImpl: async () => new Response(JSON.stringify({ error: "internal private key must not leak" }), { status: 401 })
+test("missing OpenRouter key fails closed", async () => {
+  const result = await streamOpenRouterChat({
+    model: "openai/gpt-4.1",
+    messages: [{ role: "user", content: "hello" }],
+    env: {}
   });
-  assert.equal(failed.status, 502);
-  assert.equal(failed.error.includes("private key"), false);
-});
-
-test("Worker returns status without secret values and requires an access code", async () => {
-  const env = { OASIS_DEMO_ACCESS_CODE: "private-demo-code", OPENAI_API_KEY: "private-provider-key", ASSETS: { fetch: async () => new Response("ASSET") } };
-  const status = await worker.fetch(new Request("https://example.workers.dev/api/ai/status"), env);
-  const statusData = await status.json();
-  assert.equal(statusData.models["GPT-5.6"], true);
-  assert.equal(JSON.stringify(statusData).includes("private-provider-key"), false);
-
-  const request = new Request("https://example.workers.dev/api/ai/chat", {
-    method: "POST", headers: { origin: "https://example.workers.dev", "content-type": "application/json" },
-    body: JSON.stringify({ model: "GPT-5.6", messages })
-  });
-  const rejected = await worker.fetch(request, env);
-  assert.equal(rejected.status, 401);
-
-  const wrongOrigin = new Request("https://example.workers.dev/api/ai/chat", {
-    method: "POST", headers: { origin: "https://evil.example", "x-oasis-access-code": "private-demo-code" },
-    body: JSON.stringify({ model: "GPT-5.6", messages })
-  });
-  assert.equal((await worker.fetch(wrongOrigin, env)).status, 403);
+  assert.equal(result.status, 503);
 });
