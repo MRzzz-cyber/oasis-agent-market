@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="theme-color" content="#0a1017"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
   <link rel="stylesheet" href="/styles.css"/>
 </head>
@@ -12,29 +13,47 @@
     <section class="hero">
       <span class="eyebrow">AI INVESTMENT ASSISTANT</span>
       <h1>让 AI 帮你做投资</h1>
-      <p>用自然语言说出投资目标。Oasis 帮你制定策略、分析市场、检查风险，并生成可解释的交易建议。</p>
+      <p>用自然语言说出你的想法。和 AI 一起制定策略、理解每一步决策，再由你决定是否模拟执行。</p>
       <button class="primary large" id="enter2">免费体验 Demo →</button>
-      <p class="small">默认模拟模式 · 不连接真实交易所 · 关键交易由你确认</p>
+      <p class="small">模拟模式 · 示例数据 · 不连接真实交易所或钱包</p>
     </section>
-    <section class="features"><article><span>✦</span><h3>用一句话创建策略</h3><p>不需要学习复杂的交易工具。</p></article><article><span>◉</span><h3>看清 AI 每一步</h3><p>数据、模型、费用和风险都有记录。</p></article><article><span>◇</span><h3>你的预算你做主</h3><p>先模拟交易，确认后才执行模拟订单。</p></article></section>
+    <section class="features"><article><span>✦</span><h3>先对话，再形成策略</h3><p>像和投资助理聊天一样，逐步补充目标与约束。</p></article><article><span>◉</span><h3>看见 Agent 如何工作</h3><p>用流程图查看数据、模型判断、风险检查和交易建议。</p></article><article><span>◇</span><h3>每一步都由你掌控</h3><p>预算和权限独立控制，模拟订单需要你确认。</p></article></section>
   </div>
   <div id="workspace" class="workspace hidden">
     <aside>
       <div class="side-brand">◈ Oasis <small>AI 投资助手</small></div>
       <nav><button data-tab="overview" class="selected">⌂　总览</button><button data-tab="create">✧　创建策略</button><button data-tab="strategies">▤　我的策略</button><button data-tab="policy">◇　预算与权限</button></nav>
-      <div class="side-bottom">● 模拟模式<br/><small>Base Sepolia · Demo</small></div>
+      <div class="side-bottom">● 模拟模式<br/><small>示例模型 · 无真实交易</small></div>
     </aside>
     <div class="content">
       <header class="app-header"><div id="breadcrumb">总览</div><button class="ghost" id="back-site">查看官网</button></header>
       <main>
         <section id="page-overview" class="app-page">
-          <div class="welcome"><h1>让 AI 帮你做投资</h1><p>告诉 Oasis 你的投资目标，我们先从模拟开始。</p></div>
-          <div class="suggestions"><button data-example="帮我每周定投 ETH，月度预算 500 USDT，先模拟运行">每周定投 ETH ↗</button><button data-example="帮我追踪 ETH 聪明钱的链上资金流向">追踪聪明钱 ↗</button><button data-example="分析 BTC 的趋势，单笔不超过 100 USDC">分析 BTC 趋势 ↗</button></div>
-          <form id="goal-form" class="prompt"><label for="goal">你想让 AI 做什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：帮我每周定投 ETH，每月预算 500 USDT，先模拟运行。"></textarea><div class="prompt-foot"><span>Oasis Agent · 模拟模式</span><button class="primary" type="submit">生成策略 →</button></div></form>
+          <div class="welcome"><h1>让 AI 帮你做投资</h1><p>先选一个模型，再告诉 Oasis 你在考虑什么。</p></div>
+          <div class="model-toolbar">
+            <label for="model-primary">主模型</label>
+            <select id="model-primary"><option>GPT-5.6</option><option>Claude Sonnet</option><option>Gemini</option><option>DeepSeek</option></select>
+            <span class="demo-tag">演示选择 · 尚未连接真实模型 API</span>
+          </div>
+          <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
+          <form id="goal-form" class="prompt"><label for="goal">你想和 AI 讨论什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><span>先聊想法，不必一次说清所有参数</span><button class="primary" type="submit">开始讨论 →</button></div></form>
         </section>
-        <section id="page-create" class="app-page hidden"><h2>创建策略</h2><p>确认你的目标和运行预算。</p><div class="panel"><label>投资目标</label><div id="strategy-goal" class="readout">暂无策略。先在总览输入目标。</div><label for="budget">Agent 研究预算（USDC）</label><input id="budget" value="5" inputmode="decimal" placeholder="5"/><div class="note">数据服务单次限额：0.10 USDC · 交易仅模拟</div><button class="primary" id="create-strategy">创建策略</button><div id="strategy-result"></div></div></section>
-        <section id="page-strategies" class="app-page hidden"><h2>我的策略</h2><p>查看模拟策略与 Agent 执行记录。</p><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><h3>Agent Activity</h3><p class="note">本地演示流程，以下数据与模型结论均为示例，不代表真实数据采购或投资建议。</p><div id="events" class="timeline"></div><div id="decision" class="panel inset"></div></div></section>
-        <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>默认不允许真实付款或真实交易。</p><div class="panel"><div class="kv"><span>网络</span><strong>Base Sepolia</strong></div><div class="kv"><span>服务付款</span><strong class="warn">真实支付关闭</strong></div><div class="kv"><span>单次服务报价</span><strong>0.10 USDC（示例）</strong></div><div class="kv"><span>交易执行</span><strong>模拟 + 用户确认</strong></div><div class="kv"><span>私钥</span><strong>前端不接触</strong></div><p class="note">真实测试网 x402 支付需在服务端独立启用并配置隔离的钱包，不通过本页面开启。</p></div></section>
+        <section id="page-create" class="app-page hidden">
+          <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">模拟对话</span></div>
+          <div class="conversation panel">
+            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">GPT-5.6</b></span></div><button class="ghost" id="change-model">更换模型</button></div>
+            <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" type="submit">发送</button></form>
+          </div>
+          <div id="draft-panel" class="panel draft-panel hidden">
+            <div class="draft-head"><div><span class="eyebrow">STRATEGY DRAFT</span><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
+            <div id="draft-summary" class="draft-summary"></div>
+            <details class="advanced-budget"><summary>高级设置：Agent 服务预算</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>演示默认上限 5 USDC；真实服务采购尚未启用。</small></details>
+            <button class="primary" id="create-strategy">确认草案并保存策略 →</button>
+          </div>
+        </section>
+        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>管理策略、查看 Agent 工作流和模拟订单后续。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">流程节点可点击查看每一步的输入、判断和结果。以下均为演示数据。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="flowchart"></div><div id="flow-detail" class="flow-detail">选择一个流程节点，查看 Agent 在这一步做了什么。</div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
+        <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>Agent 可以提出服务采购和交易建议，但不能自行修改权限。</p><div class="panel"><div class="kv"><span>运行模式</span><strong>模拟模式</strong></div><div class="kv"><span>网络</span><strong>Base Sepolia（预留）</strong></div><div class="kv"><span>真实服务付款</span><strong class="warn">关闭</strong></div><div class="kv"><span>真实交易</span><strong class="warn">关闭</strong></div><div class="kv"><span>交易确认</span><strong>每笔由用户确认</strong></div><div class="kv"><span>模型选择</span><strong id="policy-model">GPT-5.6</strong></div><p class="note">模型选项目前仅用于演示交互，尚未接入真实模型 API。服务采购预算与投资交易预算分开管理。</p></div></section>
       </main>
       <div id="toast" aria-live="polite"></div>
     </div>
