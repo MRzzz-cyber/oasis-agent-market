@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createUsdcPolicy, UsdcBudgetLedger } from "./usdc.mjs";
-import { BASE_SEPOLIA, USDC } from "../../../evm/src/config.mjs";
+import { BASE_SEPOLIA, USDC } from "../../evm/src/config.mjs";
 
 const recipient = "0x1111111111111111111111111111111111111111";
 const now = Date.UTC(2026, 10, 11);
