@@ -12,7 +12,7 @@ function toast(message) {
  * Worker global. No wallet, network payments or live trading are possible.
  * The localhost development server continues to use the existing Node API.
  */
-const browserOnlyDemo = !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+const browserOnlyDemo = !(["localhost", "127.0.0.1", "::1"].includes(location.hostname) && location.port === "3000");
 const demoStorageKey = "oasis-demo-v1";
 const demoMemory = { strategies: [], runs: [] };
 function readDemoState() {
