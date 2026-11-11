@@ -1,67 +1,52 @@
 # AGENTS.md
 
-## 项目概览
+## Project goal
 
-- 项目类型：Web3 黑客松项目；基于 Hedera x402 的 AI Agent 交易决策与按次付费服务 Demo。
-- 主要语言：待项目脚手架确定。预期以 TypeScript / Node.js 为主，前端可能使用 React / Next.js，链上与支付逻辑围绕 Hedera SDK、x402、Blocky402 实现。
-- 关键目录：
-  - `apps/frontend/`：Oasis 前端界面，展示用户政策、预算、报价、支付状态和决策回放。
-  - `apps/agent/`：Strategy Agent、Market Research Agent、Risk Agent、Execution Agent 的编排逻辑。
-  - `apps/market-signal-api/`：x402-gated 市场信号服务。
-  - `apps/risk-challenge-api/`：x402-gated 风险挑战服务。
-  - `packages/hedera/`：Hedera 账户、HBAR 支付、Blocky402、HCS 审计相关工具。
-  - `packages/policy/`：用户预算、单次服务限额、风险边界和权限检查。
-  - `packages/shared/`：共享类型、常量和通用工具。
-  - `data/snapshots/`：用于稳定演示的固定行情快照。
-  - `docs/`：架构、支付流程、Demo 脚本和黑客松提交材料。
-- 不要修改的目录：
-  - `node_modules/`
-  - `.next/`
-  - `dist/`
-  - `build/`
-  - `coverage/`
-  - 任何包含真实密钥、钱包助记词、私钥或生产凭据的本地文件。
+Oasis is a budget-bounded AI agent that purchases approved data/research services through x402 and produces explainable trading decisions. The MVP target is Base Sepolia + USDC. Trading execution is simulation-only.
 
-## 常用命令
+## Simplest approved stack
 
-- 安装依赖：待项目脚手架确定后更新，例如 `pnpm install`。
-- 本地开发：待项目脚手架确定后更新，例如 `pnpm dev`。
-- 运行测试：待项目脚手架确定后更新，例如 `pnpm test`。
-- 类型检查：待项目脚手架确定后更新，例如 `pnpm typecheck`。
-- 格式化：待项目脚手架确定后更新，例如 `pnpm format`。
+- Node.js 22 LTS, ESM, pnpm.
+- Node native HTTP backend; keep one deployable API process.
+- Existing Vanilla HTML/CSS/JS frontend.
+- Existing StrategyAgent state machine; do not add LangGraph.
+- x402 v2 EVM + viem for Base Sepolia payments.
+- node:test for tests.
+- Do not add React, Next.js, Express, Fastify, ORM, database, Redis, queues, microservices or Kubernetes without a concrete demonstrated need.
 
-## 代码规范
+## Repository map
 
-- 遵循现有代码风格。
-- 不做无关重构。
-- 新增功能必须补充或更新测试。
-- 优先保持 MVP 路径清晰：Agent 预算检查、x402 付款闭环、服务返回结果、HCS 审计记录。
-- 前端展示要服务于 Demo 叙事：用户授权、服务报价、付款状态、Agent 协商过程、最终交易 / 不交易结论。
-- Agent 不应绕过 User Policy；任何外部服务调用和付款都必须先检查剩余预算、单次服务限额和风险边界。
-- Execution Agent 只能执行模拟订单；除非项目目标明确变更，不接入真实交易执行。
+- apps/agent/: Strategy, Market, Risk and Execution agents.
+- apps/demo-api/: single HTTP API and frontend host.
+- apps/frontend/: UI.
+- apps/market-signal-api/, apps/risk-challenge-api/: paid service handlers used by the demo.
+- packages/policy/: deterministic permission and budget engine.
+- packages/evm/: Base Sepolia, USDC and x402 EVM payment adapter.
+- packages/shared/: shared utilities and pricing.
+- packages/hedera/: legacy hackathon implementation. Do not add new product features here.
 
-## 安全边界
+## Non-negotiable product and security rules
 
-- 不读取或提交 `.env`、密钥和私有凭据。
-- 不执行删除生产数据的命令。
-- 修改数据库迁移前先说明影响。
-- 不提交 Hedera 私钥、助记词、真实 API key、交易所凭据或 facilitator 私有配置。
-- 默认使用 Hedera testnet 和测试 HBAR；不要在未明确授权的情况下切换到 mainnet。
-- 不引入真实下单逻辑，除非用户明确要求并重新定义安全策略。
-- HCS 只写入审计摘要、哈希、交易 ID、策略版本和决策理由，不写入用户隐私数据或敏感凭据。
+1. Agent/LLM may propose a PurchaseIntent but must never change its own policy.
+2. Only Policy Engine can authorize a payment.
+3. Validate chain, token contract, recipient, service/provider allowlists, quote expiry, per-payment cap and task budget.
+4. Store USDC amounts as BigInt or integer strings in 6-decimal atomic units. Never use floating point for money.
+5. Reserve budget before signing; support idempotency and safe release/reconciliation on failures.
+6. Private keys remain server-side and never enter model context, browser code, logs or Git.
+7. Fail closed on missing policy, invalid quote, unsupported network/token or facilitator errors.
+8. Keep all trading execution simulation-only. No mainnet and no real exchange orders.
+9. Do not claim Base payment is implemented until a Base Sepolia end-to-end test passes.
+10. Preserve old Hedera tests until the migration is complete.
 
-## 提交要求
+## Workflow
 
-- 说明改动文件。
-- 说明验证命令和结果。
-- 说明未验证项和剩余风险。
-- 如果改动涉及支付流程，必须说明：
-  - 使用的网络，例如 Hedera testnet。
-  - 使用的资产，例如 HBAR。
-  - 是否经过 Blocky402 facilitator。
-  - 是否完成真实端到端付费请求。
-  - 是否写入或模拟写入 HCS 审计记录。
-- 如果改动涉及 Agent 行为，必须说明：
-  - 哪些 Agent 被修改。
-  - 预算和权限检查是否仍然生效。
-  - 是否影响 Execution Agent 的模拟执行边界。
+- Inspect existing modules before adding new abstractions.
+- Prefer small changes and existing dependency-free JavaScript patterns.
+- Add node:test coverage for every new policy/payment behavior.
+- Run pnpm test before finishing.
+- Never edit generated lockfiles by hand. Update them with pnpm when dependencies change.
+- Keep .env.example free of real credentials.
+
+## Completion report
+
+Always report changed files, commands/tests run, actual results, unverified items, and payment network/asset. Distinguish mocked tests from real testnet settlement.
