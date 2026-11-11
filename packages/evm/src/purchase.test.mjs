@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PurchaseCoordinator } from "./purchase.mjs";
-import { createUsdcPolicy } from "../../../policy/src/usdc.mjs";
+import { createUsdcPolicy } from "../../policy/src/usdc.mjs";
 import { BASE_SEPOLIA, USDC } from "./config.mjs";
 
 const recipient = "0x1111111111111111111111111111111111111111";
