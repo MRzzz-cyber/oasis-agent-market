@@ -1,67 +1,55 @@
 # Architecture
 
-The Strategy Agent is a runtime state machine, not a fixed demo script. Each stage is a
-deterministic step whose output feeds the next, and LLM output is treated as a hypothesis,
-never as authority: paid Agent charges and execution remain controlled by policy and risk guards.
+## Product boundary
 
-## Implementation Map
+Oasis has one backend process and one browser frontend. The backend owns the Agent runtime, policy checks, payment signer and audit/ledger events. The browser never signs service payments and never receives wallet secrets.
 
-| Concern | Module |
-| --- | --- |
-| Strategy Agent Runtime state machine | `apps/agent/src/strategy/StrategyAgent.mjs` |
-| Structured schemas and validation | `apps/agent/src/strategy/schemas.mjs` |
-| LLM Reasoning Layer | `apps/agent/src/strategy/LLMReasoner.mjs` |
-| Model provider adapters | `apps/agent/src/strategy/ModelProviders.mjs` |
-| Market Context system | `apps/agent/src/strategy/MarketContextBuilder.mjs` |
-| Tool Planner | `apps/agent/src/strategy/ToolPlanner.mjs` |
-| Policy Guard + Billing Guard | `apps/agent/src/strategy/PolicyPaymentGuard.mjs` |
-| x402/Hedera paid Agent settlement | `apps/agent/src/strategy/X402PaidToolClient.mjs` |
-| Market Agent | `apps/agent/src/market/MarketResearchAgent.mjs` |
-| Risk Agent | `apps/agent/src/risk/RiskAgent.mjs` |
-| Evidence Synthesizer | `apps/agent/src/strategy/EvidenceSynthesizer.mjs` |
-| Risk-Aware Decision Composer | `apps/agent/src/strategy/DecisionComposer.mjs` |
-| Execution Agent (simulation only) | `apps/agent/src/execution/ExecutionAgent.mjs` |
-| Decision Memory | `apps/agent/src/strategy/MemoryManager.mjs` |
-| Multi-agent collaboration protocol | `apps/agent/src/strategy/protocols.mjs` |
-| HCS audit wrapper | `apps/agent/src/strategy/AuditLogger.mjs` |
-| Observability and evaluation metrics | `apps/agent/src/strategy/Observability.mjs` |
-| Paid Agent pricing model | `packages/shared/src/pricing.mjs` |
-| Budget and policy engine | `packages/policy/src/index.mjs` |
-| Hedera/x402 adapter (real + mock) | `packages/hedera/src/index.mjs` |
-
-## Runtime Flow
+## Runtime flow
 
 ```text
-load_user_policy
-build_market_context
-retrieve_memory
-generate_hypothesis
-plan_evidence_needed
-plan_tool_calls
-execute_paid_research
-synthesize_evidence
-compose_strategy_decision
-final_policy_risk_check
-execution_agent_review
-write_audit
-persist_memory
-emit_observability
+User goal + budget
+  -> Strategy Agent
+  -> market context
+  -> identify evidence gap
+  -> discover approved service
+  -> receive quote
+  -> Policy Engine
+  -> reserve budget
+  -> x402 payment
+  -> Market / Risk analysis
+  -> Committee synthesis
+  -> final Risk check
+  -> user confirmation
+  -> simulated order
+  -> activity + economic ledger
 ```
 
-## LLM Reasoning Layer
+## Module map
 
-`LLMReasoner.mjs` uses a provider adapter selected by the frontend or by `STRATEGY_AGENT_PROVIDER`.
-Supported providers are OpenAI, DeepSeek, Claude, and GLM.
+| Responsibility | Location |
+|---|---|
+| Strategy state machine | apps/agent/src/strategy/StrategyAgent.mjs |
+| LLM provider adapters | apps/agent/src/strategy/ModelProviders.mjs |
+| Market context | apps/agent/src/strategy/MarketContextBuilder.mjs |
+| Service planning | apps/agent/src/strategy/ToolPlanner.mjs |
+| Policy guard | apps/agent/src/strategy/PolicyPaymentGuard.mjs |
+| Market Agent | apps/agent/src/market/MarketResearchAgent.mjs |
+| Risk Agent | apps/agent/src/risk/RiskAgent.mjs |
+| Simulation executor | apps/agent/src/execution/ExecutionAgent.mjs |
+| Deterministic policy | packages/policy/src/index.mjs |
+| Base/USDC primitives | packages/evm/src/config.mjs |
+| Shared utilities | packages/shared/src/ |
+| Single API server | apps/demo-api/src/server.mjs |
+| Browser UI | apps/frontend/ |
 
-Frontend strategy runs send `requireLlm: true`, so missing provider credentials fail clearly instead
-of pretending to be a real agent. Tests and explicit offline demos can set `OASIS_LLM_MODE=rule` to use
-the deterministic `RuleBasedStrategyReasoner`.
+## Important migration note
 
-LLM output is a hypothesis, not authority. Paid Agent charges and execution are still controlled by
-deterministic policy and risk guards.
+The currently runnable Agent and payment client still depend on Hedera/HBAR. The new packages/evm module currently contains Base Sepolia and USDC primitives only. The x402 EVM client/server, USDC Policy migration and settlement ledger are the next implementation steps. Do not treat the target flow as production-ready or testnet-complete yet.
 
-## Market Context
+## Design rules
 
-`MarketContextBuilder.mjs` uses live Binance public market data by default (with a CoinGecko fallback)
-and computes the current signal for the requested asset/timeframe. The old ETH snapshot is retained only
-through `OASIS_MARKET_DATA_MODE=fixture` for deterministic tests.
+- LLM output is a hypothesis, never permission.
+- Policy is deterministic and independent from model output.
+- Payment signing is isolated from Agent orchestration.
+- Execution Agent only creates simulated orders.
+- All money uses integer atomic units.
