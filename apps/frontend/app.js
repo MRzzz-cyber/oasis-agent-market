@@ -7,7 +7,7 @@ function toast(message) {
   $("toast").classList.add("active");
   setTimeout(() => $("toast").classList.remove("active"), 3500);
 }
-const browserOnlyDemo = !(["localhost", "127.0.0.1", "::1"].includes(location.hostname) && location.port === "3000");
+const browserOnlyDemo = true;
 const demoStorageKey = "oasis-demo-v1";
 const demoMemory = { strategies: [], runs: [] };
 function readDemoState() {
@@ -172,7 +172,8 @@ function beginConversation() {
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
   addChat("assistant", "我先把你的想法整理成策略条件。你可以继续补充投资周期、单次金额、最大回撤或暂停条件；如果暂时没有，也可以直接生成策略草案。");
-  $("draft-panel").classList.add("hidden");
+  makeDraftSummary();
+  $("draft-panel").classList.remove("hidden");
   $("chat-input").value = "";
   showTab("create");
 }
