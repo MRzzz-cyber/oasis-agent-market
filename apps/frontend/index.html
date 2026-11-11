@@ -32,8 +32,8 @@
           <div class="welcome"><h1>让 AI 帮你做投资</h1><p>先选一个模型，再告诉 Oasis 你在考虑什么。</p></div>
           <div class="model-toolbar">
             <label for="model-primary">主模型</label>
-            <select id="model-primary"><option>GPT-5.6</option><option>Claude Sonnet</option><option>Gemini</option><option>DeepSeek</option></select>
-            <span class="demo-tag">演示选择 · 尚未连接真实模型 API</span>
+            <select id="model-primary"><option selected>免费模型</option><option>GPT-5.6</option><option>Claude Sonnet</option><option>Gemini</option><option>DeepSeek</option></select>
+            <span class="demo-tag">策略顾问支持真实 OpenRouter API · 多模型委员会仍为演示</span>
             <fieldset class="committee-picker"><legend>参与策略讨论的模型（可多选）</legend>
               <label><input type="checkbox" name="committee-model" value="GPT-5.6" checked/> GPT-5.6</label>
               <label><input type="checkbox" name="committee-model" value="Claude Sonnet" checked/> Claude Sonnet</label>
@@ -47,7 +47,7 @@
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">模拟对话</span></div>
           <div class="conversation panel">
-            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">GPT-5.6</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="由 Cloudflare 管理员设置的体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button><span class="note">API Key 保存在 Cloudflare，永不输入到网页</span></div>
+            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="由 Cloudflare 管理员设置的体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button><span class="note">API Key 保存在 Cloudflare，永不输入到网页</span></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
             <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送给真实模型</button></form><p id="ai-usage" class="note">真实模型需要在 Cloudflare 中配置密钥和体验码。失败不会产生模拟 AI 回复。</p>
           </div>
@@ -59,7 +59,7 @@
           </div>
         </section>
         <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>管理策略、查看 Agent 工作流和模拟订单后续。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">流程节点可点击查看每一步的输入、判断和结果。以下均为演示数据。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="flowchart"></div><div id="flow-detail" class="flow-detail">选择一个流程节点，查看 Agent 在这一步做了什么。</div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
-        <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>Agent 可以提出服务采购和交易建议，但不能自行修改权限。</p><div class="panel"><div class="kv"><span>运行模式</span><strong>模拟模式</strong></div><div class="kv"><span>网络</span><strong>Base Sepolia（预留）</strong></div><div class="kv"><span>真实服务付款</span><strong class="warn">关闭</strong></div><div class="kv"><span>真实交易</span><strong class="warn">关闭</strong></div><div class="kv"><span>交易确认</span><strong>每笔由用户确认</strong></div><div class="kv"><span>模型选择</span><strong id="policy-model">GPT-5.6</strong></div><p class="note">模型选项目前仅用于演示交互，尚未接入真实模型 API。服务采购预算与投资交易预算分开管理。</p></div></section>
+        <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>Agent 可以提出服务采购和交易建议，但不能自行修改权限。</p><div class="panel"><div class="kv"><span>运行模式</span><strong>模拟模式</strong></div><div class="kv"><span>网络</span><strong>Base Sepolia（预留）</strong></div><div class="kv"><span>真实服务付款</span><strong class="warn">关闭</strong></div><div class="kv"><span>真实交易</span><strong class="warn">关闭</strong></div><div class="kv"><span>交易确认</span><strong>每笔由用户确认</strong></div><div class="kv"><span>模型选择</span><strong id="policy-model">免费模型</strong></div><p class="note">策略顾问接入 OpenRouter 后会产生真实 API 请求；多模型委员会仍为示例投票。服务采购预算与投资交易预算分开管理。</p></div></section>
       </main>
       <div id="toast" aria-live="polite"></div>
     </div>
