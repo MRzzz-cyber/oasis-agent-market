@@ -1,4 +1,4 @@
-import { UsdcBudgetLedger } from "../../../policy/src/usdc.mjs";
+import { UsdcBudgetLedger } from "../../policy/src/usdc.mjs";
 
 /**
  * Trusted coordinator between autonomous purchase intents and a payment transport.
