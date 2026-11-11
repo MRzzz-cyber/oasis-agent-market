@@ -1,67 +1,47 @@
 # Oasis Cloudflare 公网 Demo 部署
 
-这个版本采用 **Cloudflare Workers Static Assets**，不需要服务端钱包、Node.js 常驻服务器或数据库。
+当前 Cloudflare Workers Builds 项目采用 monorepo 子项目配置：**Root directory 必须指向 `apps/frontend`，该目录内有自己的 `wrangler.jsonc`**。
 
-**网站使用浏览器 localStorage 存储演示策略和模拟交易记录。** 不共享到其他访客，不连接真实行情或大模型，不支付测试 USDC，也不连接主网钱包。请勿用于真实资金。
+## Dashboard 设置
 
-## 最简单的部署方式：Cloudflare + GitHub
+- Git repository: `MRzzz-cyber/oasis-agent-market`
+- Production branch: `refactor/simple-base-mvp`
+- Root directory: `apps/frontend`
+- Build command: 留空
+- Deploy command: `npx wrangler deploy`
+- Preview command: 留空或默认
+- Worker name: 由 `apps/frontend/wrangler.jsonc` 指定为 `oasis-ai-demo`
 
-1. 打开 https://dash.cloudflare.com/ → Workers & Pages → Create application。
-2. 选择 GitHub，授权并选中 `MRzzz-cyber/oasis-agent-market` 仓库。
-3. 选择分支 `refactor/simple-base-mvp`（尚未合并前），或后续合并后选择 `main`。
-4. Worker 名称填写 **oasis-ai-demo**，需要与仓库 `wrangler.jsonc` 的 `name` 保持一致。
-5. 设置部署命令为 `npx wrangler deploy`。本项目是纯静态资源，不需要构建命令。
-6. 点击 Deploy，成功后 Cloudflare 会提供 `*.workers.dev` 公网地址。
-7. 浏览器访问地址：官网 → 开始使用 → 输入投资目标 → 创建策略 → 我的策略 → 运行策略 → 确认模拟交易。
+不要再使用 `--config ../../wrangler.jsonc`。Wrangler 配置现在位于子项目根目录。
 
-如果界面显示的 Git 集成配置步骤有所不同，以 Cloudflare Dashboard 当前提示为准。
+## 部署步骤
 
-### 本地使用 Wrangler 测试 Cloudflare 静态版本
+1. 在 Settings > Builds 中保存上述配置。
+2. 打开 Deployments。
+3. 选择最新 `refactor/simple-base-mvp` commit 的 Preview/Production build，或推送该分支的新 commit 触发部署。
+4. 等待 Build 和 Deploy 都显示 Ready。
+5. 打开 Cloudflare 提供的 `workers.dev` 地址。
 
-```bash
-git checkout refactor/simple-base-mvp
-npm install
-npx wrangler dev
-```
+## 本地预览
 
-按照终端显示的预览地址访问（一般为 `http://localhost:8787`）。
-
-**重要区别：** 这份 Worker 只托管前端静态文件，使用浏览器端模拟数据。原来 `npm run dev` 则运行 Node.js API 与前端；两种模式共用界面，但模拟数据存储位置不同。
-
-### 手动部署
+在仓库根目录运行：
 
 ```bash
-npx wrangler login
-npx wrangler deploy
+npx wrangler dev --config apps/frontend/wrangler.jsonc
 ```
 
-需要拥有 Cloudflare 账户，并在登录浏览器完成授权。
+## Demo 能力与边界
 
-## 为什么不将现有 Node API 直接放进 Workers？
+- 纯静态前端；策略与模拟记录保存在访客自己的浏览器 localStorage。
+- 不需要钱包、API Key、数据库或 Node 后端。
+- 不会调用真实模型、真实行情、真实 x402 付款或真实交易。
+- 本地完整 Node API 仍通过 `npm run dev` 启动，不能直接作为 Workers 静态资产 API 使用。
 
-Node.js `http.createServer` 不适合直接作为 Workers 入口。为了快速给用户提供稳定的公开演示，本轮选择 Cloudflare 静态资源托管 + 浏览器 localStorage 模拟策略流程。这意味着无需 D1、KV、Durable Objects 或钱包私钥即可体验完整前端流程。
+## 为什么配置放在 apps/frontend？
 
-以后加入真实 Agent 服务、账户、多人共享数据时，再把 API 迁移成 Workers Fetch handler，并配置 D1 / Durable Objects 或单独部署后端。
+Cloudflare Workers Builds 的 Root directory 决定命令执行位置。对于 monorepo，Cloudflare 推荐 Root directory 指向包含该 Worker 自身 Wrangler 配置的子项目目录。把 Wrangler 配置放在 `apps/frontend` 后，Wrangler 可以直接在项目目录执行 `npx wrangler deploy`，避免从 workspace 根目录运行自动项目检测。
 
-## 部署前检查
-
-- [ ] GitHub CI 通过。
-- [ ] Worker 名与 `wrangler.jsonc` 一致。
-- [ ] 网站首页可打开。
-- [ ] 可以创建策略。
-- [ ] 可以启动模拟 Agent 运行。
-- [ ] 可以看到模型投票和费用演示说明。
-- [ ] 确认模拟订单不会执行真实交易。
-- [ ] 重新打开页面后浏览器中的策略仍在（同浏览器同域名）。
-- [ ] 没有在 Cloudflare 环境配置真实付款私钥。
-
-## 常见问题
-
-- `127.0.0.1:3000` 只能在本地 Node 服务器已启动时访问；并非公网网址。
-- GitHub 仓库本身不能自动提供正在运行的 Node API。
-- Cloudflare 使用 `*.workers.dev` 公网地址，不需要你一直打开 PowerShell。
-- 不要将“网页 Demo 可用”误认为“真实 Base Sepolia 付款已经验收通过”。
-
-官方文档：
-- https://developers.cloudflare.com/workers/static-assets/
-- https://developers.cloudflare.com/workers/ci-cd/builds/git-integration/
+参考：
+- https://developers.cloudflare.com/workers/ci-cd/builds/advanced-setups/
+- https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
+- https://developers.cloudflare.com/workers/wrangler/configuration/
