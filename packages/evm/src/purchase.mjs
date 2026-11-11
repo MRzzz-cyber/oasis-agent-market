@@ -43,6 +43,7 @@ export class PurchaseCoordinator {
         status: "settled",
         quoteId: quote.quoteId,
         payment: { transactionHash: record.transactionHash, network: this.policy.network },
+        data: result.data ?? null,
         ledger: this.ledger.getSnapshot()
       };
     } catch (error) {
