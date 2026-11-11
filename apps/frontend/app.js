@@ -26,7 +26,7 @@ function demoEvent(type, message, detail = "") {
   return { id: crypto.randomUUID(), type, message, detail, at: new Date().toISOString() };
 }
 function simulateRun(strategy) {
-  const models = strategy.committee?.length ? strategy.committee : [strategy.model || "GPT-5.6"];
+  const models = strategy.committee?.length ? strategy.committee : [strategy.model || "主模型"];
   const votes = models.map((model, i) => ({
     model, action: i === 1 ? "HOLD" : "BUY",
     rationale: i === 1 ? "示例判断：建议等待更多确认信号。" : "示例判断：策略条件初步满足，仍需通过风险检查。"
@@ -155,7 +155,7 @@ function renderModelOptions() {
   );
   const visible = query ? matches.slice(0, 150) : matches.slice(0, 60);
   const select = $("model-primary");
-  const current = select.value || state.model;
+  const current = state.model || select.value;
   select.replaceChildren();
   for (const model of visible) {
     const option = document.createElement("option");
@@ -164,12 +164,15 @@ function renderModelOptions() {
     select.appendChild(option);
   }
   if (visible.some(model => model.id === current)) select.value = current;
-  else if (visible.length) select.value = visible[0].id;
+  else {
+    select.add(new Option(query ? "请选择搜索结果中的模型" : "请选择模型", ""));
+    select.value = "";
+  }
   select.disabled = visible.length === 0;
   $("model-status").textContent = query
     ? "找到 " + matches.length + " 个模型" + (matches.length > visible.length ? " · 当前显示前 " + visible.length + " 个" : "")
     : "OpenRouter · " + availableModels.length + " 个模型 · 显示最新 60 个，可搜索全部";
-  updateModelLabels();
+  if (select.value) updateModelLabels();
 }
 async function loadModels() {
   const status = $("model-status");
@@ -309,6 +312,7 @@ function beginConversation() {
   state.goal = $("goal").value.trim();
   if (!state.goal) return;
   updateModelLabels();
+  if (!state.model) { toast("请先在总览中选择一个 OpenRouter 模型"); showTab("overview"); return; }
   state.conversation = [];
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
@@ -324,7 +328,7 @@ async function refreshStrategies() {
   if (!items.length) root.appendChild(node("p", "note", "还没有策略。先在总览与 Oasis 讨论一个投资想法。"));
   for (const item of items) {
     const article = node("article", "strategy-card");
-    const info = node("div"); info.append(node("strong", "", item.asset + " · " + item.goal), node("p", "note", "主模型 " + (item.model || "GPT-5.6") + " · " + (item.committee?.length || 0) + " 个协作模型 · 模拟模式"));
+    const info = node("div"); info.append(node("strong", "", item.asset + " · " + item.goal), node("p", "note", "主模型 " + (item.model || "未记录") + " · " + (item.committee?.length || 0) + " 个协作模型 · 模拟模式"));
     const btn = node("button", "primary", "运行策略");
     btn.addEventListener("click", async () => {
       try { state.run = await request("/api/runs", { method: "POST", body: JSON.stringify({ strategyId: item.id }) }); renderRun(); }
