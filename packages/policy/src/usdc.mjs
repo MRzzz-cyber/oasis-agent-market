@@ -1,4 +1,4 @@
-import { BASE_SEPOLIA, USDC } from "../../../evm/src/config.mjs";
+import { BASE_SEPOLIA, USDC } from "../../evm/src/config.mjs";
 
 const ATOMIC = /^(0|[1-9][0-9]*)$/;
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
