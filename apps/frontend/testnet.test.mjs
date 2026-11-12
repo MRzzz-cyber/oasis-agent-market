@@ -19,3 +19,15 @@ test("typed signature binds testnet, IOC, spot pair, cloid, nonce and expiry",()
   assert.equal(packet.typed.domain.chainId,1337);
   assert.equal(packet.typed.message.connectionId,"0xb31c71c656a73c7dccabef85d44a285375b98ce93c186e96df5b2070f3805a6f");
 });
+
+test("10U preview produces an exact, valid notional at the observed 950 ask",async()=>{
+  const {tenOrder}=await import("./testnet.js");
+  const order=tenOrder("950","10",4);
+  assert.deepEqual(order,{p:"1000",s:"0.01",cost:"10"});
+  for(const ask of ["950.12","3033.5","55","2020.9"]) {
+    const q=tenOrder(ask,"10",4);
+    assert.equal(q.cost,"10");
+    assert.ok(Number(q.p)<=Number(ask)*1.1);
+  }
+  assert.throws(()=>tenOrder("950","9.99",4),/余额不足/);
+});
