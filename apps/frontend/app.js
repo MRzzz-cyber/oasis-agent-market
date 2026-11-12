@@ -1,4 +1,4 @@
-import { marketView } from "./market.js";
+import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies"];
@@ -154,7 +154,7 @@ async function request(path, options = {}) {
 }
 function showApp() { showTab("overview"); }
 let studioTab = "overview";
-const toggleMarket = marketView(prompt => { $("goal").value = prompt; showTab("overview"); $("goal").focus(); });
+const toggleMarket = marketView(prompt => { resetStarter(); $("goal").value = prompt; showTab("overview"); $("goal").focus(); });
 function showTab(tab) {
   if (!tabs.includes(tab)) return;
   for (const id of tabs) $("page-" + id).classList.toggle("hidden", id !== tab);
@@ -556,10 +556,70 @@ function renderOrderFollowup(run) {
   }
 }
 function renderRun() { showTab("strategies"); $("run-panel").scrollIntoView({ behavior: "smooth", block: "start" }); }
-$("new-idea").onclick = () => { if (chatBusy) return toast("请等待当前回复完成"); $("goal").value = ""; showTab("overview"); $("goal").focus(); };
+$("new-idea").onclick = () => { if (chatBusy) return toast("请等待当前回复完成"); resetStarter(); $("goal").value = ""; showTab("overview"); $("goal").focus(); };
 document.querySelectorAll("[data-tab]").forEach(button => button.addEventListener("click", () => showTab(button.dataset.tab === "overview" ? studioTab : button.dataset.tab)));
-document.querySelectorAll("[data-example]").forEach(button => button.addEventListener("click", () => { $("goal").value = button.dataset.example; $("goal").focus(); }));
-$("goal-form").addEventListener("submit", event => { event.preventDefault(); beginConversation(); });
+const questions = [
+  {label:"BTC 近 5 小时是上涨、下跌，还是横盘？", coin:"BTC", interval:"15m"},
+  {label:"英伟达永续最近的价格变化，有成交量配合吗？", coin:"xyz:NVDA", interval:"1h"},
+  {label:"回撤 5% 和亏损 5% 有什么区别？用 100 USDT 举个例子。"},
+  {label:"ETH 最近一个收盘价，更靠近区间高点还是低点？", coin:"ETH", interval:"1h"},
+  {label:"特斯拉永续的价格和美股正股为什么可能不同？"},
+  {label:"HYPE 的最新成交量是平时的几倍？", coin:"HYPE", interval:"15m"}
+];
+let pageOfQuestions = 0, starterRequest = null, attachedContext = "";
+function resetStarter() {
+  starterRequest?.abort();
+  starterRequest = null;
+  attachedContext = "";
+  $("question-context").textContent = "";
+}
+async function chooseStarter(question) {
+  resetStarter();
+  $("goal").value = question.label;
+  $("goal").focus();
+  if (!question.coin) return;
+  const controller = new AbortController();
+  starterRequest = controller;
+  $("question-context").textContent = "正在读取对应行情…";
+  try {
+    const params = new URLSearchParams({coin:question.coin,interval:question.interval});
+    const r = await fetch("/api/market/candles?" + params, {signal:AbortSignal.any([controller.signal,AbortSignal.timeout(12000)])});
+    if (!r.ok) throw Error();
+    const data = await r.json();
+    const duration = question.interval === "1h" ? 3600000 : 900000;
+    const closed = data.candles.filter(row => row.t + duration <= Date.now());
+    const m = indicators(closed, duration);
+    if (!m || data.coin !== question.coin || data.interval !== question.interval) throw Error();
+    if (controller.signal.aborted) return;
+    const time = new Date(closed.at(-1).t + duration);
+    attachedContext = "\nHyperliquid "+question.coin+" 永续，"+question.interval+"，样本截至 "+time.toISOString()+"。最近20根已收盘 K 线：涨跌 "+m.change.toFixed(2)+"%，最低 "+m.low+"，最高 "+m.high+"，末根收盘 "+m.close+"，均价 "+m.sma.toFixed(4)+"，末根成交量与此前20根均量之比 "+(m.volumeRatio?.toFixed(2) ?? "未知")+"。请根据样本作答，注明时间与局限。";
+    $("question-context").textContent = "已附行情 · "+question.coin+" · "+question.interval+" · "+time.toLocaleString("zh-CN");
+  } catch {
+    if (controller.signal.aborted) return;
+    attachedContext = "\n当前行情读取失败，请只解释判断方法。";
+    $("question-context").textContent = "行情暂不可用，可先讨论判断方法。";
+  } finally { if (starterRequest === controller) starterRequest = null; }
+}
+function renderQuestions() {
+  const buttons = questions.slice(pageOfQuestions*3,pageOfQuestions*3+3).map(q=>{
+    const button = node("button","","");
+    button.type="button";
+    button.append(node("span","",q.label),node("small","",q.coin ? q.interval+" ↗" : "入门 ↗"));
+    button.onclick=()=>chooseStarter(q);
+    return button;
+  });
+  $("question-list").replaceChildren(...buttons);
+}
+renderQuestions();
+$("more-questions").onclick=()=>{pageOfQuestions=1-pageOfQuestions;renderQuestions();};
+$("goal").addEventListener("input",resetStarter);
+document.querySelectorAll("[data-example]").forEach(button => button.onclick=()=>chooseStarter({label:button.dataset.example}));
+$("goal-form").addEventListener("submit", event => {
+  event.preventDefault();
+  if (starterRequest) return toast("正在读取行情，请稍候");
+  if (attachedContext) { $("goal").value += attachedContext; resetStarter(); }
+  beginConversation();
+});
 $("model-primary").addEventListener("change", () => {
   updateModelLabels();
   try { localStorage.setItem("oasis-advisor-model", state.model); } catch {}

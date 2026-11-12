@@ -17,10 +17,17 @@
     <div class="content">
       <main>
         <section id="page-overview" class="app-page">
-          <div class="welcome"><h1>今天想研究什么策略？</h1><p>与 AI 讨论你的想法，再用模拟订单验证。</p></div>
+          <div class="welcome"><h1>今天想了解什么行情？</h1><p>问行情、学指标，或从一个模拟策略开始。</p></div>
 
-          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
-          <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
+          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><small id="question-context" role="status"></small><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
+          <section class="starters" aria-labelledby="quick-heading">
+            <div class="starter-head"><h2 id="quick-heading">快捷问题</h2><button type="button" id="more-questions">换一组 ↻</button></div>
+            <div id="question-list" class="question-list"></div>
+          </section>
+          <section class="starters"><h2>探索策略模板</h2><div class="template-list">
+            <button type="button" data-example="我想每周定投 ETH，月度预算 500 USDT，每次最多 80 USDT，回撤达到 5% 时暂停。请帮我检查这些条件，再整理成模拟策略。"><strong>ETH 每周定投</strong><small>每月 500 USDT · 回撤 5% 暂停</small></button>
+            <button type="button" data-example="我想为 HYPE 设计 15 分钟放量突破观察策略。请帮我定义突破条件、成交量门槛和失效条件，列出模拟验证前还缺哪些参数。"><strong>HYPE 放量突破</strong><small>15 分钟 K 线 · 成交量验证</small></button>
+          </div></section>
         </section>
         <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 市场成交行情 · 股票类永续跟踪标的价格</p></div></div>
           <div class="panel"><div class="market-controls"><label>市场 <select id="market-group"><option>常用</option><option>加密永续</option><option>美股永续</option><option>指数与宏观</option><option>其他永续</option><option>现货</option><option>全部</option></select></label><label>标的 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>

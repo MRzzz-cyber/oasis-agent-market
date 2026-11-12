@@ -123,3 +123,10 @@ dialog::backdrop{background:#19291e66}
 .market-insights>div{padding:14px 0 0;display:grid;gap:3px}
 .market-insights strong{font-size:17px;font-variant-numeric:tabular-nums}
 .market-insights small{font-size:12px}
+
+#page-overview{margin-top:clamp(20px,4vh,50px)}
+.starters{margin-top:25px}.starters h2{font-size:15px;font-weight:620}.starter-head{display:flex;align-items:center;justify-content:space-between}.starter-head button{color:var(--muted);font-size:13px;padding:6px}
+.question-list{margin-top:8px;border-top:1px solid var(--line)}.question-list button{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:11px 3px;border-bottom:1px solid var(--line);text-align:left}.question-list small{white-space:nowrap}
+.question-list button:hover,.template-list button:hover{background:var(--tint);color:var(--green)}
+.template-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.template-list button{text-align:left;display:grid;gap:5px;padding:14px 16px;border:1px solid var(--line);border-radius:8px}
+@media(max-width:520px){.template-list{grid-template-columns:1fr}}
