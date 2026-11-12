@@ -1,3 +1,4 @@
+import { snapshot } from "../frontend/candles.js";
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -7,6 +8,8 @@ import { createStrategy, prepareRun, approveRun, rejectRun, SAMPLE_SERVICES } fr
 const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../frontend");
 const routes = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
+  ["/market.js", ["market.js", "text/javascript; charset=utf-8"]],
+  ["/candles.js", ["candles.js", "text/javascript; charset=utf-8"]],
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]]
 ]);
@@ -30,6 +33,11 @@ export function createAppServer() {
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://127.0.0.1");
+      if (req.method === "GET" && url.pathname === "/api/market/candles") {
+        const result = await snapshot(new Request(url));
+        res.writeHead(result.status, Object.fromEntries(result.headers));
+        res.end(await result.text()); return;
+      }
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "GET" && url.pathname === "/api/status") {
         send(res, 200, { ok: true, app: "Oasis", network: "Base Sepolia", mode: "simulation", realPaymentsEnabled: false, services: SAMPLE_SERVICES });

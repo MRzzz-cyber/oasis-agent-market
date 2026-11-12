@@ -41,3 +41,5 @@ button:disabled { cursor: wait; opacity: .55; }
 #account-form a{text-align:center;text-decoration:none;padding:10px}
 #invite-label input{display:block;width:100%;margin-top:6px}
 #account-button{margin-left:auto}
+
+#market-chart{display:block;width:100%;height:clamp(230px,40vw,430px)}.market-controls{display:flex;align-items:center;flex-wrap:wrap;gap:14px}.market-controls strong,.market-controls button{margin-left:auto}.market-controls select{background:#142530;color:#ecf3f4;padding:7px;border:1px solid #36515a;border-radius:6px}#market-detail{min-height:2em}

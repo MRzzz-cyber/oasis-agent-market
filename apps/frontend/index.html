@@ -22,7 +22,7 @@
   <div id="workspace" class="workspace hidden">
     <aside>
       <div class="side-brand">◈ Oasis <small>AI 投资助手</small></div>
-      <nav><button data-tab="overview" class="selected">⌂　总览</button><button data-tab="create">✧　创建策略</button><button data-tab="strategies">▤　我的策略</button><button data-tab="policy">◇　预算与权限</button></nav>
+      <nav><button data-tab="overview" class="selected">⌂　总览</button><button data-tab="market">行情分析</button><button data-tab="create">✧　创建策略</button><button data-tab="strategies">▤　我的策略</button><button data-tab="policy">◇　预算与权限</button></nav>
       <div class="side-bottom">● 模拟模式<br/><small>真实策略对话 · 模拟交易</small></div>
     </aside>
     <div class="content">
@@ -33,6 +33,11 @@
           <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
           <form id="goal-form" class="prompt"><label for="goal">你想和 AI 讨论什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 →</button></div></form>
         </section>
+        <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 永续合约 · 成交价（USD）</p></div></div>
+          <div class="panel"><div class="market-controls"><label>合约 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
+          <label>周期 <select id="market-interval"><option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></label><strong id="market-price">—</strong></div>
+          <p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="永续合约 K 线及成交量"></canvas>
+          <div class="market-controls"><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">真实模型对话 · 模拟策略</span></div>
           <div class="conversation panel">
@@ -44,7 +49,7 @@
             <div class="draft-head"><div><span class="eyebrow">STRATEGY DRAFT</span><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
             <p class="note">从你的输入初步整理，可直接修改。请确认标的和单次上限后再保存；这些参数决定模拟订单，服务预算单独设置。补充对话会重新整理本表。</p>
             <div id="draft-summary" class="draft-form">
-              <label>投资标的<select id="draft-asset"><option value="">请选择</option><option>ETH</option><option>BTC</option><option>SOL</option></select></label>
+              <label>投资标的<select id="draft-asset"><option value="">请选择</option><option>ETH</option><option>BTC</option><option>SOL</option><option>XRP</option><option>HYPE</option></select></label>
               <label>执行节奏<select id="draft-cadence"><option>每周</option><option>每天</option><option>每月</option><option>按信号触发</option></select></label>
               <label>单次金额上限 *<input id="draft-max" type="number" min="0.000001" step="any" placeholder="必填，例如 80"/></label>
               <label>投资金额币种<select id="draft-currency"><option>USDT</option><option>USDC</option></select></label>

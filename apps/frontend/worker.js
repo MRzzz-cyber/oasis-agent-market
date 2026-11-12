@@ -1,3 +1,4 @@
+import { snapshot } from "./candles.js";
 import { account, authRoute, googleMode } from "./auth.js";
 export { AccountStore } from "./auth.js";
 const SYSTEM_PROMPT = [
@@ -156,6 +157,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/market/candles" && request.method === "GET") return snapshot(request);
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
 

@@ -1,6 +1,7 @@
+import { marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
-const tabs = ["overview", "create", "strategies", "policy"];
+const tabs = ["overview", "market", "create", "strategies", "policy"];
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -29,7 +30,7 @@ function latestMatch(text, pattern) {
   return [...text.matchAll(pattern)].at(-1);
 }
 function extractDraft(goal) {
-  const asset = latestMatch(goal, /\b(BTC|ETH|SOL)\b|比特币|以太坊|索拉纳/gi);
+  const asset = latestMatch(goal, /\b(BTC|ETH|SOL|XRP|HYPE)\b|比特币|以太坊|索拉纳/gi);
   const max = latestMatch(goal, /(?:单次|每次)[^\d；。]{0,12}(\d+(?:\.\d+)?)/g);
   const capital = latestMatch(goal, /(?:月度预算|投资本金|投资预算|总投入)[^\d；。]{0,8}(\d+(?:\.\d+)?)/g);
   const stop = latestMatch(goal, /(?:回撤|跌幅)[^\d；。]{0,8}(\d+(?:\.\d+)?)\s*%/g);
@@ -43,7 +44,7 @@ function extractDraft(goal) {
   };
 }
 function validateDraft(value) {
-  if (!value || !["BTC", "ETH", "SOL"].includes(value.asset)) demoError("请确认投资标的");
+  if (!value || !["BTC", "ETH", "SOL", "XRP", "HYPE"].includes(value.asset)) demoError("请确认投资标的");
   if (!["USDT", "USDC"].includes(value.quoteAsset)) demoError("请选择投资金额币种");
   const amount = (raw, label) => {
     if (!/^(?:0|[1-9]\d{0,9})(?:\.\d{1,6})?$/.test(String(raw)) || Number(raw) <= 0) demoError(label + "需为大于 0 的金额，最多 6 位小数");
@@ -152,12 +153,14 @@ async function request(path, options = {}) {
   return data;
 }
 function showApp() { $("landing").classList.add("hidden"); $("workspace").classList.remove("hidden"); showTab("overview"); }
-function showSite() { $("landing").classList.remove("hidden"); $("workspace").classList.add("hidden"); }
+function showSite() { toggleMarket(false); $("landing").classList.remove("hidden"); $("workspace").classList.add("hidden"); }
+const toggleMarket = marketView(prompt => { $("goal").value = prompt; showTab("overview"); $("goal").focus(); });
 function showTab(tab) {
   if (!tabs.includes(tab)) return;
   for (const id of tabs) $("page-" + id).classList.toggle("hidden", id !== tab);
   document.querySelectorAll("[data-tab]").forEach(n => n.classList.toggle("selected", n.dataset.tab === tab));
-  $("breadcrumb").textContent = ({ overview: "总览", create: "创建策略", strategies: "我的策略", policy: "预算与权限" })[tab];
+  $("breadcrumb").textContent = ({ overview: "总览", market: "行情分析", create: "创建策略", strategies: "我的策略", policy: "预算与权限" })[tab];
+  toggleMarket(tab === "market");
   if (tab === "strategies") refreshStrategies();
 }
 function node(tag, cls, text) {
