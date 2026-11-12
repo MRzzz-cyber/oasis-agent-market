@@ -7,179 +7,185 @@ const SYSTEM_PROMPT = [
   "不要索要私钥、API Key；不允许承诺收益，不进行真实交易。"
 ].join("\n");
 
-export const PROVIDERS = Object.freeze({
-  "免费模型": { secret: "OPENROUTER_API_KEY", modelEnv: "OPENROUTER_FREE_MODEL", defaultModel: "openrouter/free", kind: "openrouter" },
-  "GPT-5.6": { secret: "OPENAI_API_KEY", modelEnv: "OPENAI_MODEL", defaultModel: "gpt-5.6-sol", endpoint: "https://api.openai.com/v1/responses", kind: "openai" },
-  "Claude Sonnet": { secret: "ANTHROPIC_API_KEY", modelEnv: "ANTHROPIC_MODEL", defaultModel: "claude-sonnet-4-6", endpoint: "https://api.anthropic.com/v1/messages", kind: "anthropic" },
-  Gemini: { secret: "GEMINI_API_KEY", modelEnv: "GEMINI_MODEL", defaultModel: "gemini-3.8-flash", endpoint: "https://generativelanguage.googleapis.com/v1beta/models", kind: "gemini" },
-  DeepSeek: { secret: "DEEPSEEK_API_KEY", modelEnv: "DEEPSEEK_MODEL", defaultModel: "deepseek-flash", endpoint: "https://api.deepseek.com/chat/completions", kind: "deepseek" }
-});
+const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL_CACHE_TTL_MS = 5 * 60 * 1000;
+let modelCache = null;
+let modelCacheAt = 0;
 
-function respond(data, status = 200) {
+function respond(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
-    status, headers: {
+    status,
+    headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
+      "x-content-type-options": "nosniff",
+      ...headers
     }
   });
 }
 
 export function validateChatInput(value) {
   if (!value || typeof value !== "object" || !Array.isArray(value.messages)) throw new Error("请输入有效对话");
-  if (!Object.hasOwn(PROVIDERS, value.model)) throw new Error("请从支持的模型中选择");
+  if (typeof value.model !== "string" || !/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:/-]*$/i.test(value.model) || value.model.length > 180) {
+    throw new Error("请选择有效的 OpenRouter 模型");
+  }
   if (value.messages.length < 1 || value.messages.length > 12) throw new Error("一次最多发送 12 条历史消息");
   const messages = value.messages.map(item => {
     if (!item || !["user", "assistant"].includes(item.role) || typeof item.content !== "string") throw new Error("对话格式无效");
     const content = item.content.trim();
-    if (!content || content.length > 2000) throw new Error("单条消息需在 1–2000 字以内");
+    const limit = item.role === "assistant" ? 12000 : 2000;
+    if (!content || content.length > limit) throw new Error("消息过长：用户最多 2000 字，模型回复最多 12000 字");
     return { role: item.role, content };
   });
+  if (messages.reduce((sum, item) => sum + item.content.length, 0) > 20000) throw new Error("对话历史过长，请开始新对话");
   if (messages.at(-1).role !== "user") throw new Error("最后一条必须是用户消息");
   return { model: value.model, messages };
 }
 
-function extractOutput(data, kind) {
-  if (kind === "openai") return (data.output || []).flatMap(item => (item.content || []).filter(c => c.type === "output_text").map(c => c.text)).join("\n");
-  if (kind === "anthropic") return (data.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
-  if (kind === "gemini") return (data.candidates?.[0]?.content?.parts || []).filter(p => typeof p.text === "string").map(p => p.text).join("\n");
-  return data.choices?.[0]?.message?.content || "";
+export function normalizeOpenRouterModels(payload) {
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  return rows
+    .filter(item => item && typeof item.id === "string" && typeof item.name === "string")
+    .filter(item => {
+      const inputs = item.architecture?.input_modalities;
+      const outputs = item.architecture?.output_modalities;
+      return (!Array.isArray(inputs) || inputs.includes("text")) &&
+        (!Array.isArray(outputs) || outputs.includes("text"));
+    })
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      description: typeof item.description === "string" ? item.description.slice(0, 240) : "",
+      contextLength: Number.isFinite(item.context_length) ? item.context_length : null,
+      inputPricePerMillion: pricePerMillion(item.pricing?.prompt),
+      outputPricePerMillion: pricePerMillion(item.pricing?.completion),
+      isFree: pricePerMillion(item.pricing?.prompt) === 0 && pricePerMillion(item.pricing?.completion) === 0,
+      created: Number.isFinite(item.created) ? item.created : 0,
+      provider: item.id.split("/")[0]
+    }))
+    .sort((a, b) => b.created - a.created || a.name.localeCompare(b.name))
+    .slice(0, 2000);
 }
 
-export const OPENROUTER_MODELS = Object.freeze({
-  "免费模型": { env: "OPENROUTER_FREE_MODEL", model: "openrouter/free" },
-  "GPT-5.6": { env: "OPENROUTER_GPT_MODEL", model: "openai/gpt-5.6-sol" },
-  "Claude Sonnet": { env: "OPENROUTER_CLAUDE_MODEL", model: "anthropic/claude-sonnet-4.6" },
-  Gemini: { env: "OPENROUTER_GEMINI_MODEL", model: "google/gemini-2.5-flash" },
-  DeepSeek: { env: "OPENROUTER_DEEPSEEK_MODEL", model: "deepseek/deepseek-chat" }
-});
+function pricePerMillion(value) {
+  if (value == null || value === "") return null;
+  const price = Number(value);
+  return Number.isFinite(price) && price >= 0 ? price * 1_000_000 : null;
+}
 
-export async function invokeOpenRouter({ model, messages, env, fetchImpl = fetch }) {
+export async function fetchOpenRouterModels({ fetchImpl = fetch, forceRefresh = false } = {}) {
+  if (!forceRefresh && modelCache && Date.now() - modelCacheAt < MODEL_CACHE_TTL_MS) return modelCache;
+  const response = await fetchImpl(OPENROUTER_MODELS_URL, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!response.ok) throw new Error("OpenRouter 模型目录暂时不可用（HTTP " + response.status + "）");
+  const payload = await response.json();
+  const models = normalizeOpenRouterModels(payload);
+  if (!models.length) throw new Error("OpenRouter 暂未返回可用的文本模型");
+  modelCache = models;
+  modelCacheAt = Date.now();
+  return models;
+}
+
+export async function streamOpenRouterChat({ model, messages, env, fetchImpl = fetch }) {
   const key = env.OPENROUTER_API_KEY;
-  if (!key) return { error: "OpenRouter Key 未配置，请在 Cloudflare Secrets 中添加 OPENROUTER_API_KEY", status: 503 };
-  const choice = OPENROUTER_MODELS[model];
-  if (!choice) return { error: "不支持该模型", status: 400 };
-  const modelId = env[choice.env] || choice.model;
-  let response;
+  if (!key) return respond({ error: "OpenRouter API Key 未配置，请在 Cloudflare Workers 的 Secrets 中添加 OPENROUTER_API_KEY" }, 503);
+
+  let upstream;
   try {
-    response = await fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
+    upstream = await fetchImpl(OPENROUTER_CHAT_URL, {
       method: "POST",
       headers: {
-        "authorization": "Bearer " + key,
+        authorization: "Bearer " + key,
         "content-type": "application/json",
         "HTTP-Referer": "https://oasis-agent-market.zqsanjingshou.workers.dev",
         "X-Title": "Oasis AI"
       },
       body: JSON.stringify({
-        model: modelId,
+        model,
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-        max_tokens: 650, stream: false
+        max_tokens: 900,
+        stream: true,
+        stream_options: { include_usage: true }
       }),
-      signal: AbortSignal.timeout(25000)
+      signal: AbortSignal.timeout(90000)
     });
   } catch (error) {
-    return { error: error?.name === "TimeoutError" ? "OpenRouter 模型响应超时" : "OpenRouter 连接失败，请检查网络", status: 502 };
+    return respond({ error: error?.name === "TimeoutError" ? "OpenRouter 模型响应超时" : "OpenRouter 连接失败，请稍后重试" }, 502);
   }
-  if (!response.ok) {
-    const detail = response.status === 401 ? "API Key 不正确或已失效" :
-      response.status === 402 ? "账户余额不足，或所选付费模型需要先充值" :
-      response.status === 404 ? "模型 ID 不可用，请在 Cloudflare 配置对应的 OPENROUTER_*_MODEL" :
-      response.status === 429 ? "免费额度或请求频率已达上限" : "HTTP " + response.status;
-    return { error: "OpenRouter 调用失败：" + detail, status: response.status === 429 ? 429 : 502 };
-  }
-  let data;
-  try { data = await response.json(); } catch { return { error: "OpenRouter 返回无效 JSON", status: 502 }; }
-  const text = data.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text.trim()) return { error: "模型没有返回可展示的文本", status: 502 };
-  return {
-    text: text.trim().slice(0, 6000),
-    model: data.model || modelId,
-    provider: "openrouter",
-    usage: {
-      inputTokens: data.usage?.prompt_tokens ?? null,
-      outputTokens: data.usage?.completion_tokens ?? null
-    }
-  };
-}
 
-export async function invokeModel({ model, messages, env, fetchImpl = fetch }) {
-  if (env.OPENROUTER_API_KEY || model === "免费模型") return invokeOpenRouter({ model, messages, env, fetchImpl });
-  const spec = PROVIDERS[model];
-  const apiKey = env[spec.secret];
-  if (!apiKey) return { error: model + " 尚未配置 API Key，请在 Cloudflare Secrets 配置 " + spec.secret, status: 503 };
-  const modelId = env[spec.modelEnv] || spec.defaultModel;
-  let url, body, headers = { "content-type": "application/json" };
-  if (spec.kind === "openai") {
-    url = spec.endpoint;
-    headers.authorization = "Bearer " + apiKey;
-    body = { model: modelId, instructions: SYSTEM_PROMPT, input: messages, max_output_tokens: 650 };
-  } else if (spec.kind === "anthropic") {
-    url = spec.endpoint;
-    headers["x-api-key"] = apiKey;
-    headers["anthropic-version"] = "2023-06-01";
-    body = { model: modelId, system: SYSTEM_PROMPT, messages, max_tokens: 650 };
-  } else if (spec.kind === "gemini") {
-    url = spec.endpoint + "/" + encodeURIComponent(modelId) + ":generateContent";
-    headers["x-goog-api-key"] = apiKey;
-    body = {
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-      generationConfig: { maxOutputTokens: 650 }
-    };
-  } else {
-    url = spec.endpoint;
-    headers.authorization = "Bearer " + apiKey;
-    body = { model: modelId, messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages], max_tokens: 650, stream: false };
+  if (!upstream.ok) {
+    let detail = "HTTP " + upstream.status;
+    try {
+      const payload = await upstream.json();
+      detail = payload?.error?.message || detail;
+    } catch {}
+    const safeDetail = upstream.status === 401 ? "API Key 不正确或已失效" :
+      upstream.status === 402 ? "OpenRouter 账户余额不足" :
+      upstream.status === 404 ? "模型暂不可用，请重新选择模型" :
+      upstream.status === 429 ? "请求频率或模型额度已达上限" :
+      upstream.status >= 500 ? "模型供应商暂时不可用" : detail.slice(0, 180);
+    return respond({ error: "OpenRouter 调用失败：" + safeDetail }, upstream.status === 429 ? 429 : 502);
   }
-  let response;
-  try {
-    response = await fetchImpl(url, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(25000) });
-  } catch (e) {
-    return { error: e?.name === "TimeoutError" ? "模型调用超时，请稍后重试" : "无法连接模型供应商，请检查网络和服务状态", status: 502 };
-  }
-  if (!response.ok) {
-    // Never include the raw provider error body in a public response; it could contain internal details.
-    return { error: response.status === 401 || response.status === 403 ? model + " API Key 无效或无权限" : response.status === 429 ? model + " 请求频率或配额受限" : model + " 调用失败（HTTP " + response.status + "）", status: response.status === 429 ? 429 : 502 };
-  }
-  let result;
-  try { result = await response.json(); } catch { return { error: "模型返回了无效 JSON", status: 502 }; }
-  const text = extractOutput(result, spec.kind);
-  if (!text || !text.trim()) return { error: "模型未返回可展示的文本", status: 502 };
-  return {
-    text: text.trim().slice(0, 6000),
-    model: modelId,
-    provider: spec.kind,
-    usage: {
-      inputTokens: result.usage?.input_tokens ?? result.usage?.prompt_tokens ?? result.usageMetadata?.promptTokenCount ?? null,
-      outputTokens: result.usage?.output_tokens ?? result.usage?.completion_tokens ?? result.usageMetadata?.candidatesTokenCount ?? null
+
+  if (!upstream.body) return respond({ error: "OpenRouter 未返回流式响应" }, 502);
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      "connection": "keep-alive",
+      "x-accel-buffering": "no"
     }
-  };
+  });
 }
 
 async function secureEqual(a, b) {
   const encoder = new TextEncoder();
   const [x, y] = await Promise.all([a, b].map(v => crypto.subtle.digest("SHA-256", encoder.encode(v))));
-  return new Uint8Array(x).every((n, i) => n === new Uint8Array(y)[i]);
+  const left = new Uint8Array(x), right = new Uint8Array(y);
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i++) mismatch |= left[i] ^ right[i];
+  return mismatch === 0;
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+
     if (request.method === "GET" && url.pathname === "/api/ai/status") {
-      return respond({ enabled: Boolean(env.OASIS_DEMO_ACCESS_CODE), models: Object.fromEntries(Object.entries(PROVIDERS).map(([name, spec]) => [name, Boolean(env.OPENROUTER_API_KEY || env[spec.secret])])) });
+      return respond({
+        enabled: Boolean(env.OASIS_DEMO_ACCESS_CODE),
+        openRouterConfigured: Boolean(env.OPENROUTER_API_KEY),
+        provider: "OpenRouter"
+      });
     }
+
+    if (request.method === "GET" && url.pathname === "/api/ai/models") {
+      try {
+        const models = await fetchOpenRouterModels();
+        return respond({ provider: "OpenRouter", count: models.length, models }, 200, {
+          "cache-control": "public, max-age=300"
+        });
+      } catch (error) {
+        return respond({ error: error.message || "无法获取 OpenRouter 模型目录" }, 502);
+      }
+    }
+
     if (request.method !== "POST" || url.pathname !== "/api/ai/chat") return respond({ error: "接口不存在" }, 404);
     if (!env.OASIS_DEMO_ACCESS_CODE) return respond({ error: "模型 API 尚未开放：管理员需先配置 OASIS_DEMO_ACCESS_CODE" }, 503);
     const origin = request.headers.get("origin");
     if (!origin || origin !== url.origin) return respond({ error: "只允许从 Oasis 页面调用" }, 403);
     if (!(await secureEqual(request.headers.get("x-oasis-access-code") || "", env.OASIS_DEMO_ACCESS_CODE))) return respond({ error: "体验码不正确" }, 401);
     if (Number(request.headers.get("content-length") || 0) > 25000) return respond({ error: "请求内容过大" }, 413);
+
     let payload;
     try { payload = validateChatInput(await request.json()); }
-    catch (e) { return respond({ error: e.message || "无效请求" }, 400); }
-    const result = await invokeModel({ ...payload, env });
-    if (result.error) return respond({ error: result.error }, result.status);
-    return respond({ ok: true, ...result });
+    catch (error) { return respond({ error: error.message || "无效请求" }, 400); }
+
+    return streamOpenRouterChat({ ...payload, env });
   }
 };

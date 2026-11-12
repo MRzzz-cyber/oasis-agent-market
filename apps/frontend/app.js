@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
-const state = { goal: "", strategy: null, run: null, strategies: [], model: "GPT-5.6", committee: ["GPT-5.6", "Claude Sonnet", "Gemini"], conversation: [] };
+const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "create", "strategies", "policy"];
-const MODEL_OPTIONS = ["GPT-5.6", "Claude Sonnet", "Gemini", "DeepSeek"];
+let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
   $("toast").classList.add("active");
@@ -25,8 +25,41 @@ function demoError(message) { throw new Error(message); }
 function demoEvent(type, message, detail = "") {
   return { id: crypto.randomUUID(), type, message, detail, at: new Date().toISOString() };
 }
+function latestMatch(text, pattern) {
+  return [...text.matchAll(pattern)].at(-1);
+}
+function extractDraft(goal) {
+  const asset = latestMatch(goal, /\b(BTC|ETH|SOL)\b|比特币|以太坊|索拉纳/gi);
+  const max = latestMatch(goal, /(?:单次|每次)[^\d；。]{0,12}(\d+(?:\.\d+)?)/g);
+  const capital = latestMatch(goal, /(?:月度预算|投资本金|投资预算|总投入)[^\d；。]{0,8}(\d+(?:\.\d+)?)/g);
+  const stop = latestMatch(goal, /(?:回撤|跌幅)[^\d；。]{0,8}(\d+(?:\.\d+)?)\s*%/g);
+  const cadence = latestMatch(goal, /每周|每天|每日|每月/g);
+  const currency = latestMatch(goal, /USDT|USDC/gi);
+  return {
+    asset: asset ? ({ 比特币: "BTC", 以太坊: "ETH", 索拉纳: "SOL" }[asset[0]] || asset[0].toUpperCase()) : "",
+    maxOrder: max?.[1] || "", capital: capital?.[1] || "", stopPercent: stop?.[1] || "",
+    cadence: cadence?.[0] === "每日" ? "每天" : cadence?.[0] || "按信号触发",
+    quoteAsset: currency?.[0].toUpperCase() || "USDT"
+  };
+}
+function validateDraft(value) {
+  if (!value || !["BTC", "ETH", "SOL"].includes(value.asset)) demoError("请确认投资标的");
+  if (!["USDT", "USDC"].includes(value.quoteAsset)) demoError("请选择投资金额币种");
+  const amount = (raw, label) => {
+    if (!/^(?:0|[1-9]\d{0,9})(?:\.\d{1,6})?$/.test(String(raw)) || Number(raw) <= 0) demoError(label + "需为大于 0 的金额，最多 6 位小数");
+    return String(raw);
+  };
+  const maxOrder = amount(value.maxOrder, "单次上限");
+  const capital = value.capital ? amount(value.capital, "投资预算") : "";
+  if (capital && Number(maxOrder) > Number(capital)) demoError("单次上限不能超过投资预算");
+  if (!["每周", "每天", "每月", "按信号触发"].includes(value.cadence)) demoError("请选择执行节奏");
+  const stopPercent = String(value.stopPercent || "");
+  if (stopPercent && (!/^\d+(?:\.\d{1,2})?$/.test(stopPercent) || Number(stopPercent) <= 0 || Number(stopPercent) > 100)) demoError("暂停回撤需在 0–100% 之间，且大于 0");
+  return { asset: value.asset, quoteAsset: value.quoteAsset, maxOrder, capital, cadence: value.cadence, stopPercent };
+}
 function simulateRun(strategy) {
-  const models = strategy.committee?.length ? strategy.committee : [strategy.model || "GPT-5.6"];
+  const terms = validateDraft(strategy.terms);
+  const models = strategy.committee?.length ? strategy.committee : [strategy.model || "主模型"];
   const votes = models.map((model, i) => ({
     model, action: i === 1 ? "HOLD" : "BUY",
     rationale: i === 1 ? "示例判断：建议等待更多确认信号。" : "示例判断：策略条件初步满足，仍需通过风险检查。"
@@ -36,9 +69,9 @@ function simulateRun(strategy) {
     demoEvent("goal", "读取策略目标", "Agent 读取用户的投资目标、资产偏好和执行约束。"),
     demoEvent("market", "发现市场研究任务", "此处使用预置演示信号，不代表实时行情或链上数据。"),
     demoEvent("service", "发现数据服务报价", "Market Signal API · 演示报价 0.10 USDC；没有发起真实请求或付款。"),
-    demoEvent("committee", "多模型委员会完成讨论", models.map((m, i) => m + "：" + votes[i].action).join("；")),
-    demoEvent("policy", "Policy Engine 风险检查通过", "检查模拟模式、单笔上限、服务预算和用户授权；Agent 无权修改这些规则。"),
-    demoEvent("decision", "形成模拟交易建议", "示例建议买入 " + asset + "，金额 80 USDC。此结果为固定演示数据，不是投资建议。"),
+    demoEvent("committee", "演示模型观点（未调用）", models.map((m, i) => m + "：" + votes[i].action).join("；")),
+    demoEvent("policy", "模拟参数检查完成", "已核对确认的单次上限 " + terms.maxOrder + " " + terms.quoteAsset + "；服务预算独立。行情、回撤及累计投资预算尚未验证。"),
+    demoEvent("decision", "形成模拟交易建议", "示例建议买入 " + asset + "，金额 " + terms.maxOrder + " " + terms.quoteAsset + "，不超过确认的单次上限。使用预置示例信号，不是投资建议。"),
     demoEvent("approval", "等待用户确认", "只有用户点击确认后，才会创建本地模拟订单。")
   ];
   return {
@@ -46,7 +79,7 @@ function simulateRun(strategy) {
     status: "awaiting_approval", paymentMode: "demo",
     payment: { status: "not_paid_demo", network: "eip155:84532", amountAtomic: "0" },
     operatingBudget: { limit: strategy.budget || "5", spent: "0", simulatedQuote: "0.10" },
-    votes, proposedOrder: { side: "BUY", asset, amountUsdc: "80.00", mode: "simulation" },
+    terms, votes, proposedOrder: { side: "BUY", asset, amount: terms.maxOrder, quoteAsset: terms.quoteAsset, mode: "simulation" },
     events, createdAt: new Date().toISOString()
   };
 }
@@ -58,21 +91,24 @@ async function browserDemoRequest(path, options = {}) {
   if (method === "GET" && path === "/api/strategies") return db.strategies;
   if (method === "POST" && path === "/api/strategies") {
     let body; try { body = JSON.parse(options.body || "{}"); } catch { demoError("输入格式不正确"); }
-    const goal = body.goal?.trim();
+    const goal = typeof body?.goal === "string" ? body.goal.trim() : "";
     if (typeof goal !== "string" || goal.length < 4 || goal.length > 2000) demoError("请补充投资目标");
     const raw = String(body.budget ?? "5");
     if (!/^\d+(\.\d{1,6})?$/.test(raw)) demoError("服务预算格式不正确");
     const [whole, decimals = ""] = raw.split(".");
     const atomic = BigInt(whole) * 1000000n + BigInt(decimals.padEnd(6, "0") || "0");
     if (atomic < 100000n || atomic > 100000000n) demoError("Agent 服务预算需在 0.10–100 USDC 之间");
-    const asset = /\bBTC\b|比特币/i.test(goal) ? "BTC" : /\bSOL\b|索拉纳/i.test(goal) ? "SOL" : "ETH";
+    const terms = validateDraft(body.terms);
+    const asset = terms.asset;
     const strategy = {
-      id: crypto.randomUUID(), goal, asset, budgetAtomic: atomic.toString(), budget: raw,
-      model: body.model || "GPT-5.6", committee: Array.isArray(body.committee) ? body.committee : [],
+      id: crypto.randomUUID(), goal, asset, terms, conversation: Array.isArray(body.conversation) ? body.conversation : [], budgetAtomic: atomic.toString(), budget: raw,
+      model: body.model || "OpenRouter model", modelId: body.modelId || null,
+      committee: Array.isArray(body.committee) ? body.committee : [],
       mode: "simulation", needsApproval: true, status: "draft", createdAt: new Date().toISOString()
     };
     db.strategies.push(strategy); writeDemoState(db); return strategy;
   }
+  if (method === "GET" && path === "/api/runs") return db.runs;
   if (method === "POST" && path === "/api/runs") {
     let body; try { body = JSON.parse(options.body || "{}"); } catch { demoError("输入格式不正确"); }
     const strategy = db.strategies.find(x => x.id === body.strategyId);
@@ -126,43 +162,104 @@ function node(tag, cls, text) {
   const el = document.createElement(tag); if (cls) el.className = cls;
   if (text != null) el.textContent = String(text); return el;
 }
-function getSelectedCommittee() {
-  return [...document.querySelectorAll('input[name="committee-model"]:checked')].map(x => x.value);
+function getSelectedCommittee() { return []; }
+function selectedModel() {
+  const id = $("model-primary").value;
+  return availableModels.find(item => item.id === id) || null;
+}
+function formatModelPrice(value) {
+  if (value == null) return "价格未知";
+  if (value === 0) return "免费";
+  return "$" + value.toFixed(value >= 1 ? 2 : 4) + " / 百万 Token";
 }
 function updateModelLabels() {
-  state.model = $("model-primary").value;
-  state.committee = getSelectedCommittee();
-  $("active-model-label").textContent = state.model;
-  $("policy-model").textContent = state.model + (state.committee.length ? " + " + state.committee.length + " 个协作模型" : "");
+  const model = selectedModel();
+  state.model = model?.id || "";
+  state.modelName = model?.name || "";
+  state.committee = [];
+  $("active-model-label").textContent = model ? model.name : "未选择模型";
+  $("policy-model").textContent = model ? model.name + "（OpenRouter）" : "未选择模型";
+  $("model-meta").textContent = model
+    ? model.provider + " · 上下文 " + (model.contextLength ? model.contextLength.toLocaleString("zh-CN") : "未知") +
+      " · 输入 " + formatModelPrice(model.inputPricePerMillion) + " · 输出 " + formatModelPrice(model.outputPricePerMillion)
+    : "请选择一个模型";
+}
+function renderModelOptions() {
+  const query = $("model-search").value.trim().toLowerCase();
+  const matches = availableModels.filter(model =>
+    !query || (model.name + " " + model.id + " " + model.provider).toLowerCase().includes(query)
+  );
+  const visible = query ? matches.slice(0, 150) : matches.slice(0, 60);
+  const select = $("model-primary");
+  const current = state.model || select.value;
+  select.replaceChildren();
+  for (const model of visible) {
+    const option = document.createElement("option");
+    option.value = model.id;
+    option.textContent = model.name + " · " + model.provider + (model.isFree ? " · 免费" : "");
+    select.appendChild(option);
+  }
+  if (visible.some(model => model.id === current)) select.value = current;
+  else {
+    select.add(new Option(query ? "请选择搜索结果中的模型" : "请选择模型", ""));
+    select.value = "";
+  }
+  select.disabled = visible.length === 0;
+  $("model-status").textContent = query
+    ? "找到 " + matches.length + " 个模型" + (matches.length > visible.length ? " · 当前显示前 " + visible.length + " 个" : "")
+    : "OpenRouter · " + availableModels.length + " 个模型 · 显示最新 60 个，可搜索全部";
+  if (select.value) updateModelLabels();
+}
+async function loadModels() {
+  const status = $("model-status");
+  const select = $("model-primary");
+  status.textContent = "正在获取 OpenRouter 模型目录…";
+  select.disabled = true;
+  try {
+    const response = await fetch("/api/ai/models", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "模型目录获取失败");
+    if (!Array.isArray(payload.models) || !payload.models.length) throw new Error("OpenRouter 暂无可用模型");
+    availableModels = payload.models;
+    renderModelOptions();
+    $("ai-runtime-status").textContent = "已连接 OpenRouter · " + availableModels.length + " 个可选模型";
+    return payload;
+  } catch (error) {
+    status.textContent = error.message;
+    select.replaceChildren(new Option("模型目录加载失败", ""));
+    select.disabled = true;
+    $("model-meta").textContent = "请检查 Cloudflare Worker 部署和 OpenRouter 模型目录接口";
+    $("ai-runtime-status").textContent = "OpenRouter 模型目录不可用";
+    throw error;
+  }
 }
 function addChat(role, content) {
   state.conversation.push({ role, content });
   const box = $("chat-messages");
   const msg = node("div", "chat-message " + role);
   msg.appendChild(node("span", "chat-role", role === "user" ? "你" : "Oasis"));
-  msg.appendChild(node("p", "", content)); box.appendChild(msg);
+  const paragraph = node("p", "", content);
+  msg.appendChild(paragraph); box.appendChild(msg);
   box.scrollTop = box.scrollHeight;
+  return paragraph;
 }
 function makeDraftSummary() {
-  const goal = state.goal;
-  const asset = /\bBTC\b|比特币/i.test(goal) ? "BTC" : /\bSOL\b|索拉纳/i.test(goal) ? "SOL" : "ETH";
-  const cadence = /每周|周定投/.test(goal) ? "每周" : /每天|每日/.test(goal) ? "每天" : /每月|月定投/.test(goal) ? "每月" : "按信号触发";
-  const amount = goal.match(/(?:预算|最多花|不超过|上限)[^\d]{0,8}(\d+(?:\.\d+)?)/);
-  const max = goal.match(/(?:单次|每次)[^\d]{0,8}(\d+(?:\.\d+)?)/);
-  const stop = goal.match(/(?:回撤|跌幅)[^\d]{0,8}(\d+(?:\.\d+)?)/);
-  const items = [
-    ["投资标的", asset],
-    ["执行节奏", cadence],
-    ["预算约束", amount ? amount[1] + " USDT（从对话提取，待确认）" : "尚未明确，建议在策略中补充"],
-    ["单次上限", max ? max[1] + " USDT" : "待确认"],
-    ["风险条件", stop ? "回撤达到 " + stop[1] + "% 时暂停" : "每次运行前执行风险检查"],
-    ["执行方式", "模拟交易，每笔订单由你确认"]
-  ];
-  const root = $("draft-summary"); root.replaceChildren();
-  for (const [label, value] of items) {
-    const row = node("div", "draft-row"); row.append(node("span", "", label), node("strong", "", value)); root.appendChild(row);
-  }
+  const draft = extractDraft(state.goal);
+  for (const [key, id] of Object.entries({ asset: "draft-asset", maxOrder: "draft-max", capital: "draft-capital", cadence: "draft-cadence", quoteAsset: "draft-currency", stopPercent: "draft-stop" })) $(id).value = draft[key];
   $("draft-panel").classList.remove("hidden");
+}
+function confirmedDraft() {
+  return validateDraft({ asset: $("draft-asset").value, maxOrder: $("draft-max").value, capital: $("draft-capital").value,
+    cadence: $("draft-cadence").value, quoteAsset: $("draft-currency").value, stopPercent: $("draft-stop").value });
+}
+function appendUserMessage(value) {
+  if (state.conversation.at(-1)?.role === "user") {
+    const pending = state.conversation.at(-1);
+    if ((pending.content + "；补充：" + value).length > 2000) throw Error("待发送消息合计不能超过 2000 字，请先重试上一条");
+    pending.content += "；补充：" + value;
+    const messages = $("chat-messages").querySelectorAll(".chat-message.user p");
+    messages[messages.length - 1].textContent = pending.content;
+  } else addChat("user", value);
 }
 let chatBusy = false;
 async function checkAiStatus() {
@@ -170,12 +267,16 @@ async function checkAiStatus() {
     const res = await fetch("/api/ai/status", { cache: "no-store" });
     if (!res.ok) throw Error("API 未部署");
     const status = await res.json();
-    const configured = Object.entries(status.models || {}).filter(([, enabled]) => enabled).map(([name]) => name);
-    $("ai-runtime-status").textContent = configured.length ? "真实 API 已接通：" + configured.join("、") : "尚未配置模型密钥";
+    $("ai-runtime-status").textContent = status.openRouterConfigured
+      ? "OpenRouter API Key 已配置"
+      : "模型目录可浏览，但管理员尚未配置 OpenRouter API Key";
     if (!status.enabled) $("ai-usage").textContent = "管理员尚未设置 OASIS_DEMO_ACCESS_CODE，真实调用暂不可用。";
+    await loadModels();
+    if (!status.openRouterConfigured) $("model-status").textContent += " · 等待配置 API Key";
     return status;
-  } catch {
-    $("ai-runtime-status").textContent = "真实模型接口尚未部署";
+  } catch (error) {
+    $("ai-runtime-status").textContent = "OpenRouter 尚未连接";
+    $("model-status").textContent = error.message;
     return null;
   }
 }
@@ -183,32 +284,85 @@ async function sendToRealModel() {
   if (chatBusy || !state.conversation.length) return;
   const code = $("ai-access-code").value.trim();
   if (!code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
+  if (!state.model) { $("ai-usage").textContent = "请先返回总览，选择一个 OpenRouter 模型。"; return; }
   chatBusy = true;
   const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
-  $("ai-usage").textContent = "正在调用 " + state.model + "，本次为真实 API 请求。";
+  for (const id of ["ai-retry", "create-strategy", "change-model", "model-primary"]) $(id).disabled = true;
+  $("ai-usage").textContent = "正在调用 " + (state.modelName || state.model) + " · 实时流式响应";
+  let assistantText = null;
   try {
-    const messages = state.conversation.slice(-12).map(({ role, content }) => ({ role, content }));
+    const messages = (state.conversation.length > 12 ? [state.conversation[0], ...state.conversation.slice(-11)] : state.conversation).map(({ role, content }) => ({ role, content }));
     const response = await fetch("/api/ai/chat", {
       method: "POST",
       headers: { "content-type": "application/json", "x-oasis-access-code": code },
       body: JSON.stringify({ model: state.model, messages })
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "模型调用失败");
-    addChat("assistant", data.text);
-    const parts = ["真实响应", data.provider, data.model];
-    if (data.usage?.inputTokens != null) parts.push("输入 " + data.usage.inputTokens + " tokens");
-    if (data.usage?.outputTokens != null) parts.push("输出 " + data.usage.outputTokens + " tokens");
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload.error || "模型调用失败（HTTP " + response.status + "）");
+    }
+    if (!response.body) throw new Error("浏览器未收到模型流式响应");
+    assistantText = addChat("assistant", "");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "", fullText = "", usage = null, returnedModel = state.model, streamComplete = false;
+    const consume = (line) => {
+      if (!line.startsWith("data:")) return;
+      const raw = line.slice(5).trim();
+      if (raw === "[DONE]") { streamComplete = true; return; }
+      if (!raw) return;
+      let chunk;
+      try { chunk = JSON.parse(raw); } catch { return; }
+      if (chunk.error?.message) throw new Error(chunk.error.message);
+      if (chunk.choices?.some(choice => choice.finish_reason)) streamComplete = true;
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) {
+        fullText += delta;
+        assistantText.textContent = fullText;
+        $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
+      }
+      if (chunk.model) returnedModel = chunk.model;
+      if (chunk.usage) usage = chunk.usage;
+    };
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || "";
+      for (const line of lines) consume(line);
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consume(buffer.trim());
+    if (!streamComplete) throw new Error("模型响应提前中断，请重试");
+    if (!fullText.trim()) throw new Error("模型没有返回文本，请更换模型或重试");
+    state.conversation[state.conversation.length - 1].content = fullText;
+    const parts = ["真实模型", returnedModel];
+    if (usage?.prompt_tokens != null) parts.push("输入 " + usage.prompt_tokens + " tokens");
+    if (usage?.completion_tokens != null) parts.push("输出 " + usage.completion_tokens + " tokens");
     $("ai-usage").textContent = parts.join(" · ");
   } catch (error) {
+    if (assistantText && !assistantText.textContent.trim()) {
+      assistantText.closest(".chat-message")?.remove();
+      if (state.conversation.at(-1)?.role === "assistant") state.conversation.pop();
+    } else if (assistantText) {
+      assistantText.textContent += "\n（响应中断，点击连接并重试）";
+      if (state.conversation.at(-1)?.role === "assistant") state.conversation.pop();
+    }
     $("ai-usage").textContent = "调用失败：" + error.message + "。没有生成模拟回答，可以重试。";
     toast(error.message);
-  } finally { chatBusy = false; button.disabled = false; button.textContent = "发送给真实模型"; }
+  } finally {
+    chatBusy = false; button.disabled = false; button.textContent = "发送给真实模型";
+    for (const id of ["ai-retry", "create-strategy", "change-model"]) $(id).disabled = false;
+    $("model-primary").disabled = !availableModels.length;
+  }
 }
 function beginConversation() {
+  if (chatBusy) { toast("请等待当前模型回复完成"); return; }
   state.goal = $("goal").value.trim();
   if (!state.goal) return;
   updateModelLabels();
+  if (!state.model) { toast("请先在总览中选择一个 OpenRouter 模型"); showTab("overview"); return; }
   state.conversation = [];
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
@@ -219,18 +373,39 @@ function beginConversation() {
   showTab("create");
 }
 async function refreshStrategies() {
-  const items = await request("/api/strategies"); state.strategies = items;
+  const [items, runs] = await Promise.all([request("/api/strategies"), request("/api/runs")]); state.strategies = items;
   const root = $("strategy-list"); root.replaceChildren();
   if (!items.length) root.appendChild(node("p", "note", "还没有策略。先在总览与 Oasis 讨论一个投资想法。"));
   for (const item of items) {
     const article = node("article", "strategy-card");
-    const info = node("div"); info.append(node("strong", "", item.asset + " · " + item.goal), node("p", "note", "主模型 " + (item.model || "GPT-5.6") + " · " + (item.committee?.length || 0) + " 个协作模型 · 模拟模式"));
-    const btn = node("button", "primary", "运行策略");
+    const info = node("div"); info.append(node("strong", "", item.asset + " · " + item.goal), node("p", "note", "主模型 " + (item.model || "未记录") + " · " + (item.committee?.length || 0) + " 个协作模型 · 模拟模式"));
+    const btn = node("button", "primary", item.terms ? "运行策略" : "补全旧策略");
     btn.addEventListener("click", async () => {
+      if (!item.terms) {
+        if (chatBusy) { toast("请等待模型回复完成"); return; }
+        state.goal = item.goal; state.conversation = [];
+        $("goal").value = item.goal; $("chat-messages").replaceChildren();
+        for (const message of item.conversation || [{ role: "user", content: item.goal }]) addChat(message.role, message.content);
+        makeDraftSummary(); showTab("create");
+        toast("请补全并确认单次上限；保存后会创建新策略"); return;
+      }
       try { state.run = await request("/api/runs", { method: "POST", body: JSON.stringify({ strategyId: item.id }) }); renderRun(); }
       catch (error) { toast(error.message); }
     });
-    article.append(info, btn); root.appendChild(article);
+    const history = runs.filter(run => run.strategyId === item.id).reverse();
+    const actions = node("div", "action-row"); actions.appendChild(btn);
+    if (history.length) {
+      const select = node("select", "run-history"); select.setAttribute("aria-label", "选择历史运行");
+      for (const run of history) {
+        const status = ({ awaiting_approval: "待确认", simulated: "已创建订单", monitoring: "跟踪中", rejected: "已拒绝" })[run.status] || run.status;
+        const option = node("option", "", new Date(run.createdAt).toLocaleString("zh-CN") + " · " + status);
+        option.value = run.id; select.appendChild(option);
+      }
+      const resume = node("button", "ghost", "查看运行记录（" + history.length + "）");
+      resume.addEventListener("click", () => { state.run = history.find(run => run.id === select.value); renderRunContent(); $("run-panel").scrollIntoView({ behavior: "smooth" }); });
+      actions.append(select, resume);
+    }
+    article.append(info, actions); root.appendChild(article);
   }
   if (state.run) renderRunContent();
 }
@@ -238,8 +413,8 @@ const flowInfo = {
   goal: ["理解用户目标", "读取你输入的目标和约束，形成可执行任务。"],
   market: ["发现研究任务", "判断需要哪些市场信息。当前为预置示例，不是真实行情。"],
   service: ["发现数据服务", "找到数据服务并展示报价。当前不会向服务商发起请求或付款。"],
-  committee: ["多模型讨论", "展示你选择的模型及其示例观点。当前不是实际模型推理。"],
-  policy: ["Policy Engine 检查", "检查预算、白名单、单次上限和授权边界。Agent 不能自行修改权限。"],
+  committee: ["演示模型观点", "展示你选择的模型及其示例观点。当前不是实际模型推理。"],
+  policy: ["模拟参数检查", "只验证确认的标的、单次上限和预算格式。实时风控尚未接入。"],
   decision: ["形成交易建议", "汇总研究结果，生成待确认的模拟订单。"],
   approval: ["等待用户授权", "用户可以确认或拒绝。未确认前不会创建订单。"],
   order: ["模拟订单已创建", "订单保存在当前浏览器，不会发送到交易所或区块链。"],
@@ -263,11 +438,11 @@ function renderRunContent() {
   });
   if (events.length) flow.querySelector(".flow-node")?.click();
   const decision = $("decision"); decision.replaceChildren();
-  decision.append(node("h3", "", "模拟订单建议 · " + run.asset), node("p", "note", "示例委员会：" + (run.votes || []).map(v => v.model + " " + v.action).join(" / ")));
+  decision.append(node("h3", "", "模拟订单建议 · " + run.asset), node("p", "note", "演示观点（未调用模型）：" + (run.votes || []).map(v => v.model + " " + v.action).join(" / ")));
   const votes = node("div", "vote-grid");
   (run.votes || []).forEach(v => { const card = node("div", "vote-card"); card.append(node("strong", "", v.model), node("span", v.action === "BUY" ? "vote-buy" : "vote-hold", v.action === "BUY" ? "倾向买入" : "建议观望"), node("p", "", v.rationale)); votes.appendChild(card); });
   decision.appendChild(votes);
-  decision.append(node("div", "order-proposal", "建议模拟买入 " + run.asset + " · " + run.proposedOrder.amountUsdc + " USDC"));
+  decision.append(node("div", "order-proposal", "建议模拟买入 " + run.asset + " · " + (run.proposedOrder.amount || run.proposedOrder.amountUsdc) + " " + (run.proposedOrder.quoteAsset || "USDC")));
   decision.append(node("p", "note", "真实数据采购费用：0 USDC · 真实交易金额：0 USDC。当前所有结论均为固定演示内容。"));
   if (run.status === "awaiting_approval") {
     const actions = node("div", "action-row");
@@ -314,22 +489,21 @@ document.querySelectorAll("[data-tab]").forEach(button => button.addEventListene
 document.querySelectorAll("[data-example]").forEach(button => button.addEventListener("click", () => { $("goal").value = button.dataset.example; $("goal").focus(); }));
 $("goal-form").addEventListener("submit", event => { event.preventDefault(); beginConversation(); });
 $("model-primary").addEventListener("change", updateModelLabels);
-document.querySelectorAll('input[name="committee-model"]').forEach(input => input.addEventListener("change", updateModelLabels));
+$("model-search").addEventListener("input", renderModelOptions);
 $("change-model").addEventListener("click", () => { showTab("overview"); $("model-primary").focus(); });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
-  if (state.conversation.at(-1)?.role === "user") {
-    sendToRealModel();
-    return;
-  }
-  addChat("user", value); state.goal += "；补充要求：" + value; $("chat-input").value = "";
+  try { appendUserMessage(value); } catch (error) { toast(error.message); return; }
+  state.goal = (state.goal + "；补充要求：" + value).slice(-2000); $("chat-input").value = "";
   makeDraftSummary();
   sendToRealModel();
 });
 $("create-strategy").addEventListener("click", async () => {
   try {
+    if (chatBusy) return;
     updateModelLabels();
-    const result = await request("/api/strategies", { method: "POST", body: JSON.stringify({ goal: state.goal, budget: $("budget").value, model: state.model, committee: state.committee }) });
+    const terms = confirmedDraft();
+    const result = await request("/api/strategies", { method: "POST", body: JSON.stringify({ goal: state.goal, budget: $("budget").value, model: state.modelName, modelId: state.model, committee: state.committee, terms, conversation: state.conversation }) });
     state.strategy = result; toast("策略已保存"); showTab("strategies");
   } catch (error) { toast(error.message); }
 });
