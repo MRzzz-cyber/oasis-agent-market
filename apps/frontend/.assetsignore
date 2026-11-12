@@ -1,3 +1,5 @@
 *.test.mjs
 worker.js
 .dev.vars
+
+auth.js

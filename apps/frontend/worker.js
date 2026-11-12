@@ -1,3 +1,5 @@
+import { account, authRoute, googleMode } from "./auth.js";
+export { AccountStore } from "./auth.js";
 const SYSTEM_PROMPT = [
   "你是 Oasis 的中文 AI 投资策略顾问，帮助用户通过多轮对话完善可执行的模拟投资策略。",
   "回答简洁自然，每次最多问 1 到 2 个最重要的澄清问题。优先询问交易标的、投入本金、周期、单次上限和风控条件。",
@@ -154,10 +156,12 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
 
     if (request.method === "GET" && url.pathname === "/api/ai/status") {
       return respond({
+        googleLogin: googleMode(env),
         enabled: Boolean(env.OASIS_DEMO_ACCESS_CODE),
         openRouterConfigured: Boolean(env.OPENROUTER_API_KEY),
         provider: "OpenRouter"
@@ -179,7 +183,12 @@ export default {
     if (!env.OASIS_DEMO_ACCESS_CODE) return respond({ error: "模型 API 尚未开放：管理员需先配置 OASIS_DEMO_ACCESS_CODE" }, 503);
     const origin = request.headers.get("origin");
     if (!origin || origin !== url.origin) return respond({ error: "只允许从 Oasis 页面调用" }, 403);
-    if (!(await secureEqual(request.headers.get("x-oasis-access-code") || "", env.OASIS_DEMO_ACCESS_CODE))) return respond({ error: "体验码不正确" }, 401);
+    if (googleMode(env)) {
+      if (!env.ACCOUNTS) return respond({error:"账号服务尚未配置"},503);
+      const current = await account(request,env);
+      if (!current.ok) return current;
+      if (!(await current.json()).active) return respond({error:"请先激活账号"},403);
+    } else if (!(await secureEqual(request.headers.get("x-oasis-access-code") || "", env.OASIS_DEMO_ACCESS_CODE))) return respond({ error: "体验码不正确" }, 401);
     if (Number(request.headers.get("content-length") || 0) > 25000) return respond({ error: "请求内容过大" }, 413);
 
     let payload;

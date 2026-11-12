@@ -26,7 +26,7 @@
       <div class="side-bottom">● 模拟模式<br/><small>真实策略对话 · 模拟交易</small></div>
     </aside>
     <div class="content">
-      <header class="app-header"><div id="breadcrumb">总览</div><button class="ghost" id="back-site">查看官网</button></header>
+      <header class="app-header"><div id="breadcrumb">总览</div><button class="ghost" id="account-button" hidden>登录</button><button class="ghost" id="back-site">查看官网</button></header>
       <main>
         <section id="page-overview" class="app-page">
           <div class="welcome"><h1>让 AI 帮你做投资</h1><p>从一个投资想法开始。</p></div>
@@ -36,7 +36,7 @@
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">真实模型对话 · 模拟策略</span></div>
           <div class="conversation panel">
-            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="由 Cloudflare 管理员设置的体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button><span class="note">API Key 保存在 Cloudflare，永不输入到网页</span></div>
+            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="由 Cloudflare 管理员设置的体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button><span class="note">API Key 保存在 Cloudflare，永不输入到网页</span></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
             <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送给真实模型</button></form><p id="ai-usage" class="note">真实模型需要在 Cloudflare 中配置密钥和体验码。失败不会产生模拟 AI 回复。</p>
           </div>
@@ -59,7 +59,7 @@
         <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>管理策略、查看 Agent 工作流和模拟订单后续。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
         <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>Agent 可以提出服务采购和交易建议，但不能自行修改权限。</p><div class="panel"><div class="kv"><span>运行模式</span><strong>模拟模式</strong></div><div class="kv"><span>网络</span><strong>Base Sepolia（预留）</strong></div><div class="kv"><span>真实服务付款</span><strong class="warn">关闭</strong></div><div class="kv"><span>真实交易</span><strong class="warn">关闭</strong></div><div class="kv"><span>交易确认</span><strong>每笔由用户确认</strong></div><div class="kv"><span>模型选择</span><strong id="policy-model">免费模型</strong></div><p class="note">策略顾问接入 OpenRouter 后会产生真实 API 请求；多模型委员会仍为示例投票。服务采购预算与投资交易预算分开管理。</p></div></section>
       </main>
-      <div id="toast" aria-live="polite"></div>
+      <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
   <script src="/app.js" type="module"></script>

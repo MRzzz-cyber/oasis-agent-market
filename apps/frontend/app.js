@@ -8,7 +8,7 @@ function toast(message) {
   setTimeout(() => $("toast").classList.remove("active"), 3500);
 }
 const browserOnlyDemo = true;
-const demoStorageKey = "oasis-demo-v1";
+let demoStorageKey = "oasis-demo-v1";
 const demoMemory = { strategies: [], runs: [] };
 function readDemoState() {
   try {
@@ -253,11 +253,72 @@ function appendUserMessage(value) {
   } else addChat("user", value);
 }
 let chatBusy = false;
+let googleLogin = false;
+let currentUser = null;
+function renderAccount() {
+  const pending = currentUser && !currentUser.active;
+  $("account-button").textContent = currentUser?.email || "使用 Google 登录";
+  $("account-title").textContent = pending ? "首次登录 · 激活账号" : currentUser ? "我的账号" : "登录 Oasis";
+  $("account-note").textContent = currentUser?.email || "首次登录后，输入私人体验码即可使用策略顾问。";
+  $("google-login").hidden = Boolean(currentUser);
+  $("logout").hidden = !currentUser;
+  $("activate").hidden = $("invite-label").hidden = !pending;
+}
+function openAccount() {
+  renderAccount();
+  if (!$("account-dialog").open) $("account-dialog").showModal();
+}
+$("account-button").onclick = openAccount;
+$("google-login").onclick = () => {
+  try { sessionStorage.setItem("oasis-login-goal", $("goal").value.slice(0,2000)); } catch {}
+};
+$("account-close").onclick = () => $("account-dialog").close();
+$("logout").onclick = async () => {
+  try {
+    const r = await fetch("/api/auth/logout", {method:"POST"});
+    if (!r.ok) throw Error("退出失败，请重试");
+    location.replace("/");
+  } catch (error) { $("account-note").textContent = error.message; }
+};
+$("account-form").onsubmit = async event => {
+  event.preventDefault();
+  $("activate").disabled = true;
+  try {
+    const r = await fetch("/api/auth/activate", {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({code:$("account-invite").value.trim()})});
+    const result = await r.json();
+    if (!r.ok) throw Error(result.error || "激活失败");
+    currentUser = result;
+    $("account-invite").value = "";
+    renderAccount();
+    $("account-dialog").close();
+    toast("账号已激活");
+  } catch (error) { $("account-note").textContent = error.message; }
+  finally { $("activate").disabled = false; }
+};
+async function initAccount(status) {
+  googleLogin = status.googleLogin === true;
+  if (!googleLogin) return;
+  $("legacy-access").hidden = true;
+  $("account-button").hidden = false;
+  const r = await fetch("/api/auth/me", {cache:"no-store"});
+  currentUser = r.ok ? await r.json() : null;
+  demoStorageKey = currentUser ? "oasis-account-" + currentUser.id : "oasis-guest";
+  renderAccount();
+  const login = new URLSearchParams(location.search).get("login");
+  if (login) {
+    history.replaceState(null,"","/");
+    showApp();
+    try { $("goal").value = sessionStorage.getItem("oasis-login-goal") || ""; sessionStorage.removeItem("oasis-login-goal"); } catch {}
+    if (!currentUser?.active) openAccount();
+    if (login === "failed") $("account-note").textContent = "登录未完成，请重新使用 Google 登录。";
+  }
+}
 async function checkAiStatus() {
   try {
     const res = await fetch("/api/ai/status", { cache: "no-store" });
     if (!res.ok) throw Error("API 未部署");
     const status = await res.json();
+    await initAccount(status);
     $("ai-runtime-status").textContent = status.openRouterConfigured
       ? "OpenRouter API Key 已配置"
       : "模型目录可浏览，但管理员尚未配置 OpenRouter API Key";
@@ -274,7 +335,8 @@ async function checkAiStatus() {
 async function sendToRealModel() {
   if (chatBusy || !state.conversation.length) return;
   const code = $("ai-access-code").value.trim();
-  if (!code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
+  if (googleLogin && !currentUser?.active) { openAccount(); return; }
+  if (!googleLogin && !code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
   if (!state.model) { $("ai-usage").textContent = "请先返回总览，选择一个 OpenRouter 模型。"; return; }
   chatBusy = true;
   const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
@@ -285,10 +347,11 @@ async function sendToRealModel() {
     const messages = (state.conversation.length > 12 ? [state.conversation[0], ...state.conversation.slice(-11)] : state.conversation).map(({ role, content }) => ({ role, content }));
     const response = await fetch("/api/ai/chat", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-oasis-access-code": code },
+      headers: { "content-type": "application/json", ...(!googleLogin ? {"x-oasis-access-code": code} : {}) },
       body: JSON.stringify({ model: state.model, messages })
     });
     if (!response.ok) {
+      if (googleLogin && response.status === 401) { currentUser = null; openAccount(); }
       const errorPayload = await response.json().catch(() => ({}));
       throw new Error(errorPayload.error || "模型调用失败（HTTP " + response.status + "）");
     }
@@ -350,6 +413,7 @@ async function sendToRealModel() {
 }
 function beginConversation() {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
+  if (googleLogin && !currentUser?.active) { openAccount(); return; }
   state.goal = $("goal").value.trim();
   if (!state.goal) return;
   updateModelLabels();

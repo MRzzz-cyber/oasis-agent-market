@@ -33,3 +33,11 @@ button:disabled { cursor: wait; opacity: .55; }
 .ledger-step:before{content:"";position:absolute;left:-5px;top:19px;width:8px;height:8px;border-radius:50%;background:#53d9a8}
 .ledger-label{color:#98c8b6}.ledger-step small{grid-column:2;color:#a4b5bb}.run-ledger button{margin-top:12px}
 @media(max-width:540px){.ledger-step{grid-template-columns:1fr}.ledger-step small{grid-column:1}}
+
+[hidden]{display:none!important}
+#account-dialog{max-width:min(380px,90vw);border:1px solid #36515a;border-radius:12px;background:#13222b;color:#e4edef;padding:24px}
+#account-dialog::backdrop{background:#061019bb}
+#account-form{display:grid;gap:14px}
+#account-form a{text-align:center;text-decoration:none;padding:10px}
+#invite-label input{display:block;width:100%;margin-top:6px}
+#account-button{margin-left:auto}

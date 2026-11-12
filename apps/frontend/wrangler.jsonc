@@ -11,5 +11,21 @@
     ],
     "not_found_handling": "single-page-application"
   },
-  "previews": {}
+  "previews": {},
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ACCOUNTS",
+        "class_name": "AccountStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-accounts",
+      "new_sqlite_classes": [
+        "AccountStore"
+      ]
+    }
+  ]
 }
