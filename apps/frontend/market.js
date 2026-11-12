@@ -21,19 +21,19 @@ export function marketView(analyze) {
     g.font="11px system-ui";
     for(let i=0;i<=4;i++) {
       const value = lo+range*i/4, line=y(value);
-      g.fillStyle="#30424d"; g.fillRect(0,line,right,1);
-      g.fillStyle="#a5b9bd"; g.fillText(price(value),right+5,line+3);
+      g.fillStyle="#e0e5df"; g.fillRect(0,line,right,1);
+      g.fillStyle="#57695f"; g.fillText(price(value),right+5,line+3);
     }
     rows.forEach((r,i)=>{
       const x=(i+.5)*step, w=Math.max(1,step*.68);
-      g.fillStyle=r.c>=r.o?"#48d6a2":"#fa817f";
+      g.fillStyle=r.c>=r.o?"#247455":"#ba4d47";
       g.fillRect(x,y(r.h),1,Math.max(1,y(r.l)-y(r.h)));
       g.fillRect(x-w/2,y(Math.max(r.o,r.c)),w,Math.max(1,Math.abs(y(r.o)-y(r.c))));
       const bar=r.v/volume*32;
       g.globalAlpha=.55; g.fillRect(x-w/2,height-24-bar,w,bar); g.globalAlpha=1;
     });
     const stamp = t=>new Date(t).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-    g.fillStyle="#a5b9bd"; g.fillText(stamp(rows[0].t),0,height-5);
+    g.fillStyle="#57695f"; g.fillText(stamp(rows[0].t),0,height-5);
     g.textAlign="right";g.fillText(stamp(rows.at(-1).t),right,height-5);
     const r=rows[hover] || rows.at(-1);
     if(rows[hover]) {g.fillStyle="#afc7be"; g.fillRect((hover+.5)*step,0,1,height-24);}

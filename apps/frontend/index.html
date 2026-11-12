@@ -3,35 +3,24 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="theme-color" content="#0a1017"/>
+  <meta name="theme-color" content="#f8f8f4"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
   <link rel="stylesheet" href="/styles.css"/>
 </head>
 <body>
-  <div id="landing" class="landing">
-    <header class="site-nav"><a class="brand" href="/">◈ <strong>Oasis AI</strong></a><button class="primary" id="enter">开始使用 →</button></header>
-    <section class="hero">
-      <span class="eyebrow">AI INVESTMENT ASSISTANT</span>
-      <h1>让 AI 帮你做投资</h1>
-      <p>用自然语言说出你的想法。和 AI 一起制定策略、理解每一步决策，再由你决定是否模拟执行。</p>
-      <button class="primary large" id="enter2">体验 Demo →</button>
-      <p class="small">模拟模式 · 示例数据 · 不连接真实交易所或钱包</p>
-    </section>
-    <section class="features"><article><span>✦</span><h3>先对话，再形成策略</h3><p>像和投资助理聊天一样，逐步补充目标与约束。</p></article><article><span>◉</span><h3>看见 Agent 如何工作</h3><p>用流程图查看数据、模型判断、风险检查和交易建议。</p></article><article><span>◇</span><h3>每一步都由你掌控</h3><p>预算和权限独立控制，模拟订单需要你确认。</p></article></section>
-  </div>
-  <div id="workspace" class="workspace hidden">
-    <aside>
-      <div class="side-brand">◈ Oasis <small>AI 投资助手</small></div>
-      <nav><button data-tab="overview" class="selected">⌂　总览</button><button data-tab="market">行情分析</button><button data-tab="create">✧　创建策略</button><button data-tab="strategies">▤　我的策略</button><button data-tab="policy">◇　预算与权限</button></nav>
-      <div class="side-bottom">● 模拟模式<br/><small>真实策略对话 · 模拟交易</small></div>
-    </aside>
+  <div id="workspace" class="workspace">
+    <header class="app-header"><div class="header-inner">
+      <a class="wordmark" href="/" aria-label="Oasis 首页"><i aria-hidden="true"></i>Oasis</a>
+      <nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button></nav>
+      <button class="ghost" id="account-button" hidden>登录</button>
+    </div></header>
     <div class="content">
-      <header class="app-header"><div id="breadcrumb">总览</div><button class="ghost" id="account-button" hidden>登录</button><button class="ghost" id="back-site">查看官网</button></header>
       <main>
         <section id="page-overview" class="app-page">
-          <div class="welcome"><h1>让 AI 帮你做投资</h1><p>从一个投资想法开始。</p></div>
+          <div class="welcome"><h1>今天想研究什么策略？</h1><p>与 AI 讨论你的想法，再用模拟订单验证。</p></div>
+
+          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
           <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
-          <form id="goal-form" class="prompt"><label for="goal">你想和 AI 讨论什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 →</button></div></form>
         </section>
         <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 永续合约 · 成交价（USD）</p></div></div>
           <div class="panel"><div class="market-controls"><label>合约 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
@@ -39,15 +28,15 @@
           <p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="永续合约 K 线及成交量"></canvas>
           <div class="market-controls"><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
-          <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">真实模型对话 · 模拟策略</span></div>
+          <div class="page-heading"><div><h2>策略工作台</h2><p>通过对话调整草案，确认参数后保存。</p></div><button class="ghost" id="new-idea">新建策略</button></div>
           <div class="conversation panel">
-            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="由 Cloudflare 管理员设置的体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button><span class="note">API Key 保存在 Cloudflare，永不输入到网页</span></div>
+            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
-            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送给真实模型</button></form><p id="ai-usage" class="note">真实模型需要在 Cloudflare 中配置密钥和体验码。失败不会产生模拟 AI 回复。</p>
+            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送</button></form><p id="ai-usage" class="note"></p>
           </div>
           <div id="draft-panel" class="panel draft-panel hidden">
-            <div class="draft-head"><div><span class="eyebrow">STRATEGY DRAFT</span><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
-            <p class="note">从你的输入初步整理，可直接修改。请确认标的和单次上限后再保存；这些参数决定模拟订单，服务预算单独设置。补充对话会重新整理本表。</p>
+            <div class="draft-head"><div><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
+            <p class="note">可直接修改参数。继续对话会重新整理草案。</p>
             <div id="draft-summary" class="draft-form">
               <label>投资标的<select id="draft-asset"><option value="">请选择</option><option>ETH</option><option>BTC</option><option>SOL</option><option>XRP</option><option>HYPE</option></select></label>
               <label>执行节奏<select id="draft-cadence"><option>每周</option><option>每天</option><option>每月</option><option>按信号触发</option></select></label>
@@ -56,13 +45,13 @@
               <label>投资预算（可选）<input id="draft-capital" type="number" min="0.000001" step="any" placeholder="例如月度预算 500"/></label>
               <label>暂停回撤 %（可选）<input id="draft-stop" type="number" min="0.01" max="100" step="any" placeholder="例如 5"/></label>
             </div>
-            <p class="note">当前使用预置行情演示，尚不验证实时入场条件、回撤或累计预算，也不自动按周期运行。</p>
-            <details class="advanced-budget"><summary>高级设置：Agent 服务预算</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>演示默认上限 5 USDC；真实服务采购尚未启用。</small></details>
-            <button class="primary" id="create-strategy">确认草案并保存策略 →</button>
+            <p class="note">模拟运行使用预置行情样本，每笔订单需要你确认。</p>
+            <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 真实付款及交易已关闭</small></details>
+            <button class="primary" id="create-strategy">保存策略</button>
           </div>
         </section>
-        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>管理策略、查看 Agent 工作流和模拟订单后续。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
-        <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>Agent 可以提出服务采购和交易建议，但不能自行修改权限。</p><div class="panel"><div class="kv"><span>运行模式</span><strong>模拟模式</strong></div><div class="kv"><span>网络</span><strong>Base Sepolia（预留）</strong></div><div class="kv"><span>真实服务付款</span><strong class="warn">关闭</strong></div><div class="kv"><span>真实交易</span><strong class="warn">关闭</strong></div><div class="kv"><span>交易确认</span><strong>每笔由用户确认</strong></div><div class="kv"><span>模型选择</span><strong id="policy-model">免费模型</strong></div><p class="note">策略顾问接入 OpenRouter 后会产生真实 API 请求；多模型委员会仍为示例投票。服务采购预算与投资交易预算分开管理。</p></div></section>
+        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看已保存的策略和模拟运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
+
       </main>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>

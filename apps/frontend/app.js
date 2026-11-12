@@ -1,7 +1,7 @@
 import { marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
-const tabs = ["overview", "market", "create", "strategies", "policy"];
+const tabs = ["overview", "market", "create", "strategies"];
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -152,14 +152,19 @@ async function request(path, options = {}) {
   if (!res.ok) throw new Error(data.error || "请求失败");
   return data;
 }
-function showApp() { $("landing").classList.add("hidden"); $("workspace").classList.remove("hidden"); showTab("overview"); }
-function showSite() { toggleMarket(false); $("landing").classList.remove("hidden"); $("workspace").classList.add("hidden"); }
+function showApp() { showTab("overview"); }
+let studioTab = "overview";
 const toggleMarket = marketView(prompt => { $("goal").value = prompt; showTab("overview"); $("goal").focus(); });
 function showTab(tab) {
   if (!tabs.includes(tab)) return;
   for (const id of tabs) $("page-" + id).classList.toggle("hidden", id !== tab);
-  document.querySelectorAll("[data-tab]").forEach(n => n.classList.toggle("selected", n.dataset.tab === tab));
-  $("breadcrumb").textContent = ({ overview: "总览", market: "行情分析", create: "创建策略", strategies: "我的策略", policy: "预算与权限" })[tab];
+  if (tab === "overview" || tab === "create") studioTab = tab;
+  const selected = tab === "create" ? "overview" : tab;
+  document.querySelectorAll("[data-tab]").forEach(button => {
+    const active = button.dataset.tab === selected;
+    button.classList.toggle("selected", active);
+    if (active) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current");
+  });
   toggleMarket(tab === "market");
   if (tab === "strategies") refreshStrategies();
 }
@@ -340,7 +345,7 @@ async function sendToRealModel() {
   const code = $("ai-access-code").value.trim();
   if (googleLogin && !currentUser?.active) { openAccount(); return; }
   if (!googleLogin && !code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
-  if (!state.model) { $("ai-usage").textContent = "请先返回总览，选择一个 OpenRouter 模型。"; return; }
+  if (!state.model) { $("ai-usage").textContent = "请先返回策略工作台，选择一个 OpenRouter 模型。"; return; }
   chatBusy = true;
   const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
   for (const id of ["ai-retry", "create-strategy", "change-model", "model-primary"]) $(id).disabled = true;
@@ -409,7 +414,7 @@ async function sendToRealModel() {
     $("ai-usage").textContent = "调用失败：" + error.message + "。没有生成模拟回答，可以重试。";
     toast(error.message);
   } finally {
-    chatBusy = false; button.disabled = false; button.textContent = "发送给真实模型";
+    chatBusy = false; button.disabled = false; button.textContent = "发送";
     for (const id of ["ai-retry", "create-strategy", "change-model"]) $(id).disabled = false;
     $("model-primary").disabled = !availableModels.length;
   }
@@ -420,7 +425,7 @@ function beginConversation() {
   state.goal = $("goal").value.trim();
   if (!state.goal) return;
   updateModelLabels();
-  if (!state.model) { toast("请先在总览中选择一个 OpenRouter 模型"); showTab("overview"); return; }
+  if (!state.model) { toast("请先在策略工作台中选择一个 OpenRouter 模型"); showTab("overview"); return; }
   state.conversation = [];
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
@@ -433,10 +438,15 @@ function beginConversation() {
 async function refreshStrategies() {
   const [items, runs] = await Promise.all([request("/api/strategies"), request("/api/runs")]); state.strategies = items;
   const root = $("strategy-list"); root.replaceChildren();
-  if (!items.length) root.appendChild(node("p", "note", "还没有策略。先在总览与 Oasis 讨论一个投资想法。"));
+  if (!items.length) root.appendChild(node("p", "note", "还没有策略。先在策略工作台与 Oasis 讨论一个投资想法。"));
   for (const item of items) {
     const article = node("article", "strategy-card");
-    const info = node("div"); info.append(node("strong", "", item.asset + " · " + item.goal), node("p", "note", "主模型 " + (item.model || "未记录") + " · " + (item.committee?.length || 0) + " 个协作模型 · 模拟模式"));
+    const info = node("div"); info.append(node("strong", "", item.terms ? item.asset + " · " + item.terms.cadence : item.asset + " · " + item.goal), node("p", "note", (item.terms ? "单次上限 " + item.terms.maxOrder + " " + item.terms.quoteAsset + " · " : "") + (item.model || "未记录模型")));
+    if (item.terms) {
+      const details = node("details", "strategy-goal");
+      details.append(node("summary", "", "原始目标"), node("p", "", item.goal));
+      info.appendChild(details);
+    }
     const btn = node("button", "primary", item.terms ? "运行策略" : "补全旧策略");
     btn.addEventListener("click", async () => {
       if (!item.terms) {
@@ -542,9 +552,8 @@ function renderOrderFollowup(run) {
   }
 }
 function renderRun() { showTab("strategies"); $("run-panel").scrollIntoView({ behavior: "smooth", block: "start" }); }
-for (const id of ["enter", "enter2"]) $(id).addEventListener("click", showApp);
-$("back-site").addEventListener("click", showSite);
-document.querySelectorAll("[data-tab]").forEach(button => button.addEventListener("click", () => showTab(button.dataset.tab)));
+$("new-idea").onclick = () => { if (chatBusy) return toast("请等待当前回复完成"); $("goal").value = ""; showTab("overview"); $("goal").focus(); };
+document.querySelectorAll("[data-tab]").forEach(button => button.addEventListener("click", () => showTab(button.dataset.tab === "overview" ? studioTab : button.dataset.tab)));
 document.querySelectorAll("[data-example]").forEach(button => button.addEventListener("click", () => { $("goal").value = button.dataset.example; $("goal").focus(); }));
 $("goal-form").addEventListener("submit", event => { event.preventDefault(); beginConversation(); });
 $("model-primary").addEventListener("change", () => {
