@@ -656,27 +656,27 @@ async function renderReplays() {
       if(!r.ok)return [];
       const data=await r.json();
       if(data.coin!==coin || data.interval!=="1h")return [];
-      return [1,-1].map(side=>({coin,side,result:replay(data.candles,side)})).filter(x=>x.result);
+      return [[1,false],[-1,false],[-1,true]].map(([side,continuous])=>({coin,side,continuous,result:replay(data.candles,side,Date.now(),continuous)})).filter(x=>x.result);
     } catch {return [];}
   }));
   const models=groups.flat().sort((a,b)=>b.result.gain-a.result.gain);
   const positive=models.filter(m=>m.result.gain>0.005).length;
-  $("replay-status").textContent=models.length ? "已计算 "+models.length+"/4 个模型 · "+positive+" 个本期收涨" : "暂无完整行情样本，可先选择下方策略模板。";
-  for(const {coin,side,result} of models) {
-    const name=coin+(side===1?" 均线顺势做多":" 均线走弱做空");
+  $("replay-status").textContent=models.length ? "已计算 "+models.length+"/6 个模型与对照 · "+positive+" 个本期收涨" : "暂无完整行情样本，可先选择下方策略模板。";
+  for(const {coin,side,continuous,result} of models) {
+    const name=coin+(continuous?" 持续空头对照":side===1?" 均线顺势做多":" 均线走弱做空");
     const value=Number(result.gain.toFixed(2));
     const color=value>0?"#167454":value<0?"#ad443f":"#68746e";
     const card=node("button","strategy-template","");
     card.type="button";
     const header=node("span","template-header","");
-    header.append(node("strong","",name),node("small","","1h · SMA20"));
+    header.append(node("strong","",name),node("small","",continuous?"24h · 空头对照":"1h · SMA20"));
     const strip=node("span","template-strip",""),quote=node("span","template-quote","");
     const amount=node("b","",(value>0?"↗ +":value<0?"↘ ":"→ ")+value.toFixed(2)+"%");
     amount.style.color=color;
     quote.append(amount,node("small","","模拟收益 · 截至 "+new Date(result.end).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})));
     strip.append(quote,sparkline(result.curve,color));
     card.append(header,strip,node("small","","同期标的 "+result.underlying.toFixed(2)+"% · 收盘净值最大回撤 "+result.drawdown.toFixed(2)+"% · "+result.trades+" 次开仓"));
-    card.onclick=()=>chooseStarter({label:"请帮我分析「"+name+"」：上一小时收盘价"+(side===1?"高于均线时模拟做多":"低于均线时模拟做空")+"，否则空仓；以20小时简单均线为参照，下一小时开盘成交。最近24小时样本截至 "+new Date(result.end).toISOString()+"，模拟收益 "+value+"%，每次进出各计0.05%成本，未计资金费和实际滑点。请解释该模型在哪些行情下容易失效。"});
+    card.onclick=()=>chooseStarter({label:continuous ? "请解释 "+coin+" 持续空头对照：在样本开始时按初始本金等额模拟开空，持有至24小时结束。该样本截至 "+new Date(result.end).toISOString()+"，计入进出成本后的模拟收益为 "+value+"%，未计资金费。请解释其风险和与均线择时的区别。" : "请帮我分析「"+name+"」：上一小时收盘价"+(side===1?"高于均线时模拟做多":"低于均线时模拟做空")+"，否则空仓；以20小时简单均线为参照，下一小时开盘成交。最近24小时样本截至 "+new Date(result.end).toISOString()+"，模拟收益 "+value+"%，每次进出各计0.05%成本，未计资金费和实际滑点。请解释该模型在哪些行情下容易失效。"});
     $("replay-list").append(card);
   }
 }

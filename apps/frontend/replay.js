@@ -1,5 +1,5 @@
 // Signals use only closed bars. A position change executes at the next hourly open.
-export function replay(candles, side, now = Date.now()) {
+export function replay(candles, side, now = Date.now(), continuous = false) {
   const hour = 3600000, fee = 0.0005;
   const bars = candles.filter(b => b.t + hour <= now).slice(-44);
   if (bars.length !== 44 || bars.some((b,i) => !(b.o > 0 && b.c > 0) || (i && b.t-bars[i-1].t !== hour))) return null;
@@ -12,7 +12,7 @@ export function replay(candles, side, now = Date.now()) {
   for (let i = 20; i < bars.length; i++) {
     const bar = bars[i], prior = bars.slice(i-20,i);
     const mean = prior.reduce((sum,b)=>sum+b.c,0)/20;
-    const hold = side*(prior.at(-1).c-mean) > 0;
+    const hold = continuous || side*(prior.at(-1).c-mean) > 0;
     if (!hold && units) close(bar.o);
     if (hold && !units) {
       const capital = cash/(1+fee);
