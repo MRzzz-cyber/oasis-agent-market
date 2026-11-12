@@ -1,53 +1,50 @@
-# Oasis Cloudflare 公网 Demo 部署
+# Oasis Cloudflare 部署
 
-当前 Cloudflare Workers Builds 项目采用 monorepo 子项目配置：**Root directory 必须指向 `apps/frontend`，该目录内有自己的 `wrangler.jsonc`**。
+当前入口为 `apps/frontend/worker.js`：Worker 提供 OpenRouter 模型目录和流式对话，静态前端负责策略与模拟订单，数据仅保存在当前浏览器。
 
-## Dashboard 设置
+## 构建设置
 
-- Git repository: `MRzzz-cyber/oasis-agent-market`
+- Repository: `MRzzz-cyber/oasis-agent-market`
 - Production branch: `refactor/simple-base-mvp`
 - Root directory: `apps/frontend`
 - Build command: 留空
-- Deploy command: `npx wrangler deploy`
-- Preview command: 留空或默认
-- Worker name: 由 `apps/frontend/wrangler.jsonc` 指定为 `oasis-ai-demo`
+- Deploy command: `npx wrangler deploy --config wrangler.jsonc`
+- Worker name: `oasis-ai-demo`（以该目录内的 Wrangler 配置为准）
 
-不要再使用 `--config ../../wrangler.jsonc`。Wrangler 配置现在位于子项目根目录。
+**先将 PR #2 的 OpenRouter 功能分支合并到生产分支，再从生产分支重新部署。** 仅在功能分支修复配置，不会改变生产分支的构建结果。根目录不要使用 `--config ../../wrangler.jsonc`。
 
-## 部署步骤
+`npx wrangler preview` 与生产部署命令不同。配置保留 `previews: {}`；Cloudflare 的生产部署命令仍应使用上面的 `wrangler deploy`。
 
-1. 在 Settings > Builds 中保存上述配置。
-2. 打开 Deployments。
-3. 选择最新 `refactor/simple-base-mvp` commit 的 Preview/Production build，或推送该分支的新 commit 触发部署。
-4. 等待 Build 和 Deploy 都显示 Ready。
-5. 打开 Cloudflare 提供的 `workers.dev` 地址。
+## 必需配置
 
-## 本地预览
+在实际部署的 Worker 的 Settings → Variables and Secrets 中配置 Secret：
+
+- `OPENROUTER_API_KEY`
+- `OASIS_DEMO_ACCESS_CODE`
+
+不把 Key 放进前端、Git 或普通变量。网页只输入管理员设置的体验码。配置变更后重新部署。
+
+## 部署验证
+
+1. `/api/ai/status` 应包含 `provider: "OpenRouter"`、`openRouterConfigured: true` 和 `enabled: true`。若仍返回旧版固定模型字典，说明部署的代码尚未更新。
+2. `/api/ai/models` 应返回实时目录与模型 ID。
+3. 在页面选择模型、输入体验码，确认回复逐步显示，并显示实际模型 ID 和服务端返回的 Token 用量。
+4. 补充策略条件，确认草案中的标的、单次上限与币种，保存并运行模拟订单。
+5. 确认、跟踪和复盘后刷新页面，从“我的策略”的运行记录重新打开。
+
+模型目录公开可读；真实推理需要体验码和 Key。主模型对话为真实 API 请求，行情、模型观点、数据采购和交易均为模拟；不计算虚构盈亏，不进行真实付款。
+
+## 本地检查
 
 在仓库根目录运行：
 
 ```bash
+npm install --no-package-lock --ignore-scripts
+npm test
+npx wrangler deploy --dry-run --config apps/frontend/wrangler.jsonc
 npx wrangler dev --config apps/frontend/wrangler.jsonc
 ```
 
-## Demo 能力与边界
+本地 Worker 密钥放在 `apps/frontend/.dev.vars`，不要提交。`npm run dev` 仅启动 Node 模拟 API 与静态页面，不提供 Cloudflare OpenRouter 路由；验证真实对话应使用 Wrangler。
 
-- 纯静态前端；策略与模拟记录保存在访客自己的浏览器 localStorage。
-- 不需要钱包、API Key、数据库或 Node 后端。
-- 不会调用真实模型、真实行情、真实 x402 付款或真实交易。
-- 本地完整 Node API 仍通过 `npm run dev` 启动，不能直接作为 Workers 静态资产 API 使用。
-
-## 为什么配置放在 apps/frontend？
-
-Cloudflare Workers Builds 的 Root directory 决定命令执行位置。对于 monorepo，Cloudflare 推荐 Root directory 指向包含该 Worker 自身 Wrangler 配置的子项目目录。把 Wrangler 配置放在 `apps/frontend` 后，Wrangler 可以直接在项目目录执行 `npx wrangler deploy`，避免从 workspace 根目录运行自动项目检测。
-
-参考：
-- https://developers.cloudflare.com/workers/ci-cd/builds/advanced-setups/
-- https://developers.cloudflare.com/workers/ci-cd/builds/configuration/
-- https://developers.cloudflare.com/workers/wrangler/configuration/
-
-## 真实模型 API（新版）
-
-前端静态资源由 Cloudflare 托管；`apps/frontend/worker.js` 处理 `/api/ai/chat` 与 `/api/ai/status`。部署后必须在 Cloudflare Settings > Variables and Secrets 中以 **Secret** 类型设置私人体验码 `OASIS_DEMO_ACCESS_CODE` 和至少一个模型供应商 API Key。
-
-详细说明：[真实模型接入](live-llm.md)。没有配置 Key 时会明确提示错误，绝不提供伪造的模型回复。网站的模型委员会、数据采购及订单依旧是模拟模块，不要将其宣传为已上线真实交易。
+更多说明见 [OpenRouter 接入](openrouter-integration.md)。

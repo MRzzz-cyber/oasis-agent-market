@@ -34,9 +34,11 @@ export function validateChatInput(value) {
   const messages = value.messages.map(item => {
     if (!item || !["user", "assistant"].includes(item.role) || typeof item.content !== "string") throw new Error("对话格式无效");
     const content = item.content.trim();
-    if (!content || content.length > 2000) throw new Error("单条消息需在 1–2000 字以内");
+    const limit = item.role === "assistant" ? 12000 : 2000;
+    if (!content || content.length > limit) throw new Error("消息过长：用户最多 2000 字，模型回复最多 12000 字");
     return { role: item.role, content };
   });
+  if (messages.reduce((sum, item) => sum + item.content.length, 0) > 20000) throw new Error("对话历史过长，请开始新对话");
   if (messages.at(-1).role !== "user") throw new Error("最后一条必须是用户消息");
   return { model: value.model, messages };
 }
@@ -58,7 +60,7 @@ export function normalizeOpenRouterModels(payload) {
       contextLength: Number.isFinite(item.context_length) ? item.context_length : null,
       inputPricePerMillion: pricePerMillion(item.pricing?.prompt),
       outputPricePerMillion: pricePerMillion(item.pricing?.completion),
-      isFree: Number(item.pricing?.prompt) === 0 && Number(item.pricing?.completion) === 0,
+      isFree: pricePerMillion(item.pricing?.prompt) === 0 && pricePerMillion(item.pricing?.completion) === 0,
       created: Number.isFinite(item.created) ? item.created : 0,
       provider: item.id.split("/")[0]
     }))
@@ -67,6 +69,7 @@ export function normalizeOpenRouterModels(payload) {
 }
 
 function pricePerMillion(value) {
+  if (value == null || value === "") return null;
   const price = Number(value);
   return Number.isFinite(price) && price >= 0 ? price * 1_000_000 : null;
 }

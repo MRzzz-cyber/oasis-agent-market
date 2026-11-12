@@ -50,3 +50,20 @@ test("missing OpenRouter key fails closed", async () => {
   });
   assert.equal(result.status, 503);
 });
+
+
+test("unknown catalog prices are not labeled free", () => {
+  const [model] = normalizeOpenRouterModels({ data: [{ id: "vendor/test", name: "Test", pricing: { prompt: null, completion: "" } }] });
+  assert.equal(model.isFree, false);
+  assert.equal(model.inputPricePerMillion, null);
+  assert.equal(model.outputPricePerMillion, null);
+});
+
+test("long assistant replies can be sent back on the next user turn", () => {
+  const value = validateChatInput({ model: "vendor/test", messages: [
+    { role: "user", content: "制定策略" },
+    { role: "assistant", content: "a".repeat(3000) },
+    { role: "user", content: "单次改成 25" }
+  ] });
+  assert.equal(value.messages.length, 3);
+});
