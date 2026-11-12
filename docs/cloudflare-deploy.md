@@ -9,7 +9,7 @@
 - Root directory: `apps/frontend`
 - Build command: 留空
 - Deploy command: `npx wrangler deploy --config wrangler.jsonc`
-- Worker name: `oasis-ai-demo`（以该目录内的 Wrangler 配置为准）
+- Worker name: `oasis-agent-market`（以该目录内的 Wrangler 配置为准）
 
 **先将 PR #2 的 OpenRouter 功能分支合并到生产分支，再从生产分支重新部署。** 仅在功能分支修复配置，不会改变生产分支的构建结果。根目录不要使用 `--config ../../wrangler.jsonc`。
 

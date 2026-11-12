@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "oasis-ai-demo",
+  "name": "oasis-agent-market",
   "compatibility_date": "2026-11-11",
   "main": "./worker.js",
   "assets": {
