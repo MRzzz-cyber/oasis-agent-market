@@ -187,6 +187,7 @@ function updateModelLabels() {
   state.model = model?.id || "";
   state.modelName = model?.name || "";
   state.committee = [];
+  $("change-model").value = state.model;
   $("active-model-label").textContent = model ? model.name : "未选择模型";
   $("policy-model").textContent = model ? model.name + "（OpenRouter）" : "未选择模型";
   $("model-primary").title = model
@@ -204,6 +205,9 @@ function renderModelOptions() {
   for (const model of [preferred, ...availableModels.filter(item => item !== preferred)]) {
     select.add(new Option(model.name + (model.isFree ? " · 免费" : ""), model.id));
   }
+  const inlinePicker = $("change-model");
+  inlinePicker.replaceChildren(...Array.from(select.options, option => option.cloneNode(true)));
+  inlinePicker.disabled = false;
   select.value = preferred.id;
   select.disabled = false;
   $("model-status").textContent = "";
@@ -561,7 +565,11 @@ $("model-primary").addEventListener("change", () => {
   try { localStorage.setItem("oasis-advisor-model", state.model); } catch {}
 });
 
-$("change-model").addEventListener("click", () => { showTab("overview"); $("model-primary").focus(); });
+$("change-model").addEventListener("change", event => {
+  const primary = $("model-primary");
+  primary.value = event.currentTarget.value;
+  primary.dispatchEvent(new Event("change"));
+});
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
   try { appendUserMessage(value); } catch (error) { toast(error.message); return; }

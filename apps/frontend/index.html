@@ -30,7 +30,7 @@
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>策略工作台</h2><p>通过对话调整草案，确认参数后保存。</p></div><button class="ghost" id="new-idea">新建策略</button></div>
           <div class="conversation panel">
-            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><button class="ghost" id="change-model">更换模型</button></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
+            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><label class="ghost inline-model-picker"><span aria-hidden="true">更换模型 ▾</span><select id="change-model" aria-label="更换模型" disabled></select></label></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
             <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送</button></form><p id="ai-usage" class="note"></p>
           </div>
