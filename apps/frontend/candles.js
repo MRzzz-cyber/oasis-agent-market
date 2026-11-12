@@ -61,7 +61,7 @@ export async function snapshot(request, fetcher=fetch, cache=globalThis.caches?.
   const coin = url.searchParams.get("coin"), interval = url.searchParams.get("interval");
   if (!coin || coin.length > 100 || !Object.hasOwn(intervals,interval)) return Response.json({error:"请选择支持的币种和周期"},{status:400});
   const key = new Request(url.origin+"/api/market/candles?coin="+encodeURIComponent(coin)+"&interval="+interval);
-  const cached = await cache?.match(key);
+  const cached = await cache?.match(key).catch(()=>null);
   if (cached) return cached;
   try {
     if (!coins.includes(coin) && !(await loadCatalog(fetcher)).some(m=>m.id===coin)) return Response.json({error:"市场未收录"},{status:400});
@@ -71,7 +71,7 @@ export async function snapshot(request, fetcher=fetch, cache=globalThis.caches?.
     const candles = normalize(await upstream.json(),coin,interval);
     if (!candles.length) throw Error();
     const result = Response.json({coin,interval,candles},{headers:{"cache-control":"public, max-age=10"}});
-    await cache?.put(key,result.clone());
+    await cache?.put(key,result.clone()).catch(()=>{});
     return result;
   } catch { return Response.json({error:"Hyperliquid 行情暂不可用"},{status:502}); }
 }

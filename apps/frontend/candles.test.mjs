@@ -16,3 +16,15 @@ test("catalog preserves separate venues, resolves spot token indices and exclude
   assert.equal(catalog[1].group,"美股永续");
   assert.equal(catalog[3].label,"HYPE/USDC");
 });
+
+test("market indicators exclude forming candles and compare volume to preceding bars",async()=>{
+  const {indicators}=await import("./market.js");
+  const bars=Array.from({length:22},(_,i)=>({t:i*1000,o:100,c:110,h:120,l:90,v:i===20?20:10}));
+  bars[21].h=1000;
+  const m=indicators(bars,1000,21500);
+  assert.equal(m.high,120);
+  assert.equal(m.sma,110);
+  assert.equal(m.volumeRatio,2);
+  assert.ok(Math.abs(m.change-10)<1e-9);
+  assert.equal(indicators(bars.slice(0,10),1000,21500),null);
+});

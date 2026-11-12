@@ -26,7 +26,7 @@
           <div class="panel"><div class="market-controls"><label>市场 <select id="market-group"><option>常用</option><option>加密永续</option><option>美股永续</option><option>指数与宏观</option><option>其他永续</option><option>现货</option><option>全部</option></select></label><label>标的 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
           <label>周期 <select id="market-interval"><option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></label><strong id="market-price">—</strong></div>
           <small id="market-count" role="status"></small><p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="市场 K 线及成交量"></canvas>
-          <div class="market-controls"><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
+          <div id="market-insights" class="market-insights" aria-label="已收盘 K 线指标"></div><div class="market-controls"><button type="button" class="ghost" id="market-reload">刷新行情</button><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>策略工作台</h2><p>通过对话调整草案，确认参数后保存。</p></div><button class="ghost" id="new-idea">新建策略</button></div>
           <div class="conversation panel">
