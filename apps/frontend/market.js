@@ -6,6 +6,28 @@ export function marketView(analyze) {
   const price = n => n.toLocaleString("en-US",{maximumFractionDigits:5});
   let rows = [], generation = 0, socket, timer, controller, active = false, hover = -1, refreshed = 0;
   let coin, interval;
+  const common = ["BTC","ETH","SOL","XRP","HYPE","xyz:TSLA","xyz:NVDA","xyz:AAPL","xyz:SP500","xyz:GOLD"];
+  let catalog=[], loading=false;
+  const selected = ()=>catalog.find(m=>m.id===coin) || {label:coin,quote:"USD",group:"加密永续"};
+  function options() {
+    const group=el("market-group").value, select=el("market-coin"), previous=select.value;
+    const list=group==="常用" ? common.map(id=>catalog.find(m=>m.id===id)).filter(Boolean) : catalog.filter(m=>group==="全部" || m.group===group).sort((a,b)=>a.label.localeCompare(b.label));
+    select.replaceChildren(...list.map(m=>new Option(m.label+(m.alias?" · "+m.alias:"")+(m.id.includes(":")?" · "+m.id.split(":")[0]:""),m.id)));
+    if(list.some(m=>m.id===previous))select.value=previous;
+    el("market-count").textContent=group+" · "+list.length+" 个市场";
+    if(active)start();
+  }
+  async function directory() {
+    if(loading || catalog.length)return;
+    loading=true; el("market-group").disabled=true;
+    try {
+      const r=await fetch("/api/market/catalog");if(!r.ok)throw Error();
+      const data=await r.json(); if(!data.markets?.length)throw Error();
+      catalog=data.markets;options();
+    } catch {el("market-count").textContent="完整目录暂不可用，当前显示常用币种";}
+    finally{loading=false;el("market-group").disabled=!catalog.length;}
+  }
+  el("market-group").onchange=options;
   function draw() {
     const width = canvas.clientWidth, height = canvas.clientHeight;
     if (!width || !height) return;
@@ -37,8 +59,8 @@ export function marketView(analyze) {
     g.textAlign="right";g.fillText(stamp(rows.at(-1).t),right,height-5);
     const r=rows[hover] || rows.at(-1);
     if(rows[hover]) {g.fillStyle="#afc7be"; g.fillRect((hover+.5)*step,0,1,height-24);}
-    el("market-detail").textContent=stamp(r.t)+"　开 "+price(r.o)+"　高 "+price(r.h)+"　低 "+price(r.l)+"　收 "+price(r.c)+"　量 "+price(r.v)+" "+coin;
-    el("market-price").textContent=price(rows.at(-1).c)+" USD";
+    el("market-detail").textContent=stamp(r.t)+"　开 "+price(r.o)+"　高 "+price(r.h)+"　低 "+price(r.l)+"　收 "+price(r.c)+"　量 "+price(r.v)+" "+selected().label.split("/")[0];
+    el("market-price").textContent=price(rows.at(-1).c)+" "+selected().quote;
   }
   function stop() {
     generation++; clearTimeout(timer); controller?.abort();
@@ -51,9 +73,10 @@ export function marketView(analyze) {
     coin=el("market-coin").value; interval=el("market-interval").value;
     rows=[];hover=-1;draw();el("market-detail").textContent="";el("market-price").textContent="—";
     status.textContent="正在读取 Hyperliquid 行情…";
+    if(!coin){status.textContent="此类别暂无市场";return;}
     controller=new AbortController();
     try {
-      const response=await fetch("/api/market/candles?coin="+coin+"&interval="+interval,{signal:controller.signal});
+      const response=await fetch("/api/market/candles?coin="+encodeURIComponent(coin)+"&interval="+interval,{signal:controller.signal});
       if(!response.ok) throw Error();
       const data=await response.json();
       if(gen!==generation)return;
@@ -97,7 +120,7 @@ export function marketView(analyze) {
     const latest=rows.at(-1), window=rows.slice(-20);
     const high=Math.max(...window.map(r=>r.h)),low=Math.min(...window.map(r=>r.l));
     const tail=window.slice(-6).map(r=>[new Date(r.t).toISOString(),r.o,r.h,r.l,r.c,r.v].join(",")).join("\n");
-    analyze("请分析 "+coin+" 永续合约的 "+interval+" K 线，解释走势、成交量和判断局限。Hyperliquid 行情读取于 "+new Date(refreshed).toISOString()+"。最新收盘价 "+latest.c+" USD（末根可能未收盘）。最近 "+window.length+" 根区间 "+low+"–"+high+" USD。最近样本按 UTC 开盘时间、开、高、低、收、成交量（"+coin+"）排列：\n"+tail);
+    analyze("请分析 "+coin+"（"+selected().label+" · "+selected().group+"）的 "+interval+" K 线，解释走势、成交量和判断局限。Hyperliquid 行情读取于 "+new Date(refreshed).toISOString()+"。最新收盘价 "+latest.c+" "+selected().quote+"（末根可能未收盘）。最近 "+window.length+" 根区间 "+low+"–"+high+" "+selected().quote+"。最近样本按 UTC 开盘时间、开、高、低、收、成交量（"+coin+"）排列：\n"+tail);
   };
-  return visible=>{active=visible;if(visible)start();else stop();};
+  return visible=>{active=visible;if(visible){start();directory();}else stop();};
 }

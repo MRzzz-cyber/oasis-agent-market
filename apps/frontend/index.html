@@ -22,10 +22,10 @@
           <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
           <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
         </section>
-        <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 永续合约 · 成交价（USD）</p></div></div>
-          <div class="panel"><div class="market-controls"><label>合约 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
+        <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 市场成交行情 · 股票类永续跟踪标的价格</p></div></div>
+          <div class="panel"><div class="market-controls"><label>市场 <select id="market-group"><option>常用</option><option>加密永续</option><option>美股永续</option><option>指数与宏观</option><option>其他永续</option><option>现货</option><option>全部</option></select></label><label>标的 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
           <label>周期 <select id="market-interval"><option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></label><strong id="market-price">—</strong></div>
-          <p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="永续合约 K 线及成交量"></canvas>
+          <small id="market-count" role="status"></small><p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="市场 K 线及成交量"></canvas>
           <div class="market-controls"><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>策略工作台</h2><p>通过对话调整草案，确认参数后保存。</p></div><button class="ghost" id="new-idea">新建策略</button></div>

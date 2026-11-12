@@ -1,4 +1,4 @@
-import { snapshot } from "../frontend/candles.js";
+import { snapshot, marketCatalog } from "../frontend/candles.js";
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -33,8 +33,8 @@ export function createAppServer() {
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://127.0.0.1");
-      if (req.method === "GET" && url.pathname === "/api/market/candles") {
-        const result = await snapshot(new Request(url));
+      if (req.method === "GET" && ["/api/market/candles","/api/market/catalog"].includes(url.pathname)) {
+        const result = url.pathname.endsWith("/catalog") ? await marketCatalog() : await snapshot(new Request(url));
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
