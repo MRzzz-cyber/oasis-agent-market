@@ -29,19 +29,9 @@
       <header class="app-header"><div id="breadcrumb">总览</div><button class="ghost" id="back-site">查看官网</button></header>
       <main>
         <section id="page-overview" class="app-page">
-          <div class="welcome"><h1>让 AI 帮你做投资</h1><p>先选一个模型，再告诉 Oasis 你在考虑什么。</p></div>
-          <div class="model-toolbar">
-            <div class="model-picker">
-              <label for="model-primary">主模型 · OpenRouter 实时目录</label>
-              <input id="model-search" type="search" placeholder="搜索模型或提供商，例如 Claude、DeepSeek、GPT…" autocomplete="off"/>
-              <select id="model-primary" aria-label="选择主模型" disabled><option>正在加载模型目录…</option></select>
-              <p id="model-meta" class="model-meta">正在连接 OpenRouter…</p>
-            </div>
-            <span id="model-status" class="demo-tag">正在获取 OpenRouter 模型列表</span>
-            <div class="committee-note">多模型委员会将在下一阶段接入真实并行评审；当前先确保主模型调用真实可用。</div>
-          </div>
+          <div class="welcome"><h1>让 AI 帮你做投资</h1><p>从一个投资想法开始。</p></div>
           <div class="suggestions"><button data-example="我想每周定投 ETH，月度预算 500 USDT，单次最多买入 80 USDT，先模拟运行。">每周定投 ETH ↗</button><button data-example="我想追踪 ETH 聪明钱的链上资金流向，出现大额流入时提醒我。">追踪聪明钱 ↗</button><button data-example="帮我分析 BTC 趋势，只在风险较低时提出模拟交易建议。">分析 BTC 趋势 ↗</button></div>
-          <form id="goal-form" class="prompt"><label for="goal">你想和 AI 讨论什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><span>先聊想法，不必一次说清所有参数</span><button class="primary" type="submit">开始讨论 →</button></div></form>
+          <form id="goal-form" class="prompt"><label for="goal">你想和 AI 讨论什么？</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 →</button></div></form>
         </section>
         <section id="page-create" class="app-page hidden">
           <div class="page-heading"><div><h2>和 AI 一起制定策略</h2><p>补充你的想法，Oasis 会整理成一份可检查的策略草案。</p></div><span class="demo-tag">真实模型对话 · 模拟策略</span></div>
@@ -66,7 +56,7 @@
             <button class="primary" id="create-strategy">确认草案并保存策略 →</button>
           </div>
         </section>
-        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>管理策略、查看 Agent 工作流和模拟订单后续。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">流程节点可点击查看每一步的输入、判断和结果。以下均为演示数据。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="flowchart"></div><div id="flow-detail" class="flow-detail">选择一个流程节点，查看 Agent 在这一步做了什么。</div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
+        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>管理策略、查看 Agent 工作流和模拟订单后续。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
         <section id="page-policy" class="app-page hidden"><h2>预算与权限</h2><p>Agent 可以提出服务采购和交易建议，但不能自行修改权限。</p><div class="panel"><div class="kv"><span>运行模式</span><strong>模拟模式</strong></div><div class="kv"><span>网络</span><strong>Base Sepolia（预留）</strong></div><div class="kv"><span>真实服务付款</span><strong class="warn">关闭</strong></div><div class="kv"><span>真实交易</span><strong class="warn">关闭</strong></div><div class="kv"><span>交易确认</span><strong>每笔由用户确认</strong></div><div class="kv"><span>模型选择</span><strong id="policy-model">免费模型</strong></div><p class="note">策略顾问接入 OpenRouter 后会产生真实 API 请求；多模型委员会仍为示例投票。服务采购预算与投资交易预算分开管理。</p></div></section>
       </main>
       <div id="toast" aria-live="polite"></div>

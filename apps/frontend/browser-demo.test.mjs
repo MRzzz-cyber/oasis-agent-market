@@ -113,3 +113,16 @@ test("draft extraction uses the latest explicit constraint without inventing an 
   assert.equal(draft.stopPercent, "5");
   assert.equal(vm.runInContext('extractDraft("帮我制定投资策略").asset', context), "");
 });
+
+test("sample drawdown at the confirmed limit blocks orders and keeps earlier runs available", async () => {
+  const { api } = await demoContext();
+  const post = (path, body) => api(path, {method: "POST", body: JSON.stringify(body)});
+  const strategy = await post("/api/strategies", {goal:"每周定投 ETH", terms:{asset:"ETH", quoteAsset:"USDT", maxOrder:"80", stopPercent:"8", cadence:"每周"}});
+  const normal = await post("/api/runs", {strategyId:strategy.id});
+  const stress = await post("/api/runs", {strategyId:strategy.id, scenario:"stress"});
+  assert.equal(normal.status, "awaiting_approval");
+  assert.equal(stress.status, "blocked");
+  assert.equal(stress.proposedOrder, null);
+  await assert.rejects(() => post("/api/runs/" + stress.id + "/approve", {}));
+  assert.equal((await api("/api/runs")).length, 2);
+});

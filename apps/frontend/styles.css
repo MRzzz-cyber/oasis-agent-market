@@ -24,3 +24,12 @@
 .run-history { max-width: 260px; }
 button:disabled { cursor: wait; opacity: .55; }
 @media (max-width: 600px) { .draft-form { grid-template-columns: 1fr; } .strategy-card { align-items: stretch; } .strategy-card .action-row { flex-wrap: wrap; } }
+
+.compact-picker {min-width:0;max-width:62%}
+.compact-picker select {width:100%;max-width:280px;background:#13222b;color:#d7e6e8;border:1px solid #36515a;border-radius:8px;padding:8px;font:inherit}
+.compact-picker small:not(:empty){display:block;color:#b5c6cc}
+.run-ledger{padding:8px 0 16px}
+.ledger-step{position:relative;margin-left:6px;padding:12px 0 12px 24px;border-left:2px solid #365e57;display:grid;grid-template-columns:90px minmax(0,1fr);gap:3px 12px}
+.ledger-step:before{content:"";position:absolute;left:-5px;top:19px;width:8px;height:8px;border-radius:50%;background:#53d9a8}
+.ledger-label{color:#98c8b6}.ledger-step small{grid-column:2;color:#a4b5bb}.run-ledger button{margin-top:12px}
+@media(max-width:540px){.ledger-step{grid-template-columns:1fr}.ledger-step small{grid-column:1}}

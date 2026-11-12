@@ -57,8 +57,10 @@ function validateDraft(value) {
   if (stopPercent && (!/^\d+(?:\.\d{1,2})?$/.test(stopPercent) || Number(stopPercent) <= 0 || Number(stopPercent) > 100)) demoError("暂停回撤需在 0–100% 之间，且大于 0");
   return { asset: value.asset, quoteAsset: value.quoteAsset, maxOrder, capital, cadence: value.cadence, stopPercent };
 }
-function simulateRun(strategy) {
+function simulateRun(strategy, scenario = "normal") {
   const terms = validateDraft(strategy.terms);
+  const drawdown = scenario === "stress" ? 8 : 1;
+  const blocked = Boolean(terms.stopPercent) && drawdown >= Number(terms.stopPercent);
   const models = strategy.committee?.length ? strategy.committee : [strategy.model || "主模型"];
   const votes = models.map((model, i) => ({
     model, action: i === 1 ? "HOLD" : "BUY",
@@ -70,17 +72,17 @@ function simulateRun(strategy) {
     demoEvent("market", "发现市场研究任务", "此处使用预置演示信号，不代表实时行情或链上数据。"),
     demoEvent("service", "发现数据服务报价", "Market Signal API · 演示报价 0.10 USDC；没有发起真实请求或付款。"),
     demoEvent("committee", "演示模型观点（未调用）", models.map((m, i) => m + "：" + votes[i].action).join("；")),
-    demoEvent("policy", "模拟参数检查完成", "已核对确认的单次上限 " + terms.maxOrder + " " + terms.quoteAsset + "；服务预算独立。行情、回撤及累计投资预算尚未验证。"),
+    demoEvent("policy", "模拟参数检查完成", "已核对确认的单次上限 " + terms.maxOrder + " " + terms.quoteAsset + "；服务预算独立。回撤按所选样本校验，累计预算未校验。"),
     demoEvent("decision", "形成模拟交易建议", "示例建议买入 " + asset + "，金额 " + terms.maxOrder + " " + terms.quoteAsset + "，不超过确认的单次上限。使用预置示例信号，不是投资建议。"),
     demoEvent("approval", "等待用户确认", "只有用户点击确认后，才会创建本地模拟订单。")
   ];
   return {
     id: crypto.randomUUID(), strategyId: strategy.id, goal: strategy.goal, asset,
-    status: "awaiting_approval", paymentMode: "demo",
+    scenario, drawdown, status: blocked ? "blocked" : "awaiting_approval", paymentMode: "demo",
     payment: { status: "not_paid_demo", network: "eip155:84532", amountAtomic: "0" },
     operatingBudget: { limit: strategy.budget || "5", spent: "0", simulatedQuote: "0.10" },
-    terms, votes, proposedOrder: { side: "BUY", asset, amount: terms.maxOrder, quoteAsset: terms.quoteAsset, mode: "simulation" },
-    events, createdAt: new Date().toISOString()
+    terms, votes, proposedOrder: blocked ? null : { side: "BUY", asset, amount: terms.maxOrder, quoteAsset: terms.quoteAsset, mode: "simulation" },
+    events: blocked ? events.slice(0, 4).concat(demoEvent("policy", "触发暂停规则", "示例回撤达到已确认阈值，未生成订单。")) : events, createdAt: new Date().toISOString()
   };
 }
 async function browserDemoRequest(path, options = {}) {
@@ -113,7 +115,7 @@ async function browserDemoRequest(path, options = {}) {
     let body; try { body = JSON.parse(options.body || "{}"); } catch { demoError("输入格式不正确"); }
     const strategy = db.strategies.find(x => x.id === body.strategyId);
     if (!strategy) demoError("找不到这条策略");
-    const run = simulateRun(strategy); db.runs.push(run); writeDemoState(db); return run;
+    const run = simulateRun(strategy, body.scenario === "stress" ? "stress" : "normal"); db.runs.push(run); writeDemoState(db); return run;
   }
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
     const run = db.runs.find(x => x.id === parts[2]);
@@ -179,36 +181,25 @@ function updateModelLabels() {
   state.committee = [];
   $("active-model-label").textContent = model ? model.name : "未选择模型";
   $("policy-model").textContent = model ? model.name + "（OpenRouter）" : "未选择模型";
-  $("model-meta").textContent = model
+  $("model-primary").title = model
     ? model.provider + " · 上下文 " + (model.contextLength ? model.contextLength.toLocaleString("zh-CN") : "未知") +
       " · 输入 " + formatModelPrice(model.inputPricePerMillion) + " · 输出 " + formatModelPrice(model.outputPricePerMillion)
     : "请选择一个模型";
 }
 function renderModelOptions() {
-  const query = $("model-search").value.trim().toLowerCase();
-  const matches = availableModels.filter(model =>
-    !query || (model.name + " " + model.id + " " + model.provider).toLowerCase().includes(query)
-  );
-  const visible = query ? matches.slice(0, 150) : matches.slice(0, 60);
   const select = $("model-primary");
-  const current = state.model || select.value;
+  let saved;
+  try { saved = localStorage.getItem("oasis-advisor-model"); } catch {}
+  const preferred = [saved, "openai/gpt-5.6-sol", "openrouter/free"]
+    .map(id => availableModels.find(model => model.id === id)).find(Boolean) || availableModels[0];
   select.replaceChildren();
-  for (const model of visible) {
-    const option = document.createElement("option");
-    option.value = model.id;
-    option.textContent = model.name + " · " + model.provider + (model.isFree ? " · 免费" : "");
-    select.appendChild(option);
+  for (const model of [preferred, ...availableModels.filter(item => item !== preferred)]) {
+    select.add(new Option(model.name + (model.isFree ? " · 免费" : ""), model.id));
   }
-  if (visible.some(model => model.id === current)) select.value = current;
-  else {
-    select.add(new Option(query ? "请选择搜索结果中的模型" : "请选择模型", ""));
-    select.value = "";
-  }
-  select.disabled = visible.length === 0;
-  $("model-status").textContent = query
-    ? "找到 " + matches.length + " 个模型" + (matches.length > visible.length ? " · 当前显示前 " + visible.length + " 个" : "")
-    : "OpenRouter · " + availableModels.length + " 个模型 · 显示最新 60 个，可搜索全部";
-  if (select.value) updateModelLabels();
+  select.value = preferred.id;
+  select.disabled = false;
+  $("model-status").textContent = "";
+  updateModelLabels();
 }
 async function loadModels() {
   const status = $("model-status");
@@ -228,7 +219,7 @@ async function loadModels() {
     status.textContent = error.message;
     select.replaceChildren(new Option("模型目录加载失败", ""));
     select.disabled = true;
-    $("model-meta").textContent = "请检查 Cloudflare Worker 部署和 OpenRouter 模型目录接口";
+
     $("ai-runtime-status").textContent = "OpenRouter 模型目录不可用";
     throw error;
   }
@@ -397,7 +388,7 @@ async function refreshStrategies() {
     if (history.length) {
       const select = node("select", "run-history"); select.setAttribute("aria-label", "选择历史运行");
       for (const run of history) {
-        const status = ({ awaiting_approval: "待确认", simulated: "已创建订单", monitoring: "跟踪中", rejected: "已拒绝" })[run.status] || run.status;
+        const status = ({ blocked: "风控暂停", awaiting_approval: "待确认", simulated: "已创建订单", monitoring: "跟踪中", rejected: "已拒绝" })[run.status] || run.status;
         const option = node("option", "", new Date(run.createdAt).toLocaleString("zh-CN") + " · " + status);
         option.value = run.id; select.appendChild(option);
       }
@@ -409,41 +400,42 @@ async function refreshStrategies() {
   }
   if (state.run) renderRunContent();
 }
-const flowInfo = {
-  goal: ["理解用户目标", "读取你输入的目标和约束，形成可执行任务。"],
-  market: ["发现研究任务", "判断需要哪些市场信息。当前为预置示例，不是真实行情。"],
-  service: ["发现数据服务", "找到数据服务并展示报价。当前不会向服务商发起请求或付款。"],
-  committee: ["演示模型观点", "展示你选择的模型及其示例观点。当前不是实际模型推理。"],
-  policy: ["模拟参数检查", "只验证确认的标的、单次上限和预算格式。实时风控尚未接入。"],
-  decision: ["形成交易建议", "汇总研究结果，生成待确认的模拟订单。"],
-  approval: ["等待用户授权", "用户可以确认或拒绝。未确认前不会创建订单。"],
-  order: ["模拟订单已创建", "订单保存在当前浏览器，不会发送到交易所或区块链。"],
-  rejected: ["建议已拒绝", "已记录用户决定，没有创建订单。"]
-};
 function renderRunContent() {
   const run = state.run; if (!run) return;
   $("run-panel").classList.remove("hidden");
   const flow = $("flowchart"); flow.replaceChildren();
-  const events = run.events || [];
-  events.forEach((e, i) => {
-    const meta = flowInfo[e.type] || [e.message, e.detail || ""];
-    const button = node("button", "flow-node" + (i === 0 ? " active" : ""));
-    button.append(node("span", "flow-number", String(i + 1).padStart(2, "0")), node("span", "flow-title", meta[0]), node("span", "flow-state", e.type === "order" ? "已完成" : e.type === "approval" && run.status === "awaiting_approval" ? "待确认" : "完成"));
-    button.addEventListener("click", () => {
-      flow.querySelectorAll(".flow-node").forEach(n => n.classList.remove("active")); button.classList.add("active");
-      $("flow-detail").replaceChildren(node("strong", "", meta[0]), node("p", "", e.detail || meta[1]), node("small", "", new Date(e.at).toLocaleString("zh-CN")));
-    });
-    flow.appendChild(button);
-    if (i < events.length - 1) flow.appendChild(node("div", "flow-connector", "↓"));
-  });
-  if (events.length) flow.querySelector(".flow-node")?.click();
+  const terms = run.terms || {};
+  const quote = terms.quoteAsset || run.proposedOrder?.quoteAsset || "USDC";
+  const rows = [
+    ["策略授权", run.asset + " · " + (terms.cadence || "历史策略"), "单次上限 " + (terms.maxOrder || run.proposedOrder?.amountUsdc || "未记录") + " " + quote],
+    ["行情样本", run.drawdown == null ? "历史演示信号" : "示例回撤 " + run.drawdown + "%", "预置场景 · 无实时行情"],
+    ["数据报价", (run.operatingBudget?.simulatedQuote || "0.10") + " USDC", "服务预算 " + (run.operatingBudget?.limit || "未记录") + " USDC · 实付 0"],
+    ["模拟评审", (run.votes || []).map(v => v.model + " · " + v.action).join(" / "), "预置投票 · 未调用评审模型"],
+    ["暂停规则", terms.stopPercent ? "回撤达到 " + terms.stopPercent + "% 时暂停" : "未设置回撤阈值", run.status === "blocked" ? "已触发 · 停止生成订单" : run.drawdown == null ? "历史记录未校验回撤" : "当前样本未触发暂停"]
+  ];
+  for (const [label, result, detail] of rows) {
+    const row = node("div", "ledger-step");
+    row.append(node("span", "ledger-label", label), node("strong", "", result), node("small", "", detail));
+    flow.appendChild(row);
+  }
+  if (terms.asset) {
+    const next = run.scenario === "stress" ? "normal" : "stress";
+    const replay = node("button", "ghost", next === "stress" ? "用 8% 回撤样本重新运行" : "用 1% 回撤样本重新运行");
+    replay.onclick = async () => {
+      replay.disabled = true;
+      try {
+        state.run = await request("/api/runs", { method: "POST", body: JSON.stringify({ strategyId: run.strategyId, scenario: next }) });
+        await refreshStrategies();
+      } catch (error) { replay.disabled = false; toast(error.message); }
+    };
+    flow.appendChild(replay);
+  }
   const decision = $("decision"); decision.replaceChildren();
-  decision.append(node("h3", "", "模拟订单建议 · " + run.asset), node("p", "note", "演示观点（未调用模型）：" + (run.votes || []).map(v => v.model + " " + v.action).join(" / ")));
-  const votes = node("div", "vote-grid");
-  (run.votes || []).forEach(v => { const card = node("div", "vote-card"); card.append(node("strong", "", v.model), node("span", v.action === "BUY" ? "vote-buy" : "vote-hold", v.action === "BUY" ? "倾向买入" : "建议观望"), node("p", "", v.rationale)); votes.appendChild(card); });
-  decision.appendChild(votes);
-  decision.append(node("div", "order-proposal", "建议模拟买入 " + run.asset + " · " + (run.proposedOrder.amount || run.proposedOrder.amountUsdc) + " " + (run.proposedOrder.quoteAsset || "USDC")));
-  decision.append(node("p", "note", "真实数据采购费用：0 USDC · 真实交易金额：0 USDC。当前所有结论均为固定演示内容。"));
+  if (run.status === "blocked") {
+    decision.append(node("h3", "", "已暂停 · 本次没有模拟订单"), node("p", "note", "样本回撤 " + run.drawdown + "% 已达到你设置的 " + terms.stopPercent + "% 暂停阈值。"));
+    renderOrderFollowup(run); return;
+  }
+  decision.append(node("h3", "", "模拟订单 · " + run.asset), node("div", "order-proposal", "建议模拟买入 " + run.asset + " · " + (run.proposedOrder.amount || run.proposedOrder.amountUsdc) + " " + quote));
   if (run.status === "awaiting_approval") {
     const actions = node("div", "action-row");
     for (const [action, label] of [["approve", "确认模拟订单"], ["reject", "拒绝建议"]]) {
@@ -488,8 +480,11 @@ $("back-site").addEventListener("click", showSite);
 document.querySelectorAll("[data-tab]").forEach(button => button.addEventListener("click", () => showTab(button.dataset.tab)));
 document.querySelectorAll("[data-example]").forEach(button => button.addEventListener("click", () => { $("goal").value = button.dataset.example; $("goal").focus(); }));
 $("goal-form").addEventListener("submit", event => { event.preventDefault(); beginConversation(); });
-$("model-primary").addEventListener("change", updateModelLabels);
-$("model-search").addEventListener("input", renderModelOptions);
+$("model-primary").addEventListener("change", () => {
+  updateModelLabels();
+  try { localStorage.setItem("oasis-advisor-model", state.model); } catch {}
+});
+
 $("change-model").addEventListener("click", () => { showTab("overview"); $("model-primary").focus(); });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
