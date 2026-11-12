@@ -564,7 +564,19 @@ const questions = [
   {label:"回撤 5% 和亏损 5% 有什么区别？用 100 USDT 举个例子。"},
   {label:"ETH 最近一个收盘价，更靠近区间高点还是低点？", coin:"ETH", interval:"1h"},
   {label:"特斯拉永续的价格和美股正股为什么可能不同？"},
-  {label:"HYPE 的最新成交量是平时的几倍？", coin:"HYPE", interval:"15m"}
+  {label:"HYPE 的最新成交量是平时的几倍？", coin:"HYPE", interval:"15m"},
+  {label:"BTC 过去 20 个小时的收盘均价是多少？最新收盘偏离了多少？",coin:"BTC",interval:"1h"},
+  {label:"黄金永续最近更接近区间上沿还是下沿？",coin:"xyz:GOLD",interval:"1h"},
+  {label:"每周定投和一次买入，承担的风险有什么不同？"},
+  {label:"SOL 最近 5 小时的涨跌，有没有放量支持？",coin:"SOL",interval:"15m"},
+  {label:"苹果永续近 20 小时波动了多少？",coin:"xyz:AAPL",interval:"1h"},
+  {label:"K 线的上下影线分别代表什么？为什么要等收盘？"},
+  {label:"XRP 的最新收盘价在 20 周期均线上方吗？",coin:"XRP",interval:"15m"},
+  {label:"特斯拉永续最新一小时成交量，是此前平均值的几倍？",coin:"xyz:TSLA",interval:"1h"},
+  {label:"如果月度预算是 300 USDT，如何给每次模拟买入设上限？"},
+  {label:"ETH 短线价格变化和成交量指向同一个方向吗？",coin:"ETH",interval:"15m"},
+  {label:"HYPE 最近 20 小时的价格区间，适合怎么设置观察条件？",coin:"HYPE",interval:"1h"},
+  {label:"如何区分策略回测、模拟订单和真实成交？"}
 ];
 let pageOfQuestions = 0, starterRequest = null, attachedContext = "";
 function resetStarter() {
@@ -611,9 +623,68 @@ function renderQuestions() {
   $("question-list").replaceChildren(...buttons);
 }
 renderQuestions();
-$("more-questions").onclick=()=>{pageOfQuestions=1-pageOfQuestions;renderQuestions();};
+$("more-questions").onclick=()=>{pageOfQuestions=(pageOfQuestions+1)%Math.ceil(questions.length/3);renderQuestions();};
 $("goal").addEventListener("input",resetStarter);
-document.querySelectorAll("[data-example]").forEach(button => button.onclick=()=>chooseStarter({label:button.dataset.example}));
+const templates = [
+  ["ETH","每周定投","预算管理","每月 500 USDT，每次最多 80 USDT，回撤达到 5% 暂停。请帮我检查参数，整理为每周定投模拟策略。"],
+  ["HYPE","放量突破","15 分钟","请设计突破前 20 根 K 线高点的观察规则，说明相对成交量阈值、确认条件和假突破后的退出条件。"],
+  ["BTC","回撤分批","分批建仓","请用 300 USDT 模拟本金设计三次分批买入，明确回撤的计算起点，每一档的触发条件及停止规则。"],
+  ["xyz:NVDA","量价确认","1 小时","请用英伟达永续的收盘价与均量设计趋势观察清单，说明正股休市期间需要额外确认什么。"],
+  ["SOL","均线回踩","1 小时","请设计回踩 20 周期均线后的模拟入场规则，比较收盘确认和盘中触及，列出失效条件。"],
+  ["XRP","区间观察","15 分钟","请围绕近 20 根 K 线的高低区间制定观察计划，区分接近边缘和已经突破两种情况。"],
+  ["xyz:TSLA","波动观察","1 小时","请为特斯拉永续制定波动观察计划，区分活跃时段和低成交量时段，说明哪些情况下应继续等待。"],
+  ["xyz:GOLD","趋势过滤","均线与成交量","请为黄金永续设计基于已收盘 K 线的趋势过滤条件，列出需要的历史样本与风险约束。"]
+];
+let templatePage=0;
+const quoteCache=new Map();
+async function paintQuote(coin,box,canvas) {
+  try {
+    const cached=quoteCache.get(coin);
+    let bars=cached?.bars;
+    if(!bars || Date.now()-cached.time>60000) {
+      const r=await fetch("/api/market/candles?coin="+encodeURIComponent(coin)+"&interval=1h",{signal:AbortSignal.timeout(12000)});
+      if(!r.ok)throw Error();
+      const data=await r.json();
+      if(data.coin!==coin || data.interval!=="1h")throw Error();
+      bars=data.candles.filter(x=>x.t+3600000<=Date.now()).slice(-24);
+      if(bars.length!==24 || bars.some((x,i)=>i && x.t-bars[i-1].t!==3600000))throw Error();
+      quoteCache.set(coin,{bars,time:Date.now()});
+    }
+    if(!box.isConnected)return;
+    const end=bars.at(-1),change=(end.c/bars[0].o-1)*100;
+    const values=[bars[0].o,...bars.map(r=>r.c)];
+    const low=Math.min(...values),range=Math.max(...values)-low;
+    const color=change>0?"#167454":change<0?"#ad443f":"#68746e";
+    const g=canvas.getContext("2d");
+    const points=values.map((v,i)=>[3+i*150/(values.length-1),range?37-(v-low)*32/range:20]);
+    g.clearRect(0,0,156,44);g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));
+    g.strokeStyle=color;g.lineWidth=2;g.stroke();
+    g.lineTo(153,44);g.lineTo(3,44);g.closePath();
+    const gradient=g.createLinearGradient(0,0,0,44);gradient.addColorStop(0,color+"38");gradient.addColorStop(1,color+"00");g.fillStyle=gradient;g.fill();
+    box.style.color=color;box.textContent=(change>0?"↗ +":change<0?"↘ ":"→ ")+change.toFixed(2)+"%";
+    box.parentElement.querySelector("small").textContent="标的 24h 涨跌 · 截至 "+new Date(end.t+3600000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+  } catch {box.textContent="行情暂缺";}
+}
+function renderTemplates() {
+  const root=$("template-list");root.replaceChildren();
+  for(const [coin,title,rule,prompt] of templates.slice(templatePage*4,templatePage*4+4)) {
+    const card=node("button","strategy-template","");card.type="button";
+    const ticker=coin.split(":").at(-1);
+    const header=node("span","template-header","");
+    header.append(node("strong","",ticker+" "+title),node("small","",rule));
+    const strip=node("span","template-strip","");
+    const quote=node("span","template-quote","");
+    const value=node("b","","加载中…");
+    quote.append(value,node("small","","标的 24h 涨跌"));
+    const chart=document.createElement("canvas");chart.width=156;chart.height=44;chart.setAttribute("aria-hidden","true");
+    strip.append(quote,chart);
+    card.append(header,strip);root.append(card);
+    card.onclick=()=>chooseStarter({label:coin+" 永续："+prompt});
+    paintQuote(coin,value,chart);
+  }
+}
+$("more-templates").onclick=()=>{templatePage=(templatePage+1)%Math.ceil(templates.length/4);renderTemplates();};
+renderTemplates();
 $("goal-form").addEventListener("submit", event => {
   event.preventDefault();
   if (starterRequest) return toast("正在读取行情，请稍候");

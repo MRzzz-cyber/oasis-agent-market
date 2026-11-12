@@ -130,3 +130,9 @@ dialog::backdrop{background:#19291e66}
 .question-list button:hover,.template-list button:hover{background:var(--tint);color:var(--green)}
 .template-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.template-list button{text-align:left;display:grid;gap:5px;padding:14px 16px;border:1px solid var(--line);border-radius:8px}
 @media(max-width:520px){.template-list{grid-template-columns:1fr}}
+
+.template-list .strategy-template{background:white;padding:16px;gap:19px;text-align:left}
+.template-header,.template-strip{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.template-header strong{font-size:15px}.template-header small{font-size:11px}
+.template-quote{display:grid;gap:3px}.template-quote b{font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:-.04em}.template-quote small{font-size:11px}
+.template-strip canvas{width:34%;height:38px}
