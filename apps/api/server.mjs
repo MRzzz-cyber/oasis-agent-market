@@ -8,6 +8,7 @@ import { createStrategy, prepareRun, approveRun, rejectRun, SAMPLE_SERVICES } fr
 const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../frontend");
 const routes = new Map([
   ["/", ["index.html", "text/html; charset=utf-8"]],
+  ["/replay.js", ["replay.js", "text/javascript; charset=utf-8"]],
   ["/market.js", ["market.js", "text/javascript; charset=utf-8"]],
   ["/candles.js", ["candles.js", "text/javascript; charset=utf-8"]],
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],

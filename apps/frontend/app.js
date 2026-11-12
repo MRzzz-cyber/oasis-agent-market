@@ -1,3 +1,4 @@
+import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
@@ -636,35 +637,50 @@ const templates = [
   ["xyz:GOLD","趋势过滤","均线与成交量","请为黄金永续设计基于已收盘 K 线的趋势过滤条件，列出需要的历史样本与风险约束。"]
 ];
 let templatePage=0;
-const quoteCache=new Map();
-async function paintQuote(coin,box,canvas) {
-  try {
-    const cached=quoteCache.get(coin);
-    let bars=cached?.bars;
-    if(!bars || Date.now()-cached.time>60000) {
-      const r=await fetch("/api/market/candles?coin="+encodeURIComponent(coin)+"&interval=1h",{signal:AbortSignal.timeout(12000)});
-      if(!r.ok)throw Error();
-      const data=await r.json();
-      if(data.coin!==coin || data.interval!=="1h")throw Error();
-      bars=data.candles.filter(x=>x.t+3600000<=Date.now()).slice(-24);
-      if(bars.length!==24 || bars.some((x,i)=>i && x.t-bars[i-1].t!==3600000))throw Error();
-      quoteCache.set(coin,{bars,time:Date.now()});
-    }
-    if(!box.isConnected)return;
-    const end=bars.at(-1),change=(end.c/bars[0].o-1)*100;
-    const values=[bars[0].o,...bars.map(r=>r.c)];
-    const low=Math.min(...values),range=Math.max(...values)-low;
-    const color=change>0?"#167454":change<0?"#ad443f":"#68746e";
-    const g=canvas.getContext("2d");
-    const points=values.map((v,i)=>[3+i*150/(values.length-1),range?37-(v-low)*32/range:20]);
-    g.clearRect(0,0,156,44);g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));
-    g.strokeStyle=color;g.lineWidth=2;g.stroke();
-    g.lineTo(153,44);g.lineTo(3,44);g.closePath();
-    const gradient=g.createLinearGradient(0,0,0,44);gradient.addColorStop(0,color+"38");gradient.addColorStop(1,color+"00");g.fillStyle=gradient;g.fill();
-    box.style.color=color;box.textContent=(change>0?"↗ +":change<0?"↘ ":"→ ")+change.toFixed(2)+"%";
-    box.parentElement.querySelector("small").textContent="标的 24h 涨跌 · 截至 "+new Date(end.t+3600000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-  } catch {box.textContent="行情暂缺";}
+function sparkline(values,color) {
+  const canvas=document.createElement("canvas");
+  canvas.width=156; canvas.height=44; canvas.setAttribute("aria-hidden","true");
+  const g=canvas.getContext("2d"), low=Math.min(...values), span=Math.max(...values)-low;
+  g.beginPath();
+  values.forEach((v,i)=>{
+    const x=3+150*i/(values.length-1), y=span?37-32*(v-low)/span:20;
+    if(i)g.lineTo(x,y);else g.moveTo(x,y);
+  });
+  g.lineWidth=2;g.strokeStyle=color;g.stroke();
+  return canvas;
 }
+async function renderReplays() {
+  const groups=await Promise.all(["BTC","ETH"].map(async coin=>{
+    try {
+      const r=await fetch("/api/market/candles?coin="+coin+"&interval=1h",{signal:AbortSignal.timeout(12000)});
+      if(!r.ok)return [];
+      const data=await r.json();
+      if(data.coin!==coin || data.interval!=="1h")return [];
+      return [1,-1].map(side=>({coin,side,result:replay(data.candles,side)})).filter(x=>x.result);
+    } catch {return [];}
+  }));
+  const models=groups.flat().sort((a,b)=>b.result.gain-a.result.gain);
+  const positive=models.filter(m=>m.result.gain>0.005).length;
+  $("replay-status").textContent=models.length ? "已计算 "+models.length+"/4 个模型 · "+positive+" 个本期收涨" : "暂无完整行情样本，可先选择下方策略模板。";
+  for(const {coin,side,result} of models) {
+    const name=coin+(side===1?" 均线顺势做多":" 均线走弱做空");
+    const value=Number(result.gain.toFixed(2));
+    const color=value>0?"#167454":value<0?"#ad443f":"#68746e";
+    const card=node("button","strategy-template","");
+    card.type="button";
+    const header=node("span","template-header","");
+    header.append(node("strong","",name),node("small","","1h · SMA20"));
+    const strip=node("span","template-strip",""),quote=node("span","template-quote","");
+    const amount=node("b","",(value>0?"↗ +":value<0?"↘ ":"→ ")+value.toFixed(2)+"%");
+    amount.style.color=color;
+    quote.append(amount,node("small","","模拟收益 · 截至 "+new Date(result.end).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})));
+    strip.append(quote,sparkline(result.curve,color));
+    card.append(header,strip,node("small","","同期标的 "+result.underlying.toFixed(2)+"% · 收盘净值最大回撤 "+result.drawdown.toFixed(2)+"% · "+result.trades+" 次开仓"));
+    card.onclick=()=>chooseStarter({label:"请帮我分析「"+name+"」：上一小时收盘价"+(side===1?"高于均线时模拟做多":"低于均线时模拟做空")+"，否则空仓；以20小时简单均线为参照，下一小时开盘成交。最近24小时样本截至 "+new Date(result.end).toISOString()+"，模拟收益 "+value+"%，每次进出各计0.05%成本，未计资金费和实际滑点。请解释该模型在哪些行情下容易失效。"});
+    $("replay-list").append(card);
+  }
+}
+renderReplays();
 function renderTemplates() {
   const root=$("template-list");root.replaceChildren();
   for(const [coin,title,rule,prompt] of templates.slice(templatePage*4,templatePage*4+4)) {
@@ -672,15 +688,8 @@ function renderTemplates() {
     const ticker=coin.split(":").at(-1);
     const header=node("span","template-header","");
     header.append(node("strong","",ticker+" "+title),node("small","",rule));
-    const strip=node("span","template-strip","");
-    const quote=node("span","template-quote","");
-    const value=node("b","","加载中…");
-    quote.append(value,node("small","","标的 24h 涨跌"));
-    const chart=document.createElement("canvas");chart.width=156;chart.height=44;chart.setAttribute("aria-hidden","true");
-    strip.append(quote,chart);
-    card.append(header,strip);root.append(card);
+    card.append(header,node("small","",prompt.split("。")[0]+"。"));root.append(card);
     card.onclick=()=>chooseStarter({label:coin+" 永续："+prompt});
-    paintQuote(coin,value,chart);
   }
 }
 $("more-templates").onclick=()=>{templatePage=(templatePage+1)%Math.ceil(templates.length/4);renderTemplates();};

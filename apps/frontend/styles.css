@@ -136,3 +136,5 @@ dialog::backdrop{background:#19291e66}
 .template-header strong{font-size:15px}.template-header small{font-size:11px}
 .template-quote{display:grid;gap:3px}.template-quote b{font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:-.04em}.template-quote small{font-size:11px}
 .template-strip canvas{width:34%;height:38px}
+
+.replay-method{margin-top:10px;color:var(--muted)}.replay-method p{margin-top:6px;line-height:1.7}
