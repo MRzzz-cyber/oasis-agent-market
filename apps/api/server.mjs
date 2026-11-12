@@ -11,6 +11,8 @@ const routes = new Map([
   ["/replay.js", ["replay.js", "text/javascript; charset=utf-8"]],
   ["/market.js", ["market.js", "text/javascript; charset=utf-8"]],
   ["/candles.js", ["candles.js", "text/javascript; charset=utf-8"]],
+  ["/vendor/hl-hash.js", ["vendor/hl-hash.js", "text/javascript; charset=utf-8"]],
+  ["/testnet.js", ["testnet.js", "text/javascript; charset=utf-8"]],
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]]
 ]);

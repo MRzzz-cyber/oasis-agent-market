@@ -1,0 +1,3 @@
+hl-hash.js bundles only createL1ActionHash from @nktkas/hyperliquid 0.33.3
+with esbuild 0.28.2, --bundle --minify --format=esm. No runtime CDN.
+See hl-sdk-license.txt and noble-license.txt. The SDK includes Deno std/msgpack (MIT).

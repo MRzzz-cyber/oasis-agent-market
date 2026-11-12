@@ -1,3 +1,4 @@
+import {testnetPanel} from "./testnet.js";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
@@ -529,6 +530,7 @@ function renderRunContent() {
   } else if (run.status === "simulated" || run.status === "monitoring") {
     decision.append(node("strong", "", run.status === "monitoring" ? "模拟订单跟踪中" : "模拟订单已创建"));
   } else decision.append(node("strong", "", "你已拒绝这条建议"));
+  if (run.asset === "ETH" && run.terms && run.status !== "rejected") decision.append(testnetPanel(run));
   renderOrderFollowup(run);
 }
 function renderOrderFollowup(run) {
