@@ -118,6 +118,13 @@ async function browserDemoRequest(path, options = {}) {
     let body; try { body = JSON.parse(options.body || "{}"); } catch { demoError("输入格式不正确"); }
     const strategy = db.strategies.find(x => x.id === body.strategyId);
     if (!strategy) demoError("找不到这条策略");
+    if (body.mode === "testnet") {
+      const terms = validateDraft(strategy.terms);
+      if (terms.asset !== "ETH") demoError("当前测试网现货仅支持 ETH");
+      const run = {id:crypto.randomUUID(),strategyId:strategy.id,asset:terms.asset,terms,goal:strategy.goal,
+        mode:"testnet",status:"manual_testnet",model:strategy.model,modelId:strategy.modelId,createdAt:new Date().toISOString()};
+      db.runs.push(run);writeDemoState(db);return run;
+    }
     const run = simulateRun(strategy, body.scenario === "stress" ? "stress" : "normal"); db.runs.push(run); writeDemoState(db); return run;
   }
   if (parts[0] === "api" && parts[1] === "runs" && parts[2]) {
@@ -453,7 +460,7 @@ async function refreshStrategies() {
       details.append(node("summary", "", "原始目标"), node("p", "", item.goal));
       info.appendChild(details);
     }
-    const btn = node("button", "primary", item.terms ? "运行策略" : "补全旧策略");
+    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "运行测试网策略" : "运行模拟策略") : "补全旧策略");
     btn.addEventListener("click", async () => {
       if (!item.terms) {
         if (chatBusy) { toast("请等待模型回复完成"); return; }
@@ -463,15 +470,20 @@ async function refreshStrategies() {
         makeDraftSummary(); showTab("create");
         toast("请补全并确认单次上限；保存后会创建新策略"); return;
       }
-      try { state.run = await request("/api/runs", { method: "POST", body: JSON.stringify({ strategyId: item.id }) }); renderRun(); }
-      catch (error) { toast(error.message); }
+      btn.disabled = true;
+      try {
+        state.run = await request("/api/runs", {method:"POST",body:JSON.stringify({strategyId:item.id, mode:item.asset==="ETH"?"testnet":"simulation"})});
+        await refreshStrategies();
+        $("run-panel").scrollIntoView({behavior:"smooth",block:"start"});
+      }
+      catch (error) { toast(error.message); } finally { btn.disabled = false; }
     });
     const history = runs.filter(run => run.strategyId === item.id).reverse();
     const actions = node("div", "action-row"); actions.appendChild(btn);
     if (history.length) {
       const select = node("select", "run-history"); select.setAttribute("aria-label", "选择历史运行");
       for (const run of history) {
-        const status = ({ blocked: "风控暂停", awaiting_approval: "待确认", simulated: "已创建订单", monitoring: "跟踪中", rejected: "已拒绝" })[run.status] || run.status;
+        const status = ({ manual_testnet: "测试网记录", blocked: "风控暂停", awaiting_approval: "待确认", simulated: "已创建订单", monitoring: "跟踪中", rejected: "已拒绝" })[run.status] || run.status;
         const option = node("option", "", new Date(run.createdAt).toLocaleString("zh-CN") + " · " + status);
         option.value = run.id; select.appendChild(option);
       }
@@ -483,17 +495,52 @@ async function refreshStrategies() {
   }
   if (state.run) renderRunContent();
 }
+async function reviewTestnet(run, quote, output) {
+  if (!run.modelId) throw Error("旧策略未记录模型 ID，请用工作台重新保存后再评审");
+  const headers = {"content-type":"application/json"};
+  if (!googleLogin) headers["x-oasis-access-code"] = $("ai-access-code").value.trim();
+  const content = "请只做测试网订单风险评审：核对盘口价差、原策略的触发条件和暂停阈值。说明仍缺少的证据，不推断已满足交易条件。\n"+JSON.stringify({goal:run.goal?.slice(0,600),terms:run.terms,quote});
+  const r = await fetch("/api/ai/chat",{method:"POST",headers,body:JSON.stringify({model:run.modelId,messages:[{role:"user",content}]})});
+  if (!r.ok) throw Error((await r.json().catch(()=>({}))).error || "模型评审失败");
+  const stream = await r.text();
+  let reply="", actual=run.modelId, complete=false;
+  for (const line of stream.split(/\r?\n/)) {
+    if (!line.startsWith("data:")) continue;
+    const data=line.slice(5).trim();
+    if(data==="[DONE]"){complete=true;continue;}
+    if(!data)continue;
+    const chunk=JSON.parse(data);
+    if(chunk.error)throw Error("模型评审中断");
+    reply+=chunk.choices?.[0]?.delta?.content || "";
+    if(chunk.model)actual=chunk.model;
+    if(chunk.choices?.[0]?.finish_reason)complete=true;
+  }
+  if(!complete || !reply.trim()) throw Error("未收到完整评审，请重试");
+  output.textContent="本次实际模型："+actual+"\n"+reply;
+}
 function renderRunContent() {
   const run = state.run; if (!run) return;
   $("run-panel").classList.remove("hidden");
   const flow = $("flowchart"); flow.replaceChildren();
+  const testnet = run.mode === "testnet";
+  const head = $("run-panel").querySelector(".activity-head");
+  head.querySelector("h3").textContent = testnet ? "测试网执行台 · ETH 现货" : "模拟策略回放";
+  head.querySelector(".status-pill").textContent = testnet ? "Hyperliquid Testnet" : "模拟运行";
+  head.querySelector("p").textContent = testnet ? "手动测试订单。请核对触发与暂停条件后再签名。" : "预置场景，仅用于模拟。";
+  if (testnet) {
+    flow.append(node("p","note","策略创建模型："+(run.model || "未记录")+" · 本次下单由用户决定"));
+    $("order-followup").replaceChildren();
+    $("order-followup").classList.add("hidden");
+    $("decision").replaceChildren(testnetPanel(run,reviewTestnet));
+    return;
+  }
   const terms = run.terms || {};
   const quote = terms.quoteAsset || run.proposedOrder?.quoteAsset || "USDC";
   const rows = [
     ["策略授权", run.asset + " · " + (terms.cadence || "历史策略"), "单次上限 " + (terms.maxOrder || run.proposedOrder?.amountUsdc || "未记录") + " " + quote],
     ["行情样本", run.drawdown == null ? "历史演示信号" : "示例回撤 " + run.drawdown + "%", "预置场景 · 无实时行情"],
     ["数据报价", (run.operatingBudget?.simulatedQuote || "0.10") + " USDC", "服务预算 " + (run.operatingBudget?.limit || "未记录") + " USDC · 实付 0"],
-    ["模拟评审", (run.votes || []).map(v => v.model + " · " + v.action).join(" / "), "预置投票 · 未调用评审模型"],
+    ["演示规则", "固定样本建议", "本次模拟未调用模型"],
     ["暂停规则", terms.stopPercent ? "回撤达到 " + terms.stopPercent + "% 时暂停" : "未设置回撤阈值", run.status === "blocked" ? "已触发 · 停止生成订单" : run.drawdown == null ? "历史记录未校验回撤" : "当前样本未触发暂停"]
   ];
   for (const [label, result, detail] of rows) {
@@ -530,7 +577,10 @@ function renderRunContent() {
   } else if (run.status === "simulated" || run.status === "monitoring") {
     decision.append(node("strong", "", run.status === "monitoring" ? "模拟订单跟踪中" : "模拟订单已创建"));
   } else decision.append(node("strong", "", "你已拒绝这条建议"));
-  if (run.asset === "ETH" && run.terms && run.status !== "rejected") decision.append(testnetPanel(run));
+
+  try {
+    if (run.asset==="ETH" && localStorage.getItem("oasis-hl-test-order:"+run.id)) decision.append(testnetPanel(run));
+  } catch {}
   renderOrderFollowup(run);
 }
 function renderOrderFollowup(run) {

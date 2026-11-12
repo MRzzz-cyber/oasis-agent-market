@@ -126,3 +126,16 @@ test("sample drawdown at the confirmed limit blocks orders and keeps earlier run
   await assert.rejects(() => post("/api/runs/" + stress.id + "/approve", {}));
   assert.equal((await api("/api/runs")).length, 2);
 });
+
+test("existing USDT ETH strategy starts a testnet run with its saved model and no fixture BUY",async()=>{
+  const {api}=await demoContext();
+  const post=(path,data)=>api(path,{method:"POST",body:JSON.stringify(data)});
+  const strategy=await post("/api/strategies",{goal:"每周定投 ETH",model:"顾问",modelId:"provider/advisor",terms:{asset:"ETH",maxOrder:"1000",quoteAsset:"USDT",cadence:"每周"}});
+  const run=await post("/api/runs",{strategyId:strategy.id,mode:"testnet"});
+  assert.equal(run.mode,"testnet");
+  assert.equal(run.modelId,"provider/advisor");
+  assert.equal(run.terms.quoteAsset,"USDT");
+  assert.equal(run.votes,undefined);
+  assert.equal(run.proposedOrder,undefined);
+  assert.equal((await api("/api/runs/"+run.id)).id,run.id);
+});

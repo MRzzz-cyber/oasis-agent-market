@@ -50,13 +50,12 @@ async function funds(address) {
   return usdc?clean(decimal(atoms(usdc.total)-atoms(usdc.hold))):"0";
 }
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
-export function testnetPanel(run) {
+export function testnetPanel(run,review) {
   const root=document.createElement("details");
   root.className="advanced-budget";
   root.append(element("summary","测试网现货交易 · UETH/USDC"));
-  if(run.terms?.quoteAsset!=="USDC") {
-    root.append(element("p","请新建 ETH 策略，将投资金额币种设为 USDC，再运行策略。"));return root;
-  }
+  root.open=true;
+  let budget=run.terms.maxOrder;
   const cloid="0x"+run.id.replaceAll("-","");
   if(!/^0x[0-9a-f]{32}$/i.test(cloid))return root;
   const key="oasis-hl-test-order:"+run.id;
@@ -88,21 +87,53 @@ export function testnetPanel(run) {
   let previous;
   try { previous=localStorage.getItem(key); } catch {root.append(element("p","请启用浏览器本地存储以保存测试订单回执"));return root;}
   if(previous){showRecord(JSON.parse(previous));return root;}
+  const quoteLine=element("p","正在读取测试网 UETH/USDC 盘口…");
+  root.append(quoteLine);
+  async function quote() {
+    try {
+      const market=spotMarket(await post("/info",{type:"spotMeta"}));
+      const book=await post("/info",{type:"l2Book",coin:market.coin});
+      quoteLine.textContent="测试网盘口 · 买一 "+(book.levels[0][0]?.px||"—")+" / 卖一 "+(book.levels[1][0]?.px||"—")+" USDC · "+new Date(book.time).toLocaleTimeString();
+    } catch { quoteLine.textContent="盘口读取失败，可点击下方按钮重试"; }
+  }
+  quote();
+  if (review && run.modelId) {
+    const output=element("p","");output.style.whiteSpace="pre-wrap";root.append(output);
+    button("用策略模型评审盘口",async()=>{
+      output.textContent="正在读取盘口并调用 "+run.modelId+"…";
+      try {
+        const market=spotMarket(await post("/info",{type:"spotMeta"}));
+        const book=await post("/info",{type:"l2Book",coin:market.coin});
+        await review(run,{pair:"UETH/USDC",network:"testnet",time:book.time,bid:book.levels[0][0]?.px,ask:book.levels[1][0]?.px},output);
+      } catch(e){output.textContent=e.message || "评审失败";}
+    });
+  }
+  button("刷新测试网盘口",quote);
+  if (run.terms.stopPercent) root.append(element("p","原策略暂停阈值 "+run.terms.stopPercent+"%。本次为手动测试，未自动核验回撤或入场信号。"));
+  let budgetInput;
+  if(run.terms.quoteAsset!=="USDC") {
+    const label=element("label","原策略上限 "+run.terms.maxOrder+" "+run.terms.quoteAsset+"。请为本次订单单独指定测试 USDC 上限");
+    budgetInput=document.createElement("input");budgetInput.inputMode="decimal";budgetInput.placeholder="例如 20";label.append(budgetInput);form.append(label);
+  }
   button("连接测试钱包并查看报价",async()=>{
+    if (budgetInput) {
+      budget=budgetInput.value.trim();
+      if (!budget || atoms(budget)<10n*unit || atoms(budget)>atoms(run.terms.maxOrder)) throw Error("请输入至少 10 且不高于原策略数值上限的测试 USDC 金额");
+    }
     const wallet=window.ethereum;
     if(!wallet)throw Error("请用已安装 EVM 钱包的浏览器打开");
     const [address]=await wallet.request({method:"eth_requestAccounts"});
     const market=spotMarket(await post("/info",{type:"spotMeta"}));
     const [free,book]=await Promise.all([funds(address),post("/info",{type:"l2Book",coin:market.coin})]);
-    note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC · 买一 "+(book.levels[0][0]?.px||"—")+" / 卖一 "+(book.levels[1][0]?.px||"—")+" · 单次上限 "+run.terms.maxOrder+" USDC";
+    note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC · 买一 "+(book.levels[0][0]?.px||"—")+" / 卖一 "+(book.levels[1][0]?.px||"—")+" · 单次上限 "+budget+" USDC";
     form.replaceChildren();
     const label=element("label","买入限价（USDC / UETH）"),input=document.createElement("input");
     input.inputMode="decimal";label.append(input);form.append(label);
     button("预览订单",async()=>{
-      const order=sizeOrder(run.terms.maxOrder,input.value.trim(),free,market.decimals);
+      const order=sizeOrder(budget,input.value.trim(),free,market.decimals);
       form.replaceChildren();
       result.textContent="买入 "+order.s+" UETH × 限价 "+order.p+" USDC，最高成交额 "+order.cost+" 测试 USDC（费用另计）。";
-      button("返回修改",()=>root.replaceWith(testnetPanel(run)));
+      button("返回修改",()=>root.replaceWith(testnetPanel(run,review)));
       button("用钱包签名并提交测试单",async()=>{
         if(!root.isConnected)return;
         if(localStorage.getItem(key)){showRecord(JSON.parse(localStorage.getItem(key)));return;}
@@ -111,7 +142,7 @@ export function testnetPanel(run) {
           if(accounts[0]?.toLowerCase()!==address.toLowerCase())throw Error("钱包账户已变化，请重新连接");
         };
         await check();
-        sizeOrder(run.terms.maxOrder,order.p,await funds(address),market.decimals);
+        sizeOrder(budget,order.p,await funds(address),market.decimals);
         const {action,typed,nonce,expiresAfter}=envelope(market.asset,order,cloid,Date.now());
         const sig=await wallet.request({method:"eth_signTypedData_v4",params:[address,JSON.stringify(typed)]});
         await check();
