@@ -73,6 +73,39 @@ const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent
 export function testnetPanel(run,review) {
   const root=document.createElement("section");
   root.className="ten-trade";
+  const progress=element("ol","");progress.className="execution-flow";
+  progress.setAttribute("aria-label","测试交易执行流程");
+  const detail=element("div","");detail.className="execution-detail";
+  detail.setAttribute("role","status");
+  const steps=[
+    ["确认计划","原始目标："+(run.goal || "历史策略")+"。策略模型："+(run.model || "未记录")+"。本次为手动买入 10 测试 USDC，原策略条件需要你核对。"],
+    ["账户与资金","连接你的 EVM 钱包，检查 Hyperliquid 测试网现货可用余额。需要至少 10 测试 USDC，并预留交易费用。"],
+    ["预览订单","读取测试网盘口，计算数量及限价。未立即成交的部分自动撤销。"],
+    ["签名与提交","核对账户、数量和限价后，由钱包签名。签名仅用于本次测试网订单。"],
+    ["核对结果","根据交易所回执和成交记录显示结果。结果未知时，查询原订单后再处理。"]
+  ];
+  let stage=0;
+  const stepButtons=[];
+  function selectStep(index) {
+    detail.textContent=steps[index][1];
+    stepButtons.forEach((b,i)=>b.setAttribute("aria-expanded",String(i===index)));
+  }
+  function advance(index,message) {
+    stage=index;
+    if(message)steps[index][1]=message;
+    stepButtons.forEach((b,i)=>{
+      b.dataset.state=i<stage?"done":i===stage?"current":"pending";
+      b.textContent=steps[i][0]+" · "+(i<stage?"完成":i===stage?"当前步骤":"待进行");
+      if(i===stage)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current");
+    });
+    selectStep(index);
+  }
+  steps.forEach((step,index)=>{
+    const li=element("li",""),b=element("button","");b.type="button";
+    b.onclick=()=>selectStep(index);stepButtons.push(b);li.append(b);progress.append(li);
+  });
+  root.append(progress,detail);
+  advance(0);
   const title=element("h3","用 10 测试 USDC 试买 ETH");
   root.append(title);
   const budget="10";
@@ -85,29 +118,41 @@ export function testnetPanel(run,review) {
   root.append(note,form,result);
   function button(text,handler) {
     const b=element("button",text);b.type="button";b.className="ghost";
-    b.onclick=async()=>{b.disabled=true;try{await handler();}catch(e){result.textContent=e?.message||"操作失败";}finally{b.disabled=false;}};
+    b.onclick=async()=>{b.disabled=true;try{await handler();}catch(e){result.textContent=e?.message||"操作失败";detail.textContent=result.textContent;}finally{b.disabled=false;}};
     form.append(b);return b;
   }
   function showRecord(rec) {
+    advance(4,rec.message+"。本次账户："+rec.address+"。客户订单号："+cloid);
     title.textContent="测试网订单回执";
     form.replaceChildren();note.textContent="测试网 · "+rec.address+" · 买入 "+rec.s+" UETH · 限价 "+rec.p+" USDC";
     result.textContent=rec.message+" · 客户订单号 "+cloid;
     button("查询交易所状态",async()=>{
       const q=await post("/info",{type:"orderStatus",user:rec.address,oid:cloid});
-      if(q.status!=="order"){result.textContent=rec.message+" · 暂未查到订单，请稍后查询。";return;}
+      if(q.status!=="order"){result.textContent=rec.message+" · 暂未查到订单，请稍后查询。";advance(4,result.textContent);return;}
       const o=q.order,oid=o.order.oid;
       const fills=await post("/info",{type:"userFillsByTime",user:rec.address,startTime:rec.nonce-60000,endTime:rec.nonce+600000});
       const matches=fills.filter(f=>f.oid===oid);
       const size=matches.reduce((n,f)=>n+Number(f.sz),0);
       const avg=size?matches.reduce((n,f)=>n+Number(f.sz)*Number(f.px),0)/size:0;
+      const partial=size>0 && size<Number(rec.s);
       const labels={filled:"已成交",open:"已挂单",canceled:"已撤销",rejected:"已拒绝",iocCancelRejected:"未立即成交"};
-      rec.message=(labels[o.status]||o.status)+" · 交易所订单 "+oid+(size?" · 已成交 "+size.toFixed(4)+" UETH · 均价 "+avg.toFixed(4)+" USDC":"");
-      localStorage.setItem(key,JSON.stringify(rec));result.textContent=rec.message;
+      rec.message=(partial?"部分成交 · ":"")+(labels[o.status]||o.status)+" · 交易所订单 "+oid+(size?" · 已成交 "+size.toFixed(4)+" UETH · 均价 "+avg.toFixed(4)+" USDC":"");
+      localStorage.setItem(key,JSON.stringify(rec));result.textContent=rec.message;advance(4,rec.message);
     });
   }
   let previous;
   try { previous=localStorage.getItem(key); } catch {root.append(element("p","请启用浏览器本地存储以保存测试订单回执"));return root;}
-  if(previous){showRecord(JSON.parse(previous));return root;}
+  if(previous){
+    try {
+      const record=JSON.parse(previous);
+      if(!record || !/^0x[0-9a-f]{40}$/i.test(record.address) || !Number.isFinite(record.nonce))throw Error("invalid record");
+      showRecord(record);
+    } catch {
+      result.textContent="本地订单回执损坏，请核对交易所订单记录后处理。此运行已锁定，避免重复下单。";
+      advance(4,result.textContent);
+    }
+    return root;
+  }
   if(atoms(run.terms.maxOrder)<10n*unit) {
     result.textContent="这条策略的上限低于测试单最低金额 10，无法使用此入口。"; return root;
   }
@@ -127,15 +172,18 @@ export function testnetPanel(run,review) {
     const wallet=window.ethereum;
     if(!wallet)throw Error("请用已安装 EVM 钱包的浏览器打开");
     const [address]=await wallet.request({method:"eth_requestAccounts"});
+    advance(1,"钱包已连接："+address+"。正在检查测试网现货余额和盘口。余额不足时，请先在 Hyperliquid 测试网准备测试资金，再重新预览。");
     const market=spotMarket(await post("/info",{type:"spotMeta"}));
     const [free,book]=await Promise.all([funds(address),post("/info",{type:"l2Book",coin:market.coin})]);
     const ask=book.levels[1][0]?.px;
     if(!ask)throw Error("暂无卖单，可稍后重新预览");
+    const quotedAt=Date.now();
     const order=tenOrder(ask,free,market.decimals);
     if(!root.isConnected)return;
     form.replaceChildren();
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
     result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
+    advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。报价有效期 30 秒。");
       button("重新报价",()=>root.replaceWith(testnetPanel(run,review)));
       button("确认 10U，去钱包签名",async()=>{
         if(!root.isConnected)return;
@@ -145,11 +193,13 @@ export function testnetPanel(run,review) {
           if(accounts[0]?.toLowerCase()!==address.toLowerCase())throw Error("钱包账户已变化，请重新连接");
         };
         await check();
+        if(Date.now()-quotedAt>30000)throw Error("报价已过期，请重新报价后签名");
         sizeOrder(budget,order.p,await funds(address),market.decimals);
         const {action,typed,nonce,expiresAfter}=envelope(market.asset,order,cloid,Date.now());
+        advance(3,"等待钱包签名。本次上限 10 测试 USDC（费用另计），买入 "+order.s+" UETH，限价 "+order.p+" USDC。");
         const sig=await wallet.request({method:"eth_signTypedData_v4",params:[address,JSON.stringify(typed)]});
         await check();
-        if(!root.isConnected || Date.now()>=expiresAfter)throw Error("预览已过期，请重新确认");
+        if(!root.isConnected || Date.now()>=expiresAfter || Date.now()-quotedAt>30000)throw Error("预览已过期，请重新确认");
         if(!/^0x[0-9a-f]{130}$/i.test(sig))throw Error("钱包返回的签名格式无效");
         let v=parseInt(sig.slice(-2),16);if(v<2)v+=27;
         if(v!==27 && v!==28)throw Error("签名恢复位无效");
