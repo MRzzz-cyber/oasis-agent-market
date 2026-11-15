@@ -5083,7 +5083,9 @@ function tt(t2) {
 }
 
 // scripts/vendor-hl-agent.mjs
-function createTestnetSigner() {
+function createTestnetSigner(budget = "10") {
+  if (!["10", "10.10"].includes(budget)) throw Error("\u65E0\u6548\u6D4B\u8BD5\u9884\u7B97");
+  const cap = budget === "10.10" ? 101000000000000000n : 100000000000000000n;
   const account = privateKeyToAccount(generatePrivateKey());
   let used = false;
   return {
@@ -5096,7 +5098,8 @@ function createTestnetSigner() {
         const [whole, part = ""] = value.split(".");
         return BigInt(whole) * 100000000n + BigInt(part.padEnd(8, "0"));
       };
-      if (atomic(order.p) * atomic(order.s) !== 100000000000000000n) throw Error("\u6D4B\u8BD5\u8BA2\u5355\u5FC5\u987B\u4E3A 10 USDC");
+      const notional = atomic(order.p) * atomic(order.s);
+      if (notional < 100000000000000000n || notional > cap) throw Error("\u6D4B\u8BD5\u8BA2\u5355\u5FC5\u987B\u81F3\u5C11 10 USDC \u4E14\u4E0D\u8D85\u8FC7\u786E\u8BA4\u7684 " + budget + " USDC \u4E0A\u9650");
       used = true;
       return account.signTypedData(packet.typed);
     }

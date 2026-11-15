@@ -155,3 +155,15 @@ test('conversation simulation stays local and needs explicit confirmation',async
   const order=await api('/api/runs/'+run.id+'/approve',{method:'POST',body:'{}'});
   assert.equal(order.status,'simulated');assert.equal(order.order.simulated,true);assert.equal(order.order.amount,'10');
 });
+
+
+test('conversation plans persist the explicit 10.10 cap and do not upgrade existing 10 USDC plans',async()=>{
+  const {api}=await demoContext();
+  const input={asset:'ETH',amount:'10',network:'hyperliquid-testnet',goal:'准备测试买入ETH'};
+  const old=await api('/api/trade-plans',{method:'POST',body:JSON.stringify(input)});
+  const run=await api('/api/trade-plans',{method:'POST',body:JSON.stringify({...input,amount:'10.10'})});
+  assert.equal(run.testBudget,'10.10');assert.equal(run.terms.maxOrder,'10.10');
+  const records=await api('/api/runs');assert.equal(records.find(r=>r.id===old.id).testBudget,'10');
+  assert.equal((await api('/api/strategies')).length,0);
+  await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({...input,amount:'10.11'})}));
+});

@@ -46,26 +46,28 @@ export function sizeOrder(budget,price,balance,szDecimals) {
   if(cost>free)throw Error("测试网现货可用 USDC 不足");
   return {p:px,s:clean(decimal(size)),cost:clean(decimal(cost))};
 }
-// Preserve the user's 10 USDC cap. Never inflate the limit to manufacture notional.
-export function tenOrder(ask, free, decimals, referencePrice) {
+// Preserve the confirmed cap. Never inflate the limit to manufacture notional.
+export function tenOrder(ask, free, decimals, referencePrice, budget="10") {
+  if(!["10","10.10"].includes(budget))throw Error("无效测试预算");
   if(!Number.isInteger(decimals) || decimals<0 || decimals>8)throw Error("无效市场数量精度");
-  const price=atoms(ask),reference=atoms(referencePrice),cap=10n*unit;
+  const price=atoms(ask),reference=atoms(referencePrice),cap=atoms(budget);
   if(price<=0n || reference<=0n)throw Error("测试网报价或参考价格无效");
-  if(atoms(free)<cap)throw Error("测试网现货余额不足，需要至少 10 测试 USDC，并预留费用。");
+  if(atoms(free)<cap)throw Error("测试网现货余额不足，需要至少 "+budget+" 测试 USDC，并预留费用。");
   const step=10n**BigInt(8-decimals);
   // Both the expected fill and the reference notional must clear the floor.
   const floorPrice=price<reference?price:reference;
-  const minimumLots=(cap*unit+floorPrice*step-1n)/(floorPrice*step);
+  const minimumLots=(10n*unit*unit+floorPrice*step-1n)/(floorPrice*step);
   const minimumSize=minimumLots*step;
   const minimumCost=(minimumSize*price+unit-1n)/unit;
-  if(minimumCost>cap)throw Error("当前盘口无法在 10 测试 USDC 上限内下单：最低数量 "+clean(decimal(minimumSize))+" UETH，按卖一 "+ask+" 计算至少需要 "+clean(decimal(minimumCost))+" 测试 USDC（费用另计）。未请求签名，也未提交订单；请等待报价变化或明确调整测试预算。");
-  const order=sizeOrder("10",ask,free,decimals);
-  checkTenMinimum(order,ask,referencePrice);
+  if(minimumCost>cap)throw Error("当前盘口无法在 "+budget+" 测试 USDC 上限内下单：最低数量 "+clean(decimal(minimumSize))+" UETH，按卖一 "+ask+" 计算至少需要 "+clean(decimal(minimumCost))+" 测试 USDC（费用另计）。未请求签名，也未提交订单；请等待报价变化或明确调整测试预算。");
+  const order=sizeOrder(clean(decimal(minimumCost)),ask,free,decimals);
+  checkTenMinimum(order,ask,referencePrice,budget);
   return order;
 }
-export function checkTenMinimum(order,ask,referencePrice) {
+export function checkTenMinimum(order,ask,referencePrice,budget="10") {
+  if(!["10","10.10"].includes(budget))throw Error("无效测试预算");
   const price=atoms(ask),reference=atoms(referencePrice),size=atoms(order.s),limit=atoms(order.p);
-  if(price<=0n || reference<=0n || limit*size>10n*unit*unit)throw Error("测试订单超过 10 USDC 上限或报价无效");
+  if(price<=0n || reference<=0n || limit*size>atoms(budget)*unit)throw Error("测试订单超过 "+budget+" USDC 上限或报价无效");
   if(price>limit)throw Error("当前卖价高于预览限价，请重新报价后确认。");
   if(size*(price<reference?price:reference)<10n*unit*unit)throw Error("当前预计成交金额或参考金额不足最低 10 USDC，请重新报价。不会提高限价或自动增加预算。");
 }
@@ -149,13 +151,15 @@ export function walletError(error) {
 export function testnetPanel(run,review) {
   const root=document.createElement("section");
   root.className="ten-trade";
+  const budget=run.testBudget || "10";
+  if(!["10","10.10"].includes(budget)){root.textContent="无效测试预算，请重新确认计划";return root;}
   const progress=element("ol","");progress.className="execution-flow";
   progress.setAttribute("aria-label","测试交易执行流程");
   const detail=element("div","");detail.className="execution-detail";
   detail.setAttribute("role","status");
   const steps=[
-    ["确认计划","原始目标："+(run.goal || "历史策略")+"。策略模型："+(run.model || "未记录")+"。本次为手动买入 10 测试 USDC，原策略条件需要你核对。"],
-    ["账户与资金","连接你的 EVM 钱包，检查 Hyperliquid 测试网现货可用余额。需要至少 10 测试 USDC，并预留交易费用。"],
+    ["确认计划","原始目标："+(run.goal || "历史策略")+"。策略模型："+(run.model || "未记录")+"。本次为手动买入，上限 "+budget+" 测试 USDC，原策略条件需要你核对。"],
+    ["账户与资金","连接你的 EVM 钱包，检查 Hyperliquid 测试网现货可用余额。本次预算上限 "+budget+" 测试 USDC，请预留交易费用。"],
     ["预览订单","读取测试网盘口，计算数量及限价。未立即成交的部分自动撤销。"],
     ["签名与提交","核对账户、数量和限价后，先由钱包授权测试网助手，再由你单独确认本次订单。"],
     ["核对结果","根据交易所回执和成交记录显示结果。结果未知时，查询原订单后再处理。"]
@@ -184,13 +188,12 @@ export function testnetPanel(run,review) {
   });
   root.append(progress,detail);
   advance(0);
-  const title=element("h3","用 10 测试 USDC 试买 ETH");
+  const title=element("h3","用最多 "+budget+" 测试 USDC 试买 ETH");
   title.className="trade-title";root.append(title);
-  const budget="10";
   const cloid="0x"+run.id.replaceAll("-","");
   if(!/^0x[0-9a-f]{32}$/i.test(cloid))return root;
   const key="oasis-hl-test-order:"+run.id;
-  const note=element("p","本次买入上限 10 测试 USDC，费用另计。先连接钱包预览，再授权助手并确认订单。");
+  const note=element("p","本次买入上限 "+budget+" 测试 USDC，费用另计。先连接钱包预览，再授权助手并确认订单。");
   const form=element("div",""),result=element("p","");
   form.className="trade-actions";result.className="trade-feedback";
   result.setAttribute("role","status");
@@ -207,7 +210,7 @@ export function testnetPanel(run,review) {
     const changeWallet=root.querySelector(".wallet-connection button");if(changeWallet)changeWallet.hidden=true;
     form.replaceChildren();note.textContent="测试网 · "+rec.address+" · 买入 "+rec.s+" UETH · 限价 "+rec.p+" USDC";
     result.textContent=rec.message+" · 客户订单号 "+cloid;
-    if(/minimum value of 10/.test(rec.message))result.textContent+="。此订单未成交：限价上限不等于实际成交金额。请在新预览中检查最低数量与 10 USDC 预算；本回执保留，不自动重试。";
+    if(/minimum value of 10/.test(rec.message))result.textContent+="。此订单未成交：限价上限不等于实际成交金额。请在新预览中检查最低数量与当前预算；本回执保留，不自动重试。";
     button("查询交易所状态",async()=>{
       const q=await post("/info",{type:"orderStatus",user:rec.address,oid:cloid});
       if(q.status!=="order"){result.textContent=rec.message+" · 暂未查到订单，请稍后查询。";advance(4,result.textContent);return;}
@@ -235,11 +238,11 @@ export function testnetPanel(run,review) {
     }
     return root;
   }
-  if(atoms(run.terms.maxOrder)<10n*unit) {
-    result.textContent="这条策略的上限低于测试单最低金额 10，无法使用此入口。"; return root;
+  if(atoms(run.terms.maxOrder)<atoms(budget)) {
+    result.textContent="这条策略的上限低于本次测试预算，无法使用此入口。"; return root;
   }
   const details=element("details","");details.append(element("summary","查看交易规则与模型评审"));
-  details.append(element("p","Hyperliquid 测试网 UETH/USDC · 手动限价买入 · 未立即成交的部分撤销。原策略上限 "+run.terms.maxOrder+" "+run.terms.quoteAsset+"，本次独立指定 10 测试 USDC。策略触发和暂停条件由你核对。"));
+  details.append(element("p","Hyperliquid 测试网 UETH/USDC · 手动限价买入 · 未立即成交的部分撤销。原策略上限 "+run.terms.maxOrder+" "+run.terms.quoteAsset+"，本次独立指定上限 "+budget+" 测试 USDC。策略触发和暂停条件由你核对。"));
   root.append(details);
   if(review && run.modelId) {
     const output=element("p","");
@@ -337,16 +340,16 @@ export function testnetPanel(run,review) {
       const extra=withdrawable?" 合约账户可划转余额 "+withdrawable+" 测试 USDC。":"";
       throw Error("当前地址 "+address+" 的测试网现货可用余额为 "+free+" USDC。"+extra+"请核对领取地址；若资金在 Perps，请在官方测试网划转到 Spot，再重新预览。");
     }
-    const order=tenOrder(ask,free,market.decimals,book.markPx);
+    const order=tenOrder(ask,free,market.decimals,book.markPx,budget);
     if(!root.isConnected)return;
     form.replaceChildren();
     walletTrigger.onclick=()=>{const next=testnetPanel(run,review);root.replaceWith(next);next.querySelector(".wallet-connection button")?.click();};
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
-    result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
+    result.textContent="买入 "+order.s+" UETH · 预计成交额 "+order.cost+" 测试 USDC，预算上限 "+budget+"（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
     result.textContent+=" 盘口买一 "+(book.levels[0]?.[0]?.px || "暂无")+"，卖一 "+ask+"，参考价 "+book.markPx+"；测试网报价不代表真实 ETH 行情。";
     advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。提交前重新核对最新盘口，保留本次限价和数量。");
       button("更换钱包或重新报价",()=>root.replaceWith(testnetPanel(run,review)));
-      const sessionKey=run.id+":"+address.toLowerCase();
+      const sessionKey=run.id+":"+address.toLowerCase()+":"+budget;
       if(!testnetSessions.has(sessionKey))testnetSessions.set(sessionKey,{signer:null,approved:false});
       const session=testnetSessions.get(sessionKey);
       let signer=session.signer,approved=session.approved;
@@ -363,13 +366,13 @@ export function testnetPanel(run,review) {
         approved=await isApproved();session.approved=approved;
         confirmOrder.dataset.blocked=String(!approved);
         confirmOrder.disabled=!approved || confirmOrder.dataset.busy==="true";
-        approvalStatus.textContent=approved?"交易所已确认测试网助手："+signer.address+"。现在可以确认 10 USDC 订单。":"交易所暂未确认此助手，请完成授权后点击核对状态。";
+        approvalStatus.textContent=approved?"交易所已确认测试网助手："+signer.address+"。现在可以确认上限 "+budget+" USDC 的订单。":"交易所暂未确认此助手，请完成授权后点击核对状态。";
         if(approved)advance(3,approvalStatus.textContent);
         return approved;
       };
       const consent=element("label","");consent.className="trade-consent";
       const checkbox=element("input","");checkbox.type="checkbox";
-      consent.append(checkbox,element("span","我同意授权测试网交易助手。协议授权覆盖本测试账户交易，10 USDC 为 Oasis 本次订单限制。密钥仅保存在当前页面内存；刷新会丢失密钥，但授权仍需在官方 API 页面撤销。"));
+      consent.append(checkbox,element("span","我同意授权测试网交易助手。协议授权覆盖本测试账户交易，"+budget+" USDC 为 Oasis 本次订单限制。密钥仅保存在当前页面内存；刷新会丢失密钥，但授权仍需在官方 API 页面撤销。"));
       form.append(consent);
       const apiLink=element("a","在官方测试网管理或撤销 API 授权");
       apiLink.href="https://app.hyperliquid-testnet.xyz/API";apiLink.target="_blank";apiLink.rel="noopener noreferrer";apiLink.className="trade-permission-link";form.append(apiLink);
@@ -390,7 +393,7 @@ export function testnetPanel(run,review) {
           await checkAccount();
           if(!signer) {
             const {createTestnetSigner}=await import("./vendor/hl-agent.js");
-            signer=createTestnetSigner();session.signer=signer;
+            signer=createTestnetSigner(budget);session.signer=signer;
           }
           // Reconcile an uncertain earlier request before sending another approval.
           if(!await isApproved()) {
@@ -408,22 +411,22 @@ export function testnetPanel(run,review) {
             if(attempt<3)await new Promise(resolve=>setTimeout(resolve,700));
           }
           if(!approved)throw Error("钱包签名已处理，但交易所尚未确认授权。请点击核对授权状态。");
-          result.textContent="测试网助手已授权："+signer.address+"。请单独确认本次 10 USDC 订单。";
+          result.textContent="测试网助手已授权："+signer.address+"。请单独确认本次上限 "+budget+" USDC 的订单。";
           advance(3,result.textContent);
         } catch(error) {
           approvalStatus.textContent="授权未完成："+walletError(error);
           throw error;
         }
       });
-      const confirmOrder=button("确认 10U 测试订单",async()=>{
+      const confirmOrder=button("确认上限 "+budget+" USDC 测试订单",async()=>{
         if(!root.isConnected)return;
         if(localStorage.getItem(key)){showRecord(JSON.parse(localStorage.getItem(key)));return;}
         await checkAccount();
         if(!signer || !await reconcileApproval())throw Error("测试网助手尚未获得有效授权，请先完成授权或核对状态。");
         const book=await post("/info",{type:"l2Book",coin:market.coin});
         const freshAsk=checkBook(book,market.coin);
-        checkTenMinimum(order,freshAsk,book.markPx);
-        sizeOrder(budget,order.p,await funds(address),market.decimals);
+        checkTenMinimum(order,freshAsk,book.markPx,budget);
+        sizeOrder(order.cost,order.p,await funds(address),market.decimals);
         const packet=envelope(market.asset,order,cloid,Date.now());
         const {action,nonce,expiresAfter}=packet;
         if(!root.isConnected)throw Error("页面已变化，请重新确认");

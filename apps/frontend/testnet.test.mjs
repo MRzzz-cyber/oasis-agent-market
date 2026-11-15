@@ -113,3 +113,29 @@ test('quote check distinguishes stale, missing, mismatched and clock-skewed data
   assert.throws(()=>checkBook({...book,checkedAt:undefined},'@1137'),/时间信息异常/);
   assert.throws(()=>checkBook({...book,time:now-120000,checkedAt:now-120000},'@1137'),/同步系统时间/);
 });
+
+
+test('explicit 10.10 cap permits a 10.07 order at the real 950 ask without changing legacy caps',async()=>{
+  const {tenOrder,checkTenMinimum}=await import('./testnet.js');
+  const order=tenOrder('950','999',4,'950','10.10');
+  assert.deepEqual(order,{p:'950',s:'0.0106',cost:'10.07'});
+  assert.throws(()=>tenOrder('950','999',4,'950'),/至少需要 10.07/);
+  assert.throws(()=>checkTenMinimum(order,'950','950'),/超过 10/);
+  checkTenMinimum(order,'950','950','10.10');
+  assert.throws(()=>checkTenMinimum(order,'950','940','10.10'),/不足最低/);
+  assert.throws(()=>tenOrder('950','999',4,'950','100'),/无效测试预算/);
+});
+
+test('signer binds the explicit cap and rejects larger notional or an implicit budget increase',async()=>{
+  const {createTestnetSigner}=await import('./vendor/hl-agent.js');
+  const {recoverTypedDataAddress}=await import('viem');
+  const packet=envelope(11137,{p:'950',s:'0.0106'},'0x'+'12'.repeat(16),Date.now());
+  await assert.rejects(()=>createTestnetSigner().signOrder(packet),/上限/);
+  const signer=createTestnetSigner('10.10');
+  const signature=await signer.signOrder(packet);
+  assert.equal((await recoverTypedDataAddress({...packet.typed,signature})).toLowerCase(),signer.address.toLowerCase());
+  await assert.rejects(()=>signer.signOrder(packet),/已使用/);
+  const tooLarge=envelope(11137,{p:'950',s:'0.0107'},'0x'+'12'.repeat(16),Date.now());
+  await assert.rejects(()=>createTestnetSigner('10.10').signOrder(tooLarge),/上限/);
+  assert.throws(()=>createTestnetSigner('100'),/无效测试预算/);
+});
