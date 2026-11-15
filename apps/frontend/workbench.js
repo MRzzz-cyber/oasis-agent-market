@@ -1,5 +1,6 @@
-import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=records-v12-20261116";
-import {availableWallets} from './testnet.js?v=records-v12-20261116';
+import {initDeposit} from './deposit.js?v=deposit-v13-20261116';
+import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=deposit-v13-20261116";
+import {availableWallets} from './testnet.js?v=deposit-v13-20261116';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];
@@ -76,6 +77,8 @@ export function initWorkbench({prompt,trade,account}) {
   $('wallet-open').onclick=()=>openFunds();$('wallet-close').onclick=()=>closeFunds();$('funding-backdrop').onclick=closeFunds;
   $('funds-trade').onclick=closeFunds;$('account-wallet-login').onclick=account;
   const drawer=$('funding-drawer');
+  const deposit=initDeposit({getWallet:()=>wallet,openWalletChooser:()=>{openFunds();$('funds-wallet-chooser').open=true;$('funds-wallet-chooser').scrollIntoView({block:'nearest'});},onRefresh:()=>{if(wallet)refreshFunds();}});
+  $('funds-deposit').onclick=deposit.open;
   function closeFunds(){drawer.close();$('funding-backdrop').hidden=true;}
   function openFunds(){if(!drawer.open)drawer.showModal();$('funding-backdrop').hidden=true;renderFunds();renderWalletChoices();setTimeout(()=>{if(drawer.open)renderWalletChoices();},250);}
   const funds=()=>({connected:Boolean(wallet),network:'hyperliquid-mainnet',status:fundsStatus==='ready'&&Date.now()-fundsUpdatedAt>60000?'unknown':fundsStatus,available:fundsAvailable,address:wallet?.address||null});
@@ -84,6 +87,7 @@ export function initWorkbench({prompt,trade,account}) {
     $('funds-balance').textContent='—';$('funds-perp').textContent='—';$('funds-native').textContent='—';$('funds-native-symbol').textContent='';$('funds-chain-usdc').textContent='—';$('funds-chain').textContent='尚未连接';$('funds-spot-assets').replaceChildren();
   }
   function renderFunds() {
+    deposit.invalidate();
     for(const selector of ['.funds-account','.wallet-overview','.wallet-asset-details'])document.querySelector(selector).hidden=!wallet;
     balanceGeneration++;$('funds-wallet-chooser').open=!wallet;$('funds-wallet-summary').textContent=wallet?'使用 Oasis 账号钱包':'创建账号钱包';fundsStatus='unknown';fundsAvailable=null;emitFunds();resetAssetValues();
     $('funds-address').textContent=wallet?wallet.address.slice(0,8)+'…'+wallet.address.slice(-6):'连接后显示地址';
@@ -123,7 +127,7 @@ export function initWorkbench({prompt,trade,account}) {
   $('funds-copy').onclick=async()=>{if(!wallet)return;try{await navigator.clipboard.writeText(wallet.address);$('funds-status').textContent='已复制钱包地址。该地址不是 Hyperliquid 专属入金指令，请在官方核对支持的网络与资产。';}catch{$('funds-status').textContent='无法复制，请手动选择上方地址。';}};
   let watchedProvider=null;
   const invalidateWallet=()=>{wallet=null;renderFunds();renderWalletChoices();};
-  const chainChanged=()=>{if(wallet)refreshFunds();};
+  const chainChanged=()=>{deposit.invalidate();if(wallet)refreshFunds();};
   function watchWallet(provider){if(watchedProvider?.removeListener){for(const name of ['accountsChanged','disconnect'])watchedProvider.removeListener(name,invalidateWallet);watchedProvider.removeListener('chainChanged',chainChanged);}watchedProvider=provider;if(provider?.on){for(const name of ['accountsChanged','disconnect'])provider.on(name,invalidateWallet);provider.on('chainChanged',chainChanged);}}
   let connectionGeneration=0;
   async function connectChoice(choice,button){

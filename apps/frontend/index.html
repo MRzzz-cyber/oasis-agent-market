@@ -4,10 +4,10 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
-  <link rel="icon" href="/brand/favicon.svg?v=records-v12-20261116" type="image/svg+xml"/>
+  <link rel="icon" href="/brand/favicon.svg?v=deposit-v13-20261116" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=records-v12-20261116"/>
-  <link rel="stylesheet" href="/workbench.css?v=records-v12-20261116"/>
+  <link rel="stylesheet" href="/styles.css?v=deposit-v13-20261116"/>
+  <link rel="stylesheet" href="/workbench.css?v=deposit-v13-20261116"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
@@ -78,7 +78,7 @@
         <footer class="release-footer"><span id="release-label">工作台 v4</span><span id="release-status" role="status"></span><button type="button" id="reload-release" class="ghost" hidden>加载最新版本</button></footer>
       </main>
       <dialog id="funding-drawer" class="funding-drawer" aria-labelledby="funds-title"><div class="drawer-heading"><div><span class="eyebrow">WALLET & FUNDS</span><h2 id="funds-title">钱包与资金</h2></div><button type="button" id="wallet-close" class="icon-button" aria-label="关闭资金面板">×</button></div>
-      <p class="funds-network">主网资产</p>
+      <div class="funds-top-actions"><p class="funds-network">主网资产</p><button type="button" class="primary" id="funds-deposit">↓ 充值</button></div>
       <div class="funds-account"><strong id="funds-wallet-name">尚未选择钱包</strong><code id="funds-address">连接后显示地址</code><div><button type="button" id="funds-copy" class="ghost" disabled>复制地址</button><button type="button" id="funds-refresh" class="ghost" disabled>刷新</button></div></div>
       <section class="mainnet-assets wallet-overview"><div class="assets-section-head"><h3>钱包余额</h3><small id="funds-chain">尚未连接</small></div><div class="wallet-usdc"><strong id="funds-chain-usdc">—</strong><span>USDC</span></div><div class="native-usdc"><span>原生币</span><span><strong id="funds-native">—</strong> <b id="funds-native-symbol"></b></span></div><p id="funds-native-status" class="note" role="status">连接后查看当前网络余额</p></section>
       <details class="wallet-asset-details"><summary>交易账户详情 <span>Hyperliquid ↗</span></summary><section class="mainnet-assets"><div class="native-usdc"><span>现货可用 USDC</span><strong id="funds-balance">—</strong></div><div class="native-usdc"><span>永续可提 USDC</span><strong id="funds-perp">—</strong></div><div id="funds-spot-assets" class="spot-assets"></div><p id="funds-status" class="note" role="status">连接后读取交易账户</p><p class="note account-scope">与钱包余额分开计算，不含子账户、金库及其他永续 DEX。</p><a class="wallet-official-link" href="https://app.hyperliquid.xyz/portfolio" target="_blank" rel="noopener noreferrer">在官方查看 ↗</a></section></details>
@@ -86,9 +86,10 @@
       <section class="wallet-external"><div class="assets-section-head"><h3>连接其他钱包</h3><button type="button" class="ghost" id="funds-connect">重新检测</button></div><div id="funds-wallet-list" class="wallet-list" aria-label="已有钱包"></div></section>
       <p class="wallet-panel-footnote">仅展示主网资产 · 正式网下单暂未开放</p>
       <button type="button" class="ghost funds-trade" id="funds-trade">返回研究 →</button></dialog><button id="funding-backdrop" class="funding-backdrop" type="button" hidden aria-label="关闭钱包与资金"></button>
+      <dialog id="deposit-dialog" class="deposit-dialog" aria-labelledby="deposit-title"><div class="drawer-heading"><div><span class="eyebrow">RECEIVE CRYPTO</span><h2 id="deposit-title">充值</h2></div><button type="button" class="icon-button" id="deposit-close" aria-label="关闭充值">×</button></div><p class="deposit-intro">从其他钱包或交易所转入加密货币</p><div class="deposit-selectors"><label>网络<select id="deposit-network" aria-label="充值网络"></select></label><label>币种<select id="deposit-asset" aria-label="充值币种"><option value="USDC">USDC</option><option value="native" id="deposit-native-option">ETH</option></select></label></div><div class="deposit-code-box"><canvas id="deposit-qr" width="224" height="224" hidden aria-label="收款地址二维码"></canvas><p id="deposit-qr-status" role="status">创建或连接钱包后显示收款码</p></div><p class="deposit-qr-caption">二维码仅包含地址，请在转出平台选择同一网络。</p><div class="deposit-recipient"><div><span>收款地址</span><small id="deposit-selected-network"></small></div><strong id="deposit-wallet-name"></strong><code id="deposit-address">—</code><button type="button" id="deposit-copy" class="ghost" disabled>复制地址</button></div><p id="deposit-contract" class="deposit-contract"></p><p id="deposit-status" class="deposit-status" role="status"></p><button type="button" class="primary" id="deposit-connect">创建或连接钱包</button><button type="button" class="ghost" id="deposit-verify" hidden>重新核对地址</button><details class="deposit-help"><summary>充值说明</summary><p>仅使用所选主网与币种。USDC 为该网络的 Circle 原生 USDC，不是 USDC.e。转出平台可能另有最低金额和手续费，到账时间取决于网络确认。</p><p>资产接收到钱包，不会自动兑换、跨链或入金 Hyperliquid。Oasis 暂未开放主网转出及交易，请按需转入。</p><p>当前余额面板只显示钱包当前网络。接收其他网络资产后，需切换到相应网络查看。</p></details><button type="button" class="ghost deposit-done" id="deposit-done">返回钱包并刷新</button></dialog>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=records-v12-20261116" type="module"></script>
+  <script src="/app.js?v=deposit-v13-20261116" type="module"></script>
 </body>
 </html>

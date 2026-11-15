@@ -1,17 +1,17 @@
-import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=records-v12-20261116';
-import {renderAccountButton} from "./account-avatar.js?v=records-v12-20261116";
-import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=records-v12-20261116";
-import {conversationGuide,fundingState} from "./conversation-guide.js?v=records-v12-20261116";
-import {setMarkdown} from "./markdown.js?v=records-v12-20261116";
-import {initEyeMotion} from "./eye-logo.js?v=records-v12-20261116";
-import {initWorkbench} from "./workbench.js?v=records-v12-20261116";
-import {testnetPanel} from "./testnet.js?v=records-v12-20261116";
+import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=deposit-v13-20261116';
+import {renderAccountButton} from "./account-avatar.js?v=deposit-v13-20261116";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=deposit-v13-20261116";
+import {conversationGuide,fundingState} from "./conversation-guide.js?v=deposit-v13-20261116";
+import {setMarkdown} from "./markdown.js?v=deposit-v13-20261116";
+import {initEyeMotion} from "./eye-logo.js?v=deposit-v13-20261116";
+import {initWorkbench} from "./workbench.js?v=deposit-v13-20261116";
+import {testnetPanel} from "./testnet.js?v=deposit-v13-20261116";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="records-v12-20261116";
+const UI_RELEASE="deposit-v13-20261116";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;

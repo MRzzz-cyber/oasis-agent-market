@@ -23,11 +23,13 @@
     "@x402/express": "2.30.0",
     "@x402/fetch": "2.30.0",
     "express": "^5.1.0",
+    "qrcode": "1.5.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "viem": "^2.38.0"
   },
   "devDependencies": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "jsqr": "1.4.0"
   }
 }
