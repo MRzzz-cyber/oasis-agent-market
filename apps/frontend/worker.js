@@ -162,7 +162,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"workbench-v4-20261115",defaultTestBudget:"20"});
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"eye-v5-20261115",defaultTestBudget:"20"});
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if(url.pathname === "/api/market/overview" && request.method === "GET")return overview();
     if (url.pathname === "/api/market/catalog" && request.method === "GET") return marketCatalog();
@@ -170,7 +170,7 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) {
       const asset=await env.ASSETS.fetch(request);
-      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","workbench-v4-20261115");
+      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","eye-v5-20261115");
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }
 

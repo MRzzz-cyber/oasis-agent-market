@@ -1,11 +1,12 @@
-import {initWorkbench} from "./workbench.js?v=workbench-v4-20261115";
-import {testnetPanel} from "./testnet.js?v=workbench-v4-20261115";
+import {initEyeMotion} from "./eye-logo.js?v=eye-v5-20261115";
+import {initWorkbench} from "./workbench.js?v=eye-v5-20261115";
+import {testnetPanel} from "./testnet.js?v=eye-v5-20261115";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="workbench-v4-20261115";
+const UI_RELEASE="eye-v5-20261115";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -286,6 +287,7 @@ function addChat(role, content) {
   state.conversation.push({ role, content });
   const box = $("chat-messages");
   const msg = node("div", "chat-message " + role);
+  if(role==="assistant"){const eye=node("span","assistant-avatar");eye.dataset.oasisEye="";msg.appendChild(eye);}
   msg.appendChild(node("span", "chat-role", role === "user" ? "你" : "Oasis"));
   const paragraph = node("p", "", content);
   msg.appendChild(paragraph); box.appendChild(msg);
@@ -926,3 +928,5 @@ const workbench=initWorkbench({
     makeDraftSummary();showTab("create");showChatTradePlan();
   },account:openAccount
 });
+
+initEyeMotion();
