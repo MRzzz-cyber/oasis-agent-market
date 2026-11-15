@@ -1,12 +1,13 @@
-import {initEyeMotion} from "./eye-logo.js?v=eye-v5-20261115";
-import {initWorkbench} from "./workbench.js?v=eye-v5-20261115";
-import {testnetPanel} from "./testnet.js?v=eye-v5-20261115";
+import {setMarkdown} from "./markdown.js?v=markdown-v6-20261115";
+import {initEyeMotion} from "./eye-logo.js?v=markdown-v6-20261115";
+import {initWorkbench} from "./workbench.js?v=markdown-v6-20261115";
+import {testnetPanel} from "./testnet.js?v=markdown-v6-20261115";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="eye-v5-20261115";
+const UI_RELEASE="markdown-v6-20261115";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -289,7 +290,8 @@ function addChat(role, content) {
   const msg = node("div", "chat-message " + role);
   if(role==="assistant"){const eye=node("span","assistant-avatar");eye.dataset.oasisEye="";msg.appendChild(eye);}
   msg.appendChild(node("span", "chat-role", role === "user" ? "你" : "Oasis"));
-  const paragraph = node("p", "", content);
+  const paragraph = role === "assistant" ? node("div", "markdown-body") : node("p", "", content);
+  if (role === "assistant") setMarkdown(paragraph, content);
   msg.appendChild(paragraph); box.appendChild(msg);
   box.scrollTop = box.scrollHeight;
   return paragraph;
@@ -437,7 +439,7 @@ async function sendToRealModel() {
       const delta = chunk.choices?.[0]?.delta?.content;
       if (typeof delta === "string" && delta) {
         fullText += delta;
-        assistantText.textContent = fullText;
+        setMarkdown(assistantText, fullText);
         $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
       }
       if (chunk.model) returnedModel = chunk.model;
@@ -467,7 +469,7 @@ async function sendToRealModel() {
       assistantText.closest(".chat-message")?.remove();
       if (state.conversation.at(-1)?.role === "assistant") state.conversation.pop();
     } else if (assistantText) {
-      assistantText.textContent += "\n（响应中断，点击连接并重试）";
+      setMarkdown(assistantText, (assistantText.dataset.markdownSource || "") + "\n（响应中断，点击连接并重试）");
       if (state.conversation.at(-1)?.role === "assistant") state.conversation.pop();
     }
     $("ai-usage").textContent = "调用失败：" + error.message + "。没有生成模拟回答，可以重试。";
@@ -637,7 +639,7 @@ async function reviewTestnet(run, quote, output) {
     if(chunk.choices?.[0]?.finish_reason)complete=true;
   }
   if(!complete || !reply.trim()) throw Error("未收到完整评审，请重试");
-  output.textContent="本次实际模型："+actual+"\n"+reply;
+  setMarkdown(output,"本次实际模型："+actual+"\n\n"+reply);
 }
 function renderRunContent() {
   const run = state.run; if (!run) return;
