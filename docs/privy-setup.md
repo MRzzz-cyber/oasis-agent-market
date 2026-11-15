@@ -28,7 +28,9 @@ Privy 自带的 createOnLogin 不覆盖自定义 JWT 登录，所以组件在身
 
 ## 2. 生成 Oasis 身份签名密钥
 
-在本地项目根目录运行：
+无需命令行时，可以在自己浏览器打开 `/privy-setup.html`，本地生成密钥并复制到 Cloudflare。该页面不上传或持久化私钥，线上已有公钥时不允许重新生成。请保持页面打开并先下载私钥备份，公钥发布匹配后再在 Privy 保存。
+
+也可在本地项目根目录运行：
 
 ```sh
 npm run setup:privy

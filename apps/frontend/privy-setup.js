@@ -1,0 +1,11 @@
+import {generateIdentityKeys,samePublicKey} from './privy-keygen.js';
+const $=id=>document.getElementById(id);let keys=null,missing=false,busy=false;
+const say=text=>{$('status').textContent=text;};
+async function onlineKey(){const r=await fetch('/.well-known/jwks.json',{cache:'no-store',signal:AbortSignal.timeout(15000)});const body=await r.json();if(r.status===503&&body.error==='身份公钥尚未配置')return null;if(!r.ok||!Array.isArray(body.keys)||!body.keys.length)throw Error('公钥接口暂不可用，请等待部署完成后重试。');return body.keys[0];}
+async function check(){try{const key=await onlineKey();missing=!key;if(!key){say(keys?'线上尚未发布公钥。先在 Cloudflare 保存公钥变量，再检查。':'线上尚未配置公钥，可以生成一次身份密钥。');}else if(keys&&!samePublicKey(keys.publicJwk,key)){say('线上公钥与本页密钥不同。请勿保存 Privy 配置或覆盖已有私钥，先核对 Cloudflare 配置。');}else{say('线上公钥已发布'+(keys?'，并与本页密钥匹配':'')+'。可以回到 Privy 保存 JWT 配置，再启用账号钱包。');} $('generate').disabled=Boolean(key)||Boolean(keys)||busy;}catch(e){missing=false;$('generate').disabled=true;say(e.message||'无法检查线上公钥，请重试。');}}
+$('generate').onclick=async()=>{if(!missing||keys||busy)return;busy=true;$('generate').disabled=true;say('正在本机生成身份密钥…');try{if(await onlineKey())throw Error('线上已有公钥，已停止生成以避免意外轮换。');keys=await generateIdentityKeys();$('public').value=JSON.stringify(keys.publicJwk);for(const id of ['copy-private','copy-public','download','clear'])$(id).disabled=false;say('已在本机生成。请先下载私钥备份，再将两项分别填入 Cloudflare。私钥不会自动上传。');}catch(e){say(e.message||'生成失败，请重试。');$('generate').disabled=false;}finally{busy=false;}};
+async function copy(value){try{await navigator.clipboard.writeText(value);say('已复制。请粘贴到对应 Cloudflare 变量中；不要粘贴到聊天。');}catch{say('复制失败，请允许剪贴板访问；私钥也可下载备份后在本机查看。');}}
+$('copy-private').onclick=()=>keys&&copy(keys.privateKey);$('copy-public').onclick=()=>keys&&copy(JSON.stringify(keys.publicJwk));
+$('download').onclick=()=>{if(!keys)return;const url=URL.createObjectURL(new Blob([keys.privateKey],{type:'text/plain'})),a=document.createElement('a');a.href=url;a.download='oasis-auth-private-key.pem';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);say('已请求下载私钥备份。请妥善保存，只用于 Cloudflare Secret。');};
+$('clear').onclick=()=>{keys=null;$('public').value='';for(const id of ['copy-private','copy-public','download','clear'])$(id).disabled=true;say('已清除本页密钥引用，请一并清理剪贴板中的私钥。');check();};
+$('check').onclick=check;check();
