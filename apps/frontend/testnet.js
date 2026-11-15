@@ -22,6 +22,7 @@ export function checkBook(book,coin) {
   if(age>30000)throw Error("测试网盘口已过期 "+Math.floor(age/1000)+" 秒，请重新报价；持续过期时请稍后再试");
   if(age < -5000)throw Error("交易所报价时间异常，请稍后重新报价");
   if(Math.abs(Date.now()-book.checkedAt)>60000)throw Error("电脑时间与报价服务器相差超过 1 分钟，请先同步系统时间，再重新预览");
+  if(!/^\d+(?:\.\d{1,8})?$/.test(String(book.markPx)) || Number(book.markPx)<=0)throw Error("测试网参考价格不可用，无法核对最低交易金额，请重新报价");
   return book.levels[1][0].px;
 }
 function atoms(value) {
@@ -45,25 +46,28 @@ export function sizeOrder(budget,price,balance,szDecimals) {
   if(cost>free)throw Error("测试网现货可用 USDC 不足");
   return {p:px,s:clean(decimal(size)),cost:clean(decimal(cost))};
 }
-// Exactly 10 USDC: with 8-decimal fixed-point price and size their product is 10^17.
-// Enumerating its divisors avoids rounding the notional below the exchange minimum.
-export function tenOrder(ask, free, decimals) {
-  const best=atoms(ask), step=10n**BigInt(8-decimals), target=10n*unit*unit;
-  if(best<=0n)throw Error("测试网暂无卖价，请稍后刷新");
-  if(atoms(free)<10n*unit)throw Error("测试网现货余额不足，需要至少 10 测试 USDC。");
-  let above=null, below=null;
-  for(let a=0;a<=17;a++) for(let b=0;b<=17;b++) {
-    const size=2n**BigInt(a)*5n**BigInt(b);
-    if(size%step)continue;
-    const px=target/size;
-    const text=clean(decimal(px));
-    if(text.includes(".") && (text.split(".")[1].length>8-decimals || text.replace(".","").replace(/^0+/,"").length>5))continue;
-    if(px>=best && (above===null || px<above))above=px;
-    if(px<best && (below===null || px>below))below=px;
-  }
-  const limit=above!==null && above*100n<=best*110n ? above : below;
-  if(!limit)throw Error("当前没有合适的 10 USDC 限价组合，请稍后重试");
-  return sizeOrder("10",clean(decimal(limit)),free,decimals);
+// Preserve the user's 10 USDC cap. Never inflate the limit to manufacture notional.
+export function tenOrder(ask, free, decimals, referencePrice) {
+  if(!Number.isInteger(decimals) || decimals<0 || decimals>8)throw Error("无效市场数量精度");
+  const price=atoms(ask),reference=atoms(referencePrice),cap=10n*unit;
+  if(price<=0n || reference<=0n)throw Error("测试网报价或参考价格无效");
+  if(atoms(free)<cap)throw Error("测试网现货余额不足，需要至少 10 测试 USDC，并预留费用。");
+  const step=10n**BigInt(8-decimals);
+  // Both the expected fill and the reference notional must clear the floor.
+  const floorPrice=price<reference?price:reference;
+  const minimumLots=(cap*unit+floorPrice*step-1n)/(floorPrice*step);
+  const minimumSize=minimumLots*step;
+  const minimumCost=(minimumSize*price+unit-1n)/unit;
+  if(minimumCost>cap)throw Error("当前盘口无法在 10 测试 USDC 上限内下单：最低数量 "+clean(decimal(minimumSize))+" UETH，按卖一 "+ask+" 计算至少需要 "+clean(decimal(minimumCost))+" 测试 USDC（费用另计）。未请求签名，也未提交订单；请等待报价变化或明确调整测试预算。");
+  const order=sizeOrder("10",ask,free,decimals);
+  checkTenMinimum(order,ask,referencePrice);
+  return order;
+}
+export function checkTenMinimum(order,ask,referencePrice) {
+  const price=atoms(ask),reference=atoms(referencePrice),size=atoms(order.s),limit=atoms(order.p);
+  if(price<=0n || reference<=0n || limit*size>10n*unit*unit)throw Error("测试订单超过 10 USDC 上限或报价无效");
+  if(price>limit)throw Error("当前卖价高于预览限价，请重新报价后确认。");
+  if(size*(price<reference?price:reference)<10n*unit*unit)throw Error("当前预计成交金额或参考金额不足最低 10 USDC，请重新报价。不会提高限价或自动增加预算。");
 }
 export function spotMarket(meta) {
   const token=meta.tokens.find(t=>t.tokenId?.toLowerCase()===TOKEN && t.name==="UETH");
@@ -203,6 +207,7 @@ export function testnetPanel(run,review) {
     const changeWallet=root.querySelector(".wallet-connection button");if(changeWallet)changeWallet.hidden=true;
     form.replaceChildren();note.textContent="测试网 · "+rec.address+" · 买入 "+rec.s+" UETH · 限价 "+rec.p+" USDC";
     result.textContent=rec.message+" · 客户订单号 "+cloid;
+    if(/minimum value of 10/.test(rec.message))result.textContent+="。此订单未成交：限价上限不等于实际成交金额。请在新预览中检查最低数量与 10 USDC 预算；本回执保留，不自动重试。";
     button("查询交易所状态",async()=>{
       const q=await post("/info",{type:"orderStatus",user:rec.address,oid:cloid});
       if(q.status!=="order"){result.textContent=rec.message+" · 暂未查到订单，请稍后查询。";advance(4,result.textContent);return;}
@@ -332,13 +337,13 @@ export function testnetPanel(run,review) {
       const extra=withdrawable?" 合约账户可划转余额 "+withdrawable+" 测试 USDC。":"";
       throw Error("当前地址 "+address+" 的测试网现货可用余额为 "+free+" USDC。"+extra+"请核对领取地址；若资金在 Perps，请在官方测试网划转到 Spot，再重新预览。");
     }
-    const order=tenOrder(ask,free,market.decimals);
+    const order=tenOrder(ask,free,market.decimals,book.markPx);
     if(!root.isConnected)return;
     form.replaceChildren();
     walletTrigger.onclick=()=>{const next=testnetPanel(run,review);root.replaceWith(next);next.querySelector(".wallet-connection button")?.click();};
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
     result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
-    result.textContent+=" 盘口买一 "+(book.levels[0]?.[0]?.px || "暂无")+"，卖一 "+ask+"；测试网报价不代表真实 ETH 行情。";
+    result.textContent+=" 盘口买一 "+(book.levels[0]?.[0]?.px || "暂无")+"，卖一 "+ask+"，参考价 "+book.markPx+"；测试网报价不代表真实 ETH 行情。";
     advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。提交前重新核对最新盘口，保留本次限价和数量。");
       button("更换钱包或重新报价",()=>root.replaceWith(testnetPanel(run,review)));
       const sessionKey=run.id+":"+address.toLowerCase();
@@ -417,7 +422,7 @@ export function testnetPanel(run,review) {
         if(!signer || !await reconcileApproval())throw Error("测试网助手尚未获得有效授权，请先完成授权或核对状态。");
         const book=await post("/info",{type:"l2Book",coin:market.coin});
         const freshAsk=checkBook(book,market.coin);
-        if(atoms(freshAsk)>atoms(order.p))throw Error("当前卖价高于预览限价，请重新报价后确认。");
+        checkTenMinimum(order,freshAsk,book.markPx);
         sizeOrder(budget,order.p,await funds(address),market.decimals);
         const packet=envelope(market.asset,order,cloid,Date.now());
         const {action,nonce,expiresAfter}=packet;
