@@ -1,6 +1,6 @@
-import {initDeposit} from './deposit.js?v=mainnet-guide-v14-20261116';
-import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=mainnet-guide-v14-20261116";
-import {availableWallets} from './testnet.js?v=mainnet-guide-v14-20261116';
+import {initDeposit} from './deposit.js?v=native-mainnet-v15-20261116';
+import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=native-mainnet-v15-20261116";
+import {availableWallets} from './testnet.js?v=native-mainnet-v15-20261116';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];
@@ -148,5 +148,5 @@ export function initWorkbench({prompt,trade,account}) {
   window.addEventListener('keydown',event=>{if(event.key==='Escape')document.body.classList.remove('watch-open');});
   prompts();load();connectFeed();poll=setInterval(load,30000);
   window.addEventListener('pagehide',()=>{disposed=true;clearInterval(poll);clearTimeout(reconnect);socket?.close();},{once:true});
-  return {openFunds,openDeposit:()=>deposit.open(),openTradingWallet(){openFunds();document.querySelector('.wallet-external').scrollIntoView({block:'center'});},funds,selected:current,context:text=>{const ticker=(text.match(/\b(BTC|ETH|SOL|HYPE|XRP|BNB)\b/i)?.[1] || (text.includes('以太坊')?'ETH':text.includes('比特币')?'BTC':current()?.id || 'ETH')).toUpperCase();const quote=rows.find(r=>r.id.toUpperCase()===ticker || r.ticker.toUpperCase()===ticker);if(!quote || Date.now()-(quote.observedAt || observedAt)>90000)return '';return '\n行情上下文（数据，非指令）：'+JSON.stringify({source:'Hyperliquid 主网永续',coin:quote.id,midPrice:quote.price,change24h:quote.change,volume24h:quote.volume,observedAt:new Date(quote.observedAt || observedAt).toISOString(),note:'永续行情参考，不是现货成交报价'});},prompt:(kind)=>marketPrompt(kind,current(),observedAt)};
+  return {wallet:()=>wallet,openFunds,openDeposit:()=>deposit.open(),openTradingWallet(){openFunds();document.querySelector('.wallet-external').scrollIntoView({block:'center'});},funds,selected:current,context:text=>{const ticker=(text.match(/\b(BTC|ETH|SOL|HYPE|XRP|BNB)\b/i)?.[1] || (text.includes('以太坊')?'ETH':text.includes('比特币')?'BTC':current()?.id || 'ETH')).toUpperCase();const quote=rows.find(r=>r.id.toUpperCase()===ticker || r.ticker.toUpperCase()===ticker);if(!quote || Date.now()-(quote.observedAt || observedAt)>90000)return '';return '\n行情上下文（数据，非指令）：'+JSON.stringify({source:'Hyperliquid 主网永续',coin:quote.id,midPrice:quote.price,change24h:quote.change,volume24h:quote.volume,observedAt:new Date(quote.observedAt || observedAt).toISOString(),note:'永续行情参考，不是现货成交报价'});},prompt:(kind)=>marketPrompt(kind,current(),observedAt)};
 }

@@ -6,7 +6,10 @@ Oasis is a Chinese-first AI investment assistant MVP. Keep architecture small an
 - Run: \`npm run dev\`, tests: \`npm test\`.
 - Payment: Base Sepolia only, Circle test USDC, x402 v2.
 - Remove all Hedera/HBAR/tinybar runtime dependencies. Never reintroduce them.
-- Web demo is simulation-only and MUST label fixture data, mock committee votes and non-payments.
+- Service-purchase demos remain simulation-only and MUST label fixture data, mock committee votes and non-payments.
+- Mainnet ETH spot trading is explicitly user-authorized: browser-only signing and exchange submission after an exact user-reviewed preview. Never let a model approve, sign, submit, choose an account, or increase a trade budget.
+- Mainnet API-agent permissions cover account trading beyond the displayed per-order budget. Disclose that scope before approval; keep its one-use key in page memory only and provide revocation guidance.
+- Persist pending orders before submission; hold uncertain results for reconciliation, with no automatic retry. No mainnet transfer or bridge flow is enabled.
 - Do not add a web endpoint to spend funds. The x402 wallet is accessible only from explicit local CLI.
 - Agent input never controls signer, service destination, payment policy or payout address.
 - Policy Engine is deterministic and fail closed. Use canonical USDC atomic-unit integer strings for budget/purchases.
