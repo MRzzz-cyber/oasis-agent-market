@@ -1,4 +1,4 @@
-import {availableWallets} from './testnet.js?v=guided-v7-20261115';
+import {availableWallets} from './testnet.js?v=privy-v8-20261115';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];
@@ -117,8 +117,10 @@ export function initWorkbench({prompt,trade,account}) {
     const choices=availableWallets();
     if(!choices.length){list.append(el('p','note','未检测到 EVM 钱包，请安装或解锁 Rabby、MetaMask 等浏览器钱包。'));return;}
     for(const choice of choices){const b=el('button','wallet-option',choice.name+' ↗');b.type='button';b.onclick=async()=>{
-      b.disabled=true;try{const accounts=await choice.provider.request({method:'eth_requestAccounts'});const address=accounts?.[0];if(!/^0x[0-9a-f]{40}$/i.test(address||''))throw Error('钱包没有返回有效地址');wallet={address,name:choice.name,provider:choice.provider};watchWallet(choice.provider);list.replaceChildren();renderFunds();}catch(e){$('funds-status').textContent=e.code===4001?'你取消了连接，可重新选择钱包。':e.message||'钱包连接失败';}finally{b.disabled=false;}};list.append(b);}
+      b.disabled=true;try{const accounts=await choice.provider.request({method:'eth_requestAccounts'});const address=accounts?.[0];if(!/^0x[0-9a-f]{40}$/i.test(address||''))throw Error('钱包没有返回有效地址');wallet={address,name:choice.name,provider:choice.provider,kind:choice.kind};watchWallet(choice.provider);list.replaceChildren();renderFunds();}catch(e){$('funds-status').textContent=e.code===4001?'你取消了连接，可重新选择钱包。':e.message||'钱包连接失败';}finally{b.disabled=false;}};list.append(b);}
   };
+  window.addEventListener('oasis:account-wallet-ready',event=>{if(!wallet&&event.detail?.provider){wallet=event.detail;watchWallet(wallet.provider);renderFunds();}});
+  window.addEventListener('oasis:account-wallet-cleared',event=>{if(wallet?.provider===event.detail?.provider){wallet=null;renderFunds();}});
   window.addEventListener('oasis:wallet-connected',event=>{if(event.detail?.address && event.detail?.provider){wallet=event.detail;watchWallet(wallet.provider);renderFunds();}});
   window.addEventListener('oasis:trade-settled',()=>{if(wallet)refreshFunds();});
   window.addEventListener('keydown',event=>{if(event.key==='Escape')document.body.classList.remove('watch-open');});

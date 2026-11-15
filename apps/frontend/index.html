@@ -4,10 +4,10 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
-  <link rel="icon" href="/brand/favicon.svg?v=guided-v7-20261115" type="image/svg+xml"/>
+  <link rel="icon" href="/brand/favicon.svg?v=privy-v8-20261115" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=guided-v7-20261115"/>
-  <link rel="stylesheet" href="/workbench.css?v=guided-v7-20261115"/>
+  <link rel="stylesheet" href="/styles.css?v=privy-v8-20261115"/>
+  <link rel="stylesheet" href="/workbench.css?v=privy-v8-20261115"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
@@ -84,11 +84,11 @@
       <div class="funds-account"><strong id="funds-wallet-name">尚未连接交易钱包</strong><code id="funds-address">连接钱包后显示地址</code><div><button type="button" id="funds-copy" class="ghost" disabled>复制地址</button><button type="button" id="funds-refresh" class="ghost" disabled>刷新余额</button></div></div>
       <p id="funds-status" class="note" role="status">请连接钱包查看测试资金。</p>
       <div class="funds-help"><h3>准备测试资金</h3><ol><li>连接已领取测试币的钱包。</li><li>资金需要位于测试网 Spot 账户。</li><li>预览数量与限价，再授权并确认订单。</li></ol><a href="https://app.hyperliquid-testnet.xyz/" target="_blank" rel="noopener noreferrer">打开官方测试网，检查资金或划转 ↗</a></div>
-      <div class="account-wallet-note"><strong>账号钱包</strong><span>尚未启用</span><p>登录与现有钱包连接均可使用。注册自动创建钱包还在接入，当前请连接已有钱包；这里不会生成或保存私钥。</p><button type="button" class="ghost" id="account-wallet-login">查看登录账户</button></div>
+      <div class="account-wallet-note"><strong>Oasis 账号钱包</strong><span id="account-wallet-state">登录后创建</span><p id="account-wallet-note">使用 Google 登录并激活后，创建或恢复独立账号钱包；已有钱包仍可连接。</p><button type="button" class="ghost" id="account-wallet-action">登录并创建钱包</button><button type="button" class="ghost" id="account-wallet-login">查看登录账户</button></div>
       <button type="button" class="primary funds-trade" id="funds-trade">准备 ETH 测试交易 →</button></dialog><button id="funding-backdrop" class="funding-backdrop" type="button" hidden aria-label="关闭钱包与资金"></button>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=guided-v7-20261115" type="module"></script>
+  <script src="/app.js?v=privy-v8-20261115" type="module"></script>
 </body>
 </html>
