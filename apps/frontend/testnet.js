@@ -67,7 +67,7 @@ export function envelope(asset,order,cloid,nonce) {
 export function approvalEnvelope(agentAddress,chainId,nonce) {
   if(!/^0x[0-9a-f]{40}$/i.test(agentAddress) || !/^0x[0-9a-f]+$/i.test(chainId) || !Number.isSafeInteger(Number(BigInt(chainId))))throw Error("无效的授权地址或签名网络");
   const action={type:"approveAgent",hyperliquidChain:"Testnet",signatureChainId:chainId,
-    agentAddress:agentAddress.toLowerCase(),agentName:"Oasis Test Session",nonce};
+    agentAddress:agentAddress.toLowerCase(),agentName:"OasisTest",nonce};
   return {action,nonce,typed:{
     domain:{name:"HyperliquidSignTransaction",version:"1",chainId:Number(BigInt(chainId)),verifyingContract:"0x"+"0".repeat(40)},
     primaryType:"HyperliquidTransaction:ApproveAgent",
@@ -76,6 +76,13 @@ export function approvalEnvelope(agentAddress,chainId,nonce) {
     message:action
   }};
 }
+export function isActiveAgent(agents,address,now=Date.now()) {
+  if(!Array.isArray(agents) || !/^0x[0-9a-f]{40}$/i.test(address))return false;
+  return agents.some(agent=>agent.address?.toLowerCase()===address.toLowerCase() &&
+    (agent.validUntil===null || (Number.isFinite(agent.validUntil) && agent.validUntil>now)));
+}
+// Keep keys in page memory across panel redraws; never serialize session signers.
+const testnetSessions=new Map();
 export function splitSignature(sig) {
   if(!/^0x[0-9a-f]{130}$/i.test(sig))throw Error("钱包返回的签名格式无效");
   let v=parseInt(sig.slice(-2),16);if(v<2)v+=27;
@@ -164,7 +171,7 @@ export function testnetPanel(run,review) {
   root.append(note,form,result);
   function button(text,handler) {
     const b=element("button",text);b.type="button";b.className="ghost";
-    b.onclick=async()=>{b.disabled=true;const label=b.textContent;b.textContent="处理中…";result.textContent="正在处理，请留意所选钱包扩展的连接或签名请求。";try{await handler();}catch(e){result.textContent=walletError(e);detail.textContent=result.textContent;}finally{b.disabled=false;b.textContent=label;}};
+    b.onclick=async()=>{b.disabled=true;b.dataset.busy="true";const label=b.textContent;b.textContent="处理中…";result.textContent="正在处理，请留意所选钱包扩展的连接或签名请求。";try{await handler();}catch(e){result.textContent=walletError(e);detail.textContent=result.textContent;}finally{delete b.dataset.busy;b.disabled=b.dataset.blocked==="true";b.textContent=label;}};
     form.append(b);return b;
   }
   function showRecord(rec) {
@@ -272,7 +279,27 @@ export function testnetPanel(run,review) {
     result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
     advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。提交前重新核对最新盘口，保留本次限价和数量。");
       button("更换钱包或重新报价",()=>root.replaceWith(testnetPanel(run,review)));
-      let signer=null,approved=false;
+      const sessionKey=run.id+":"+address.toLowerCase();
+      if(!testnetSessions.has(sessionKey))testnetSessions.set(sessionKey,{signer:null,approved:false});
+      const session=testnetSessions.get(sessionKey);
+      let signer=session.signer,approved=session.approved;
+      const approvalStatus=element("p",approved?"测试网助手已验证，请确认订单。":"测试网助手待授权，授权验证成功后开放交易。");
+      approvalStatus.setAttribute("role","status");form.append(approvalStatus);
+      const isApproved=async()=>{
+        if(!signer)return false;
+        const agents=await post("/info",{type:"extraAgents",user:address});
+        return isActiveAgent(agents,signer.address);
+      };
+      const reconcileApproval=async()=>{
+        confirmOrder.dataset.blocked="true";
+        confirmOrder.disabled=true;
+        approved=await isApproved();session.approved=approved;
+        confirmOrder.dataset.blocked=String(!approved);
+        confirmOrder.disabled=!approved || confirmOrder.dataset.busy==="true";
+        approvalStatus.textContent=approved?"交易所已确认测试网助手："+signer.address+"。现在可以确认 10 USDC 订单。":"交易所暂未确认此助手，请完成授权后点击核对状态。";
+        if(approved)advance(3,approvalStatus.textContent);
+        return approved;
+      };
       const consent=element("label","");
       const checkbox=element("input","");checkbox.type="checkbox";
       consent.append(checkbox,element("span","我同意授权测试网交易助手。协议授权覆盖本测试账户交易，10 USDC 为 Oasis 本次订单限制。密钥仅保存在当前页面内存；刷新会丢失密钥，但授权仍需在官方 API 页面撤销。"));
@@ -283,39 +310,49 @@ export function testnetPanel(run,review) {
         const accounts=await wallet.request({method:"eth_accounts"});
         if(accounts[0]?.toLowerCase()!==address.toLowerCase())throw Error("钱包账户已变化，请重新连接");
       };
-      button("授权测试网交易助手",async()=>{
-        if(!checkbox.checked)throw Error("请先阅读并勾选测试网交易权限说明。");
-        if(!root.isConnected)return;
+      button("核对授权状态",async()=>{
         await checkAccount();
-        if(!signer) {
-          const {createTestnetSigner}=await import("./vendor/hl-agent.js");
-          signer=createTestnetSigner();
-        }
-        // Reconcile any earlier uncertain approval before signing another approval.
-        const isApproved=async()=>{
-          const agents=await post("/info",{type:"extraAgents",user:address});
-          return agents.some(agent=>agent.address?.toLowerCase()===signer.address.toLowerCase() && agent.validUntil>Date.now());
-        };
-        if(!await isApproved()) {
-          const chainId=await wallet.request({method:"eth_chainId"});
-          const packet=approvalEnvelope(signer.address,chainId,Date.now());
-          advance(3,"请在钱包确认测试网 Agent 授权。授权成功后仍需点击确认订单。Agent 地址："+signer.address);
-          const signature=splitSignature(await wallet.request({method:"eth_signTypedData_v4",params:[address,JSON.stringify(packet.typed)]}));
-          await checkAccount();
-          if(!root.isConnected || await wallet.request({method:"eth_chainId"})!==chainId)throw Error("页面或签名网络已变化，请重新检查授权状态");
-          const reply=await post("/exchange",{action:packet.action,nonce:packet.nonce,signature});
-          if(reply.status!=="ok")throw Error("测试网授权未成功："+String(reply.response));
-        }
-        approved=await isApproved();
-        if(!approved)throw Error("授权尚未在交易所确认，请稍后再次点击核对授权");
-        result.textContent="测试网助手已授权："+signer.address+"。请单独确认本次 10 USDC 订单。";
-        advance(3,result.textContent);
+        await reconcileApproval();
+        result.textContent=approvalStatus.textContent;
       });
-      button("确认 10U 测试订单",async()=>{
+      button("授权测试网交易助手",async()=>{
+        approvalStatus.textContent="正在检查授权，请留意钱包弹窗。";
+        try {
+          if(!checkbox.checked)throw Error("请先阅读并勾选测试网交易权限说明。");
+          if(!root.isConnected)return;
+          await checkAccount();
+          if(!signer) {
+            const {createTestnetSigner}=await import("./vendor/hl-agent.js");
+            signer=createTestnetSigner();session.signer=signer;
+          }
+          // Reconcile an uncertain earlier request before sending another approval.
+          if(!await isApproved()) {
+            const chainId=await wallet.request({method:"eth_chainId"});
+            const packet=approvalEnvelope(signer.address,chainId,Date.now());
+            advance(3,"请在钱包确认测试网 Agent 授权。授权成功后仍需点击确认订单。Agent 地址："+signer.address);
+            const signature=splitSignature(await wallet.request({method:"eth_signTypedData_v4",params:[address,JSON.stringify(packet.typed)]}));
+            await checkAccount();
+            if(!root.isConnected || await wallet.request({method:"eth_chainId"})!==chainId)throw Error("页面或签名网络已变化，请重新检查授权状态");
+            const reply=await post("/exchange",{action:packet.action,nonce:packet.nonce,signature});
+            if(reply.status!=="ok")throw Error("测试网授权未成功："+String(reply.response));
+          }
+          for(let attempt=0;attempt<4;attempt++) {
+            if(await reconcileApproval())break;
+            if(attempt<3)await new Promise(resolve=>setTimeout(resolve,700));
+          }
+          if(!approved)throw Error("钱包签名已处理，但交易所尚未确认授权。请点击核对授权状态。");
+          result.textContent="测试网助手已授权："+signer.address+"。请单独确认本次 10 USDC 订单。";
+          advance(3,result.textContent);
+        } catch(error) {
+          approvalStatus.textContent="授权未完成："+walletError(error);
+          throw error;
+        }
+      });
+      const confirmOrder=button("确认 10U 测试订单",async()=>{
         if(!root.isConnected)return;
         if(localStorage.getItem(key)){showRecord(JSON.parse(localStorage.getItem(key)));return;}
-        if(!approved || !signer)throw Error("请先授权测试网交易助手，再确认订单。");
         await checkAccount();
+        if(!signer || !await reconcileApproval())throw Error("测试网助手尚未获得有效授权，请先完成授权或核对状态。");
         const book=await post("/info",{type:"l2Book",coin:market.coin});
         if(!book.levels[1][0]?.px || !Number.isFinite(book.time) || Date.now()-book.time>30000)throw Error("最新盘口不可用，请重新报价");
         if(atoms(book.levels[1][0].px)>atoms(order.p))throw Error("当前卖价高于预览限价，请重新报价后确认。");
@@ -336,6 +373,8 @@ export function testnetPanel(run,review) {
         } catch {rec.message="提交结果未确认，请查询原订单";}
         localStorage.setItem(key,JSON.stringify(rec));showRecord(rec);
       });
+      confirmOrder.dataset.blocked=String(!approved);
+      confirmOrder.disabled=!approved;
   });
   return root;
 }
