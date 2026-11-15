@@ -29,5 +29,11 @@
   "build": {
     "command": "npm ci --include=dev --no-audit --no-fund && npm run build:wallet",
     "cwd": "../.."
+  },
+  "keep_vars": true,
+  "vars": {
+    "PRIVY_APP_ID": "cmwhzs2zd026t0gjpx4uzetpq",
+    "OASIS_AUTH_ISSUER": "https://oasis-agent-market.zqsanjingshou.workers.dev",
+    "OASIS_AUTH_KEY_ID": "oasis-auth-v1"
   }
 }
