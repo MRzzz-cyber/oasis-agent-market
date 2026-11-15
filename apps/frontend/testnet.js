@@ -140,6 +140,10 @@ export function walletChoices(announced,ethereum) {
   }
   return choices;
 }
+export function availableWallets() {
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+  return walletChoices(announcedWallets.values(),window.ethereum);
+}
 export function walletError(error) {
   if(/chainid.*(?:same|match)/i.test(error?.message || ""))return "钱包拒绝了 Hyperliquid 订单签名域。请使用测试网交易助手授权，再单独确认订单。";
   if(error?.code===4001)return "你取消了钱包请求。请重新选择钱包后连接。";
@@ -159,7 +163,7 @@ export function testnetPanel(run,review) {
   const detail=element("div","");detail.className="execution-detail";
   detail.setAttribute("role","status");
   const steps=[
-    ["确认计划","原始目标："+(run.goal || "历史策略")+"。策略模型："+(run.model || "未记录")+"。本次为手动买入，上限 "+budget+" 测试 USDC，原策略条件需要你核对。"],
+    ["确认计划",run.source==="direct"?"本次为用户确认的单次 ETH 测试交易，上限 "+budget+" 测试 USDC，费用另计。不自动运行策略或模型交易信号。":"原始目标："+(run.goal || "历史策略")+"。策略模型："+(run.model || "未记录")+"。本次为手动买入，上限 "+budget+" 测试 USDC，原策略条件需要你核对。"],
     ["账户与资金","连接你的 EVM 钱包，检查 Hyperliquid 测试网现货可用余额。本次预算上限 "+budget+" 测试 USDC，请预留交易费用。"],
     ["预览订单","读取测试网盘口，计算数量及限价。未立即成交的部分自动撤销。"],
     ["签名与提交","核对账户、数量和限价后，先由钱包授权测试网助手，再由你单独确认本次订单。"],
@@ -209,6 +213,12 @@ export function testnetPanel(run,review) {
     advance(4,rec.message+"。本次账户："+rec.address+"。客户订单号："+cloid);
     title.textContent="测试网订单回执";
     const changeWallet=root.querySelector(".wallet-connection button");if(changeWallet)changeWallet.hidden=true;
+    const amountBox=root.querySelector(".test-amount");if(amountBox)amountBox.hidden=true;
+    if(/^(已成交|部分成交)/.test(rec.message)) {
+      window.dispatchEvent(new Event("oasis:trade-settled"));
+      const status=root.querySelector(".wallet-connection p");
+      if(status){status.textContent="正在刷新成交后余额…";funds(rec.address).then(free=>{if(root.isConnected)status.textContent=rec.address.slice(0,6)+"…"+rec.address.slice(-4)+" · 成交后可用 "+free+" 测试 USDC";}).catch(()=>{status.textContent="成交已确认，余额刷新失败，请在钱包与资金面板重新读取。";});}
+    }
     form.replaceChildren();note.textContent="测试网 · "+rec.address+" · 买入 "+rec.s+" UETH · 限价 "+rec.p+" USDC";
     result.textContent=rec.message+" · 客户订单号 "+cloid;
     if(/minimum value of 10/.test(rec.message))result.textContent+="。此订单未成交：限价上限不等于实际成交金额。请在新预览中检查最低数量与当前预算；本回执保留，不自动重试。";
@@ -250,7 +260,7 @@ export function testnetPanel(run,review) {
     try{localStorage.setItem("oasis-hl-test-budget:"+run.id,value);root.replaceWith(testnetPanel({...run,testBudget:value},review));}catch{result.textContent="无法保存本次测试金额，请检查浏览器存储权限";}
   };
   amountBox.append(amountLabel,applyAmount,element("small","本次是独立手动测试，金额以此处预览为准，不自动执行原策略。"));root.insertBefore(amountBox,result);
-  const details=element("details","");details.append(element("summary","查看交易规则与模型评审"));
+  const details=element("details","");details.append(element("summary",run.source==="direct"?"查看测试交易规则":"查看交易规则与模型评审"));
   details.append(element("p","Hyperliquid 测试网 UETH/USDC · 手动限价买入 · 未立即成交的部分撤销。原策略上限 "+run.terms.maxOrder+" "+run.terms.quoteAsset+"，本次独立指定上限 "+budget+" 测试 USDC。策略触发和暂停条件由你核对。"));
   root.append(details);
   if(review && run.modelId) {
@@ -337,6 +347,7 @@ export function testnetPanel(run,review) {
     if(!/^0x[0-9a-f]{40}$/i.test(address || ""))throw Error("未获得有效钱包地址，请解锁钱包并允许网站连接。");
     if(!root.isConnected)return;
     walletName.textContent=choice.name;walletBadge.textContent="✓";
+    window.dispatchEvent(new CustomEvent("oasis:wallet-connected",{detail:{address,name:choice.name,provider:wallet}}));
     walletStatus.textContent=address.slice(0,6)+"…"+address.slice(-4)+" · 已连接";walletStatus.title=address;
     note.textContent="当前读取 Hyperliquid 测试网现货账户。钱包已授权时可能直接返回地址；订单预览后再请求测试网助手授权。";
     advance(1,"钱包已连接："+address+"。正在检查测试网现货余额和盘口。余额不足时，请先在 Hyperliquid 测试网准备测试资金，再重新预览。");
@@ -403,7 +414,7 @@ export function testnetPanel(run,review) {
           if(!root.isConnected)return;
           await checkAccount();
           if(!signer) {
-            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=trade-v3-20261115");
+            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=workbench-v4-20261115");
             signer=createTestnetSigner(budget);session.signer=signer;
           }
           // Reconcile an uncertain earlier request before sending another approval.

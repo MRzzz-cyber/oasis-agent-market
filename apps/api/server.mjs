@@ -1,3 +1,4 @@
+import {overview} from "../frontend/market-overview.js";
 import {testnetBook} from "../frontend/testnet-quotes.js";
 import { snapshot, marketCatalog } from "../frontend/candles.js";
 import http from "node:http";
@@ -16,6 +17,8 @@ const routes = new Map([
   ["/vendor/hl-agent.js", ["vendor/hl-agent.js", "text/javascript; charset=utf-8"]],
   ["/testnet.js", ["testnet.js", "text/javascript; charset=utf-8"]],
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
+  ["/workbench.js", ["workbench.js", "text/javascript; charset=utf-8"]],
+  ["/workbench.css", ["workbench.css", "text/css; charset=utf-8"]],
   ["/styles.css", ["styles.css", "text/css; charset=utf-8"]]
 ]);
 
@@ -38,12 +41,13 @@ export function createAppServer() {
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://127.0.0.1");
+      if(req.method === "GET" && url.pathname === "/api/market/overview"){const result=await overview();res.writeHead(result.status,Object.fromEntries(result.headers));res.end(await result.text());return;}
       if (req.method === "GET" && ["/api/market/candles","/api/market/catalog","/api/testnet/book"].includes(url.pathname)) {
         const result = url.pathname === "/api/testnet/book" ? await testnetBook(new Request(url)) : url.pathname.endsWith("/catalog") ? await marketCatalog() : await snapshot(new Request(url));
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
-      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"trade-v3-20261115",defaultTestBudget:"20"});return;}
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"workbench-v4-20261115",defaultTestBudget:"20"});return;}
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "GET" && url.pathname === "/api/status") {
         send(res, 200, { ok: true, app: "Oasis", network: "Base Sepolia", mode: "simulation", realPaymentsEnabled: false, services: SAMPLE_SERVICES });
