@@ -524,7 +524,7 @@ function renderChatChoices() {
 }
 function fundingAction(info){if(info.kind==='connect'||info.kind==='external')return workbench.openTradingWallet();if(info.kind==='ready')return showChatTradePlan();return workbench.openFunds();}
 function renderFundingCard(){
- const host=$('chat-funding-card');host.replaceChildren();const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds')return;
+ const host=$('chat-funding-card');host.replaceChildren();const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds'||$('chat-trade-plan').querySelector('.mainnet-plan'))return;
  const info=fundingState(workbench.funds(),guide.budget),card=node('section','funding-cta guided-funding'),copy=node('div');copy.append(node('span','funding-network-label','Hyperliquid Mainnet · 真实资金'),node('strong','',info.title),node('p','note',info.body));
  let button;if(info.kind==='fund'){button=node('a','primary',info.action+' ↗');button.href=OFFICIAL_TRADE_URL;button.target='_blank';button.rel='noopener noreferrer';}else{button=node('button','primary',info.action);button.type='button';button.onclick=()=>fundingAction(info);}card.append(copy,button);host.append(card);
 }
@@ -559,7 +559,7 @@ function showChatTradePlan(amount=conversationGuide(state.conversation).budget||
  const confirm=node('button','primary','确认计划，检查资金');confirm.type='button';const status=node('p','note');status.setAttribute('role','status');const funding=node('div','mainnet-plan-funding');funding.id='mainnet-plan-funding';funding.hidden=true;
  input.oninput=()=>{funding.hidden=true;funding.replaceChildren();status.textContent='金额已修改，请重新确认计划。';};
  confirm.onclick=()=>{try{const budget=tradeBudget(input.value);addChat('user','我确认 ETH 主网现货买入计划，本次买入预算 '+budget+' USDC，费用另计；只检查资金，订单由我在官网单独确认。');persistConversation();funding.hidden=false;updateMainnetPlanFunding(budget);renderChatChoices();renderFundingCard();status.textContent='计划已确认，尚未提交订单。';}catch(e){status.textContent=e.message;}};
- card.append(confirm,status,funding);host.append(card);host.scrollIntoView({behavior:'smooth',block:'nearest'});
+ card.append(confirm,status,funding);host.append(card);renderFundingCard();host.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function beginConversation() {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
