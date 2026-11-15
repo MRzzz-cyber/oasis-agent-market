@@ -27,7 +27,7 @@ export async function issueWalletToken(user,env,now=Math.floor(Date.now()/1000))
 }
 export async function privyRoute(request,env){
  const path=new URL(request.url).pathname,config=publicWalletConfig(env);
- if(path==='/api/wallet/config'&&request.method==='GET')return reply({enabled:config.enabled,appId:config.enabled?config.appId:null,clientId:config.enabled?config.clientId:null,mode:'user-controlled',network:'hyperliquid-testnet'});
+ if(path==='/api/wallet/config'&&request.method==='GET')return reply({enabled:config.enabled,appId:config.enabled?config.appId:null,clientId:config.enabled?config.clientId:null,mode:'user-controlled',network:'hyperliquid-mainnet',executionEnabled:false,signingNetwork:'hyperliquid-testnet'});
  if(path==='/.well-known/jwks.json'&&request.method==='GET')return config.jwk?reply({keys:[config.jwk]}):reply({error:'身份公钥尚未配置'},503);
  if(path!=='/api/wallet/token')return reply({error:'接口不存在'},404);
  if(request.method!=='POST')return reply({error:'仅支持 POST'},405);

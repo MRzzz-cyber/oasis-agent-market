@@ -13,6 +13,7 @@ const SYSTEM_PROMPT = [
   "当信息足够时，总结目标、标的、交易节奏、预算、入场/暂停规则并请用户确认。",
   "界面提供继续研究、模拟买入 ETH 和自定测试金额的 ETH 测试网交易选项。一次手动测试无需先保存长期策略，不要强迫用户填周期或服务预算。你不能连接钱包或提交交易；由界面预览、用户授权和单独确认。",
   "不编造实时市场数据、收益率、钱包付款或订单成交。用户消息可能附带界面提供的行情快照，应注明来源、市场类型和时间，区分主网永续参考行情与测试网现货执行报价。",
+  "钱包面板默认读取正式网资产，但 Oasis 正式网下单尚未开放。不要将主网余额当作测试网资金，不要宣称主网订单可执行，也不要引导用户为未开放功能充值。",
   "没有工具提供的账户数据时，不能声称余额为零、钱包未连接或已充值。资金不足与充值由钱包与资金卡片核对；你只能协助研究，不能宣称已下单或已创建钱包。",
   "不要索要私钥、API Key；不允许承诺收益，不进行真实交易。"
 ].join("\n");
@@ -164,7 +165,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"header-v9-20261116",defaultTestBudget:"20"});
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"mainnet-wallet-v10-20261116",defaultTestBudget:"20"});
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if(url.pathname === "/api/market/overview" && request.method === "GET")return overview();
     if (url.pathname === "/api/market/catalog" && request.method === "GET") return marketCatalog();
@@ -173,7 +174,7 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) {
       const asset=await env.ASSETS.fetch(request);
-      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","header-v9-20261116");
+      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","mainnet-wallet-v10-20261116");
       if(url.pathname.startsWith("/privy-setup")){headers.set("referrer-policy","no-referrer");headers.set("x-frame-options","DENY");headers.set("content-security-policy","default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");}
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }

@@ -1,4 +1,5 @@
-import {availableWallets} from './testnet.js?v=header-v9-20261116';
+import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=mainnet-wallet-v10-20261116";
+import {availableWallets} from './testnet.js?v=mainnet-wallet-v10-20261116';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];
@@ -73,56 +74,71 @@ export function initWorkbench({prompt,trade,account}) {
   $('toggle-watch').onclick=()=>document.body.classList.toggle('watch-open');
   $('header-wallet-open').onclick=()=>openFunds();
   $('wallet-open').onclick=()=>openFunds();$('wallet-close').onclick=()=>closeFunds();$('funding-backdrop').onclick=closeFunds;
-  $('funds-trade').onclick=()=>{closeFunds();trade();};$('account-wallet-login').onclick=account;
+  $('funds-trade').onclick=closeFunds;$('account-wallet-login').onclick=account;
   const drawer=$('funding-drawer');
   function closeFunds(){drawer.close();$('funding-backdrop').hidden=true;}
-  function openFunds(){if(!drawer.open)drawer.showModal();$('funding-backdrop').hidden=true;renderFunds();}
-  const funds=()=>({connected:Boolean(wallet),status:fundsStatus==='ready'&&Date.now()-fundsUpdatedAt>60000?'unknown':fundsStatus,available:fundsAvailable,address:wallet?.address||null});
+  function openFunds(){if(!drawer.open)drawer.showModal();$('funding-backdrop').hidden=true;renderFunds();renderWalletChoices();setTimeout(()=>{if(drawer.open)renderWalletChoices();},250);}
+  const funds=()=>({connected:Boolean(wallet),network:'hyperliquid-mainnet',status:fundsStatus==='ready'&&Date.now()-fundsUpdatedAt>60000?'unknown':fundsStatus,available:fundsAvailable,address:wallet?.address||null});
   const emitFunds=()=>window.dispatchEvent(new CustomEvent('oasis:funds-updated'));
+  function resetAssetValues(){
+    $('funds-balance').textContent='—';$('funds-perp').textContent='—';$('funds-native').textContent='—';$('funds-native-symbol').textContent='';$('funds-chain-usdc').textContent='—';$('funds-chain').textContent='连接后识别当前网络';$('funds-spot-assets').replaceChildren();
+  }
   function renderFunds() {
-    balanceGeneration++;
-    fundsStatus='unknown';fundsAvailable=null;emitFunds();
-    $('funds-balance').textContent='—';$('funds-eth').textContent='—';
-    $('funds-address').textContent=wallet?wallet.address:'连接钱包后显示地址';
-    $('funds-wallet-name').textContent=wallet?.name || '尚未连接交易钱包';
+    balanceGeneration++;$('funds-wallet-chooser').open=!wallet;$('funds-wallet-summary').textContent=wallet?'更换钱包':'选择钱包';fundsStatus='unknown';fundsAvailable=null;emitFunds();resetAssetValues();
+    $('funds-address').textContent=wallet?wallet.address:'连接后显示你的钱包地址';
+    $('funds-wallet-name').textContent=wallet?.name || '尚未选择钱包';
     $('funds-copy').disabled=!wallet;$('funds-refresh').disabled=!wallet;
-    $('funds-status').textContent=wallet?'正在读取测试网账户…':'连接领取测试币的钱包，查看 USDC 与 UETH 余额。';
+    $('funds-status').textContent=wallet?'正在读取正式网账户…':'连接钱包后读取正式网资产。';
+    $('funds-native-status').textContent='仅显示当前支持主网的原生币和 Circle 原生 USDC，不含 USDC.e 或其他代币。';
     if(wallet)refreshFunds();
   }
   async function refreshFunds() {
-    const generation=++balanceGeneration;if(!wallet)return;
-    const selectedWallet=wallet;
-    fundsStatus='loading';fundsAvailable=null;emitFunds();
-    $('funds-status').textContent='正在读取测试网账户…';
+    const generation=++balanceGeneration;if(!wallet)return;const selectedWallet=wallet;
+    fundsStatus='loading';fundsAvailable=null;emitFunds();resetAssetValues();$('funds-status').textContent='正在读取 Hyperliquid 正式网账户…';$('funds-native-status').textContent='正在读取当前钱包主网的原生币余额…';
+    const stillCurrent=()=>generation===balanceGeneration&&wallet===selectedWallet;
     try {
       const accounts=await selectedWallet.provider.request({method:'eth_accounts'});
-      if(generation!==balanceGeneration || wallet!==selectedWallet)return;
-      if(accounts?.[0]?.toLowerCase()!==selectedWallet.address.toLowerCase()){wallet=null;$('funds-balance').textContent='—';$('funds-eth').textContent='—';renderFunds();return;}
-      const r=await fetch('https://api.hyperliquid-testnet.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'spotClearinghouseState',user:selectedWallet.address}),signal:AbortSignal.timeout(12000)});
-      if(!r.ok)throw Error();const data=await r.json();if(generation!==balanceGeneration)return;if(!Array.isArray(data.balances))throw Error();
-      const usd=data.balances?.find(b=>b.coin==='USDC'&&b.token===0),eth=data.balances?.find(b=>b.coin==='UETH'&&b.token===1242);
-      const free=usd?Number(usd.total)-Number(usd.hold):0;
-      const ethTotal=Number(eth?.total||0);if(!Number.isFinite(free)||free<0||!Number.isFinite(ethTotal)||ethTotal<0)throw Error();
-      fundsStatus='ready';fundsAvailable=free;fundsUpdatedAt=Date.now();emitFunds();
-      $('funds-balance').textContent=free.toLocaleString('en-US',{maximumFractionDigits:6});$('funds-eth').textContent=ethTotal.toLocaleString('en-US',{maximumFractionDigits:8});
-      $('funds-status').textContent='测试网现货余额 · 更新于 '+new Date().toLocaleTimeString('zh-CN',{hour12:false});
-    }catch{if(generation===balanceGeneration){fundsStatus='error';fundsAvailable=null;emitFunds();$('funds-status').textContent='余额读取失败，请刷新重试；不代表账户余额为零。';}}
+      if(!stillCurrent())return;
+      if(accounts?.[0]?.toLowerCase()!==selectedWallet.address.toLowerCase()){wallet=null;renderFunds();return;}
+      const nativeTask=readNativeBalance(selectedWallet.provider,selectedWallet.address).then(info=>{
+        if(!stillCurrent())return;
+        if(info.status!=='ready'){$('funds-chain').textContent='当前网络不在支持的主网列表';$('funds-native-status').textContent='请在钱包中切换至 Ethereum、Arbitrum、Base、Optimism 或 HyperEVM 主网后刷新；不会把测试币显示为正式资产。';return;}
+        $('funds-chain').textContent=info.chain+' Mainnet';$('funds-native').textContent=displayAmount(info.amount);$('funds-native-symbol').textContent=info.symbol;$('funds-chain-usdc').textContent=info.usdc===null?'—':displayAmount(info.usdc,6);$('funds-native-status').textContent='仅显示 '+info.chain+' 主网的原生币和 Circle 原生 USDC，不含 USDC.e 或其他代币。'+(info.usdc===null?' USDC 读取暂不可用。':'');
+      }).catch(()=>{if(stillCurrent())$('funds-native-status').textContent='链上余额读取失败，请刷新重试；不代表余额为零。';});
+      const data=await readMainnetAccount(selectedWallet.address);if(!stillCurrent())return;
+      // Recheck address after the network requests, even if the provider emitted no event.
+      const after=await selectedWallet.provider.request({method:'eth_accounts'});if(!stillCurrent())return;
+      if(after?.[0]?.toLowerCase()!==selectedWallet.address.toLowerCase()){wallet=null;renderFunds();return;}
+      if(data.spot){fundsStatus='ready';fundsAvailable=Number(data.spot.available);fundsUpdatedAt=Date.now();$('funds-balance').textContent=displayAmount(data.spot.available,6);
+        const list=$('funds-spot-assets');if(!data.spot.assets.length)list.append(el('p','note','现货账户暂无资产'));
+        for(const asset of data.spot.assets.slice(0,12)){const row=el('div','spot-asset-row');row.append(el('span','',asset.coin),el('strong','',displayAmount(asset.total)));list.append(row);}
+      }else fundsStatus='error';
+      if(data.perp)$('funds-perp').textContent=displayAmount(data.perp.withdrawable,6);
+      emitFunds();$('funds-status').textContent=(data.spot&&data.perp?'正式网账户已更新':data.spot||data.perp?'部分账户数据暂不可用，未读取的项目显示 —':'正式网资产读取失败，请重试；不代表余额为零。')+' · '+new Date().toLocaleTimeString('zh-CN',{hour12:false});
+      await nativeTask;
+    }catch{if(stillCurrent()){fundsStatus='error';fundsAvailable=null;emitFunds();$('funds-status').textContent='正式网资产读取失败，请重试；不代表余额为零。';}}
   }
   $('funds-refresh').onclick=refreshFunds;
-  $('funds-copy').onclick=async()=>{if(!wallet)return;try{await navigator.clipboard.writeText(wallet.address);$('funds-status').textContent='已复制钱包地址；请核对网络和账户。';}catch{$('funds-status').textContent='无法复制，请手动选择上方地址。';}};
+  $('funds-copy').onclick=async()=>{if(!wallet)return;try{await navigator.clipboard.writeText(wallet.address);$('funds-status').textContent='已复制钱包地址。该地址不是 Hyperliquid 专属入金指令，请在官方核对支持的网络与资产。';}catch{$('funds-status').textContent='无法复制，请手动选择上方地址。';}};
   let watchedProvider=null;
-  const invalidateWallet=()=>{wallet=null;renderFunds();};
-  function watchWallet(provider){if(watchedProvider?.removeListener){for(const name of ['accountsChanged','disconnect'])watchedProvider.removeListener(name,invalidateWallet);}watchedProvider=provider;if(provider?.on){for(const name of ['accountsChanged','disconnect'])provider.on(name,invalidateWallet);}}
-  $('funds-connect').onclick=async()=>{
-    const list=$('funds-wallet-list');list.replaceChildren();availableWallets();await new Promise(resolve=>setTimeout(resolve,200));
-    const choices=availableWallets();
-    if(!choices.length){list.append(el('p','note','未检测到 EVM 钱包，请安装或解锁 Rabby、MetaMask 等浏览器钱包。'));return;}
-    for(const choice of choices){const b=el('button','wallet-option',choice.name+' ↗');b.type='button';b.onclick=async()=>{
-      b.disabled=true;try{const accounts=await choice.provider.request({method:'eth_requestAccounts'});const address=accounts?.[0];if(!/^0x[0-9a-f]{40}$/i.test(address||''))throw Error('钱包没有返回有效地址');wallet={address,name:choice.name,provider:choice.provider,kind:choice.kind};watchWallet(choice.provider);list.replaceChildren();renderFunds();}catch(e){$('funds-status').textContent=e.code===4001?'你取消了连接，可重新选择钱包。':e.message||'钱包连接失败';}finally{b.disabled=false;}};list.append(b);}
-  };
+  const invalidateWallet=()=>{wallet=null;renderFunds();renderWalletChoices();};
+  const chainChanged=()=>{if(wallet)refreshFunds();};
+  function watchWallet(provider){if(watchedProvider?.removeListener){for(const name of ['accountsChanged','disconnect'])watchedProvider.removeListener(name,invalidateWallet);watchedProvider.removeListener('chainChanged',chainChanged);}watchedProvider=provider;if(provider?.on){for(const name of ['accountsChanged','disconnect'])provider.on(name,invalidateWallet);provider.on('chainChanged',chainChanged);}}
+  let connectionGeneration=0;
+  async function connectChoice(choice,button){
+    const attempt=++connectionGeneration;button.disabled=true;try{const accounts=await choice.provider.request({method:'eth_requestAccounts'});const address=accounts?.[0];if(attempt!==connectionGeneration)return;if(!/^0x[0-9a-f]{40}$/i.test(address||''))throw Error('钱包没有返回有效地址');wallet={address,name:choice.name,provider:choice.provider,kind:choice.kind};watchWallet(choice.provider);renderFunds();renderWalletChoices();}catch(e){$('funds-status').textContent=e.code===4001?'你取消了连接，可重新选择钱包。':e.message||'钱包连接失败';}finally{button.disabled=false;}
+  }
+  function renderWalletChoices(){
+    const list=$('funds-wallet-list');list.replaceChildren();const choices=availableWallets().filter(c=>c.kind!=='embedded'),used=new Set();
+    function row(name,choice,url){const control=choice?el('button','wallet-provider-row'):el('a','wallet-provider-row');if(choice){control.type='button';control.onclick=()=>connectChoice(choice,control);}else{control.href=url;control.target='_blank';control.rel='noopener noreferrer';}
+      const icon=el('span','provider-letter '+(name.toLowerCase().includes('rabby')?'rabby':'metamask'),name.slice(0,1));const copy=el('span','provider-copy');copy.append(el('strong','',name),el('small','',choice?(wallet?.provider===choice.provider?'已连接':'已检测到 · 点击连接'):'尚未检测到 · 前往官网'));control.append(icon,copy,el('span','provider-arrow',choice?'连接 →':'安装 ↗'));list.append(control);}
+    for(const [name,brand,url] of [['Rabby Wallet','rabby','https://rabby.io/'],['MetaMask','metamask','https://metamask.io/']]){const choice=choices.find(c=>c.name.toLowerCase().includes(brand));if(choice)used.add(choice.provider);row(name,choice,url);}
+    for(const choice of choices)if(!used.has(choice.provider))row(choice.name,choice,null);
+  }
+  $('funds-connect').onclick=()=>{renderWalletChoices();setTimeout(()=>{if(drawer.open)renderWalletChoices();},250);};
   window.addEventListener('oasis:account-wallet-ready',event=>{if(!wallet&&event.detail?.provider){wallet=event.detail;watchWallet(wallet.provider);renderFunds();}});
   window.addEventListener('oasis:account-wallet-cleared',event=>{if(wallet?.provider===event.detail?.provider){wallet=null;renderFunds();}});
-  window.addEventListener('oasis:wallet-connected',event=>{if(event.detail?.address && event.detail?.provider){wallet=event.detail;watchWallet(wallet.provider);renderFunds();}});
+  window.addEventListener('oasis:wallet-connected',event=>{if(event.detail?.address && event.detail?.provider){connectionGeneration++;wallet=event.detail;watchWallet(wallet.provider);renderFunds();}});
   window.addEventListener('oasis:trade-settled',()=>{if(wallet)refreshFunds();});
   window.addEventListener('keydown',event=>{if(event.key==='Escape')document.body.classList.remove('watch-open');});
   prompts();load();connectFeed();poll=setInterval(load,30000);
