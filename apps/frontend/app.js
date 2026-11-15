@@ -1,10 +1,11 @@
-import {testnetPanel} from "./testnet.js?v=trade-v3-20261115";
+import {initWorkbench} from "./workbench.js?v=workbench-v4-20261115";
+import {testnetPanel} from "./testnet.js?v=workbench-v4-20261115";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="trade-v3-20261115";
+const UI_RELEASE="workbench-v4-20261115";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -204,7 +205,7 @@ function mountDirectTestnet() {
   host.append(testnetPanel(run));
 }
 async function checkRelease() {
-  $("release-label").textContent="交易台 v3 · "+UI_RELEASE;
+  $("release-label").textContent="工作台 v4 · "+UI_RELEASE;
   $("reload-release").onclick=()=>location.reload();
   try {
     const response=await fetch("/api/release",{cache:"no-store"});
@@ -402,6 +403,11 @@ async function sendToRealModel() {
   let assistantText = null;
   try {
     const messages = (state.conversation.length > 12 ? [state.conversation[0], ...state.conversation.slice(-11)] : state.conversation).map(({ role, content }) => ({ role, content }));
+    const last=messages.at(-1);
+    if(last?.role==="user" && !last.content.includes("行情上下文")) {
+      const context=workbench.context(last.content);
+      if(context && last.content.length+context.length<=2000)last.content+=context;
+    }
     const response = await fetch("/api/ai/chat", {
       method: "POST",
       headers: { "content-type": "application/json", ...(!googleLogin ? {"x-oasis-access-code": code} : {}) },
@@ -453,6 +459,7 @@ async function sendToRealModel() {
     if (usage?.completion_tokens != null) parts.push("输出 " + usage.completion_tokens + " tokens");
     $("ai-usage").textContent = parts.join(" · ");
     renderChatChoices();
+    renderFundingCard();
   } catch (error) {
     if (assistantText && !assistantText.textContent.trim()) {
       assistantText.closest(".chat-message")?.remove();
@@ -474,10 +481,18 @@ function renderChatChoices() {
   actions.append(node("span","note","接下来，你想怎么进行？"));
   const choices=[
     ["继续了解行情",()=>{ $("chat-input").value="请说明当前判断的依据、风险和还缺少的数据，不生成交易指令。";$("chat-form").requestSubmit(); }],
-    ["模拟买入 ETH · 10 USDC",()=>startChatSimulation()],
+    ["钱包与资金",()=>workbench.openFunds()],
+    ["本地模拟 · ETH",()=>startChatSimulation()],
     ["测试网买入 ETH",()=>showChatTradePlan()]
   ];
   for(const [label,handler] of choices){const b=node("button","ghost",label);b.type="button";b.onclick=()=>{if(chatBusy)return toast("请等待当前回复完成");handler();};actions.append(b);}
+}
+function renderFundingCard() {
+  const host=$("chat-funding-card");host.replaceChildren();
+  if(!/买|购入|计划|资金|充值/.test(state.goal))return;
+  const card=node("section","funding-cta");
+  const copy=node("div");copy.append(node("span","funding-cta-icon","▣"),node("strong","","先检查交易资金"),node("p","note","连接现有钱包，查看测试网 USDC 和 UETH。余额与订单数量由界面核对。"));
+  const b=node("button","primary","钱包与资金 →");b.type="button";b.onclick=()=>workbench.openFunds();card.append(copy,b);host.append(card);
 }
 async function startChatSimulation() {
   const host=$("chat-trade-plan");
@@ -531,7 +546,7 @@ function beginConversation() {
   updateModelLabels();
   if (!state.model) { toast("请先在策略工作台中选择一个 OpenRouter 模型"); showTab("overview"); return; }
   state.conversation = [];
-  $("chat-next-actions").replaceChildren();$("chat-trade-plan").replaceChildren();
+  $("chat-next-actions").replaceChildren();$("chat-trade-plan").replaceChildren();$("chat-funding-card").replaceChildren();
   $("draft-panel").open=false;
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
@@ -903,3 +918,8 @@ $("ai-retry").addEventListener("click", () => { if (state.conversation.at(-1)?.r
 $("direct-test").onclick=()=>showTab("testnet");
 checkRelease();
 if(new URLSearchParams(location.search).get("trade")==="testnet")showTab("testnet");
+
+const workbench=initWorkbench({
+  prompt:value=>{if(chatBusy)return toast("请等待当前回复完成");resetStarter();$("goal").value=value;beginConversation();},
+  trade:()=>showTab("testnet"),account:openAccount
+});

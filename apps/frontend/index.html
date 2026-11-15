@@ -3,31 +3,42 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="theme-color" content="#f8f8f4"/>
+  <meta name="theme-color" content="#101312"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=trade-v3-20261115"/>
+  <link rel="stylesheet" href="/styles.css?v=workbench-v4-20261115"/>
+  <link rel="stylesheet" href="/workbench.css?v=workbench-v4-20261115"/>
 </head>
 <body>
-  <div id="workspace" class="workspace">
+  <div id="workspace" class="workspace workbench-shell">
+    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页">O</a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="策略与记录" aria-label="策略与记录">◷</button><span class="rail-bottom">TEST</span></aside>
     <header class="app-header"><div class="header-inner">
       <a class="wordmark" href="/" aria-label="Oasis 首页"><i aria-hidden="true"></i>Oasis</a>
-      <nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button><button data-tab="testnet">测试交易</button></nav>
+      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button><button data-tab="testnet">测试交易</button></nav>
       <button class="ghost" id="account-button" hidden>登录</button>
     </div></header>
-    <div class="content">
+    <aside class="market-sidebar" aria-label="实时市场行情">
+      <div class="watch-head"><h2>市场行情</h2><span class="live-dot">实时</span></div>
+      <div class="watch-tabs"><button class="active" type="button" data-watch-group="crypto">加密</button><button type="button" data-watch-group="stocks">美股</button><button type="button" data-watch-group="macro">宏观</button><button type="button" data-watch-group="all">全部</button></div>
+      <label class="watch-search"><span class="sr-only">搜索行情</span><input id="watch-search" placeholder="搜索币种或市场" type="search"/></label>
+      <div class="watch-columns"><span>资产 / 永续</span><span>价格 / 24h</span></div><div id="watchlist" class="watchlist"></div>
+      <div class="watch-foot"><span id="watch-count">—</span><button type="button" id="watch-refresh" aria-label="刷新侧栏行情">↻ 刷新</button><small id="watch-status" role="status">正在连接 Hyperliquid…</small><small>主网永续行情 · 测试交易另行报价</small></div>
+    </aside>
+    <div class="content"><div class="workbench-bar"><button type="button" id="toggle-watch" aria-label="显示市场列表">☰</button><span>AI 交易助手 <span class="bar-divider">/</span> <b id="workbench-asset">ETH</b></span><span class="environment-badge">测试网执行</span></div>
       <main>
         <section id="page-overview" class="app-page"><div class="direct-test-link"><button type="button" class="ghost" id="direct-test">直接测试一笔 ETH 交易 ↗</button></div>
-          <div class="welcome"><h1>今天想了解什么行情？</h1><p>问行情、学指标，或从一个模拟策略开始。</p></div>
+          <div class="welcome"><div class="assistant-emblem">O</div><span class="eyebrow">YOUR MARKET, IN CONTEXT</span><h1>从一个判断，<br/>到一份交易计划。</h1><p>先看懂行情，再和 Oasis 一起明确行动。每一笔交易由你确认。</p></div>
+          <div class="selected-quote"><span class="coin-symbol" data-coin="ETH">E</span><strong id="selected-market">ETH</strong><b id="selected-market-price">行情读取中</b><span id="selected-market-change">—</span><small>主网永续 / 实时参考</small></div>
+          <div id="prompt-guides" class="prompt-guides" aria-label="引导问题"></div>
 
-          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><small id="question-context" role="status"></small><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
+          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="也可以直接输入：我想研究 ETH，现在买入需要注意什么？"></textarea><small id="question-context" role="status"></small><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
           <section class="starters" aria-labelledby="quick-heading">
             <div class="starter-head"><h2 id="quick-heading">快捷问题</h2><button type="button" id="more-questions">换一组 ↻</button></div>
             <div id="question-list" class="question-list"></div>
           </section>
-          <section class="starters" aria-labelledby="replay-heading"><div class="starter-head"><h2 id="replay-heading">策略表现</h2><small>近 24 小时 · 模拟回放</small></div>
+          <details class="research-extras"><summary>探索策略与历史样本</summary><section class="starters" aria-labelledby="replay-heading"><div class="starter-head"><h2 id="replay-heading">策略表现</h2><small>近 24 小时 · 模拟回放</small></div>
             <p id="replay-status" class="note" role="status">正在读取行情…</p><div id="replay-list" class="template-list"></div>
             <details class="replay-method"><summary>计算口径</summary><p>固定展示 BTC、ETH 各两条均线规则，另列各自持续持有等额空头 24 小时的对照。收盘高于 20 小时均线时做多，低于均线时偏空做空；各模型在自己的条件失效时空仓。下一小时开盘模拟成交，期末按收盘价结算。每次进出各计 0.05% 成本，未计资金费、实际滑点和盘中波动。按本窗口模拟收益排序。</p></details></section>
-          <section class="starters" aria-labelledby="template-heading"><div class="starter-head"><h2 id="template-heading">探索策略模板</h2><button type="button" id="more-templates">下一组模板 ↻</button></div><div class="template-list" id="template-list"></div></section>
+          <section class="starters" aria-labelledby="template-heading"><div class="starter-head"><h2 id="template-heading">探索策略模板</h2><button type="button" id="more-templates">下一组模板 ↻</button></div><div class="template-list" id="template-list"></div></section></details>
         </section>
         <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 市场成交行情 · 股票类永续跟踪标的价格</p></div></div>
           <div class="panel"><div class="market-controls"><label>市场 <select id="market-group"><option>常用</option><option>加密永续</option><option>美股永续</option><option>指数与宏观</option><option>其他永续</option><option>现货</option><option>全部</option></select></label><label>标的 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
@@ -35,10 +46,10 @@
           <small id="market-count" role="status"></small><p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="市场 K 线及成交量"></canvas>
           <div id="market-insights" class="market-insights" aria-label="已收盘 K 线指标"></div><div class="market-controls"><button type="button" class="ghost" id="market-reload">刷新行情</button><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
-          <div class="page-heading"><div><h2>策略工作台</h2><p>先讨论，再选择模拟或测试网交易。策略保存为可选。</p></div><button class="ghost" id="new-idea">新对话</button></div>
+          <div class="page-heading"><div><h2>和 Oasis 一起研究</h2><p>先讨论，再选择模拟或测试网交易。策略保存为可选。</p></div><button class="ghost" id="new-idea">新对话</button></div>
           <div class="conversation panel">
-            <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><label class="ghost inline-model-picker"><span aria-hidden="true">更换模型 ▾</span><select id="change-model" aria-label="更换模型" disabled></select></label></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
-            <div id="chat-messages" class="chat-messages" aria-live="polite"></div><div id="chat-next-actions" class="chat-next-actions" aria-label="对话下一步"></div><div id="chat-trade-plan" class="chat-trade-plan" aria-live="polite"></div>
+            <div class="conversation-top"><div><strong>Oasis · 交易助手</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><label class="ghost inline-model-picker"><span aria-hidden="true">更换模型 ▾</span><select id="change-model" aria-label="更换模型" disabled></select></label></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
+            <div id="chat-messages" class="chat-messages" aria-live="polite"></div><div id="chat-next-actions" class="chat-next-actions" aria-label="对话下一步"></div><div id="chat-funding-card"></div><div id="chat-trade-plan" class="chat-trade-plan" aria-live="polite"></div>
             <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送</button></form><p id="ai-usage" class="note"></p>
           </div>
           <details id="draft-panel" class="panel draft-panel hidden"><summary>查看完整策略 · 可选</summary><div class="draft-content">
@@ -60,14 +71,23 @@
         <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看交易计划、准备测试交易和核对运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
 
         <section id="page-testnet" class="app-page hidden">
-          <div class="page-heading"><div><span class="status-pill">Hyperliquid Testnet · 测试资产 · 交易台 v3</span><h2>测试一笔 ETH 交易</h2><p>填写金额，连接钱包预览，再授权并单独确认订单。</p></div></div>
+          <div class="page-heading"><div><span class="status-pill">Hyperliquid Testnet · 测试资产 · 工作台 v4</span><h2>测试一笔 ETH 交易</h2><p>填写金额，连接钱包预览，再授权并单独确认订单。</p></div></div>
           <div id="testnet-direct-host"></div>
         </section>
-        <footer class="release-footer"><span id="release-label">交易台 v3</span><span id="release-status" role="status"></span><button type="button" id="reload-release" class="ghost" hidden>加载最新版本</button></footer>
+        <footer class="release-footer"><span id="release-label">工作台 v4</span><span id="release-status" role="status"></span><button type="button" id="reload-release" class="ghost" hidden>加载最新版本</button></footer>
       </main>
+      <dialog id="funding-drawer" class="funding-drawer" aria-labelledby="funds-title"><div class="drawer-heading"><div><span class="eyebrow">WALLET & FUNDS</span><h2 id="funds-title">钱包与资金</h2></div><button type="button" id="wallet-close" class="icon-button" aria-label="关闭资金面板">×</button></div>
+      <p class="funds-network">Hyperliquid Testnet · 仅测试资产</p>
+      <section class="funds-total"><small>现货可用余额 · 测试 USDC</small><strong id="funds-balance">—</strong><div>UETH 持有量 <b id="funds-eth">—</b></div></section>
+      <div class="funds-actions"><button type="button" class="primary" id="funds-connect">连接交易钱包</button><a class="ghost" href="https://app.hyperliquid-testnet.xyz/drip" target="_blank" rel="noopener noreferrer">领取测试币 ↗</a></div><div id="funds-wallet-list" class="wallet-list"></div>
+      <div class="funds-account"><strong id="funds-wallet-name">尚未连接交易钱包</strong><code id="funds-address">连接钱包后显示地址</code><div><button type="button" id="funds-copy" class="ghost" disabled>复制地址</button><button type="button" id="funds-refresh" class="ghost" disabled>刷新余额</button></div></div>
+      <p id="funds-status" class="note" role="status">请连接钱包查看测试资金。</p>
+      <div class="funds-help"><h3>准备测试资金</h3><ol><li>连接已领取测试币的钱包。</li><li>资金需要位于测试网 Spot 账户。</li><li>预览数量与限价，再授权并确认订单。</li></ol><a href="https://app.hyperliquid-testnet.xyz/" target="_blank" rel="noopener noreferrer">打开官方测试网，检查资金或划转 ↗</a></div>
+      <div class="account-wallet-note"><strong>账号钱包</strong><span>尚未启用</span><p>登录与现有钱包连接均可使用。注册自动创建钱包还在接入，当前请连接已有钱包；这里不会生成或保存私钥。</p><button type="button" class="ghost" id="account-wallet-login">查看登录账户</button></div>
+      <button type="button" class="primary funds-trade" id="funds-trade">准备 ETH 测试交易 →</button></dialog><button id="funding-backdrop" class="funding-backdrop" type="button" hidden aria-label="关闭钱包与资金"></button>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=trade-v3-20261115" type="module"></script>
+  <script src="/app.js?v=workbench-v4-20261115" type="module"></script>
 </body>
 </html>
