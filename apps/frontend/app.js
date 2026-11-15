@@ -530,7 +530,7 @@ function renderRunContent() {
   const head = $("run-panel").querySelector(".activity-head");
   head.querySelector("h3").textContent = testnet ? "测试网执行台 · ETH 现货" : "模拟策略回放";
   head.querySelector(".status-pill").textContent = testnet ? "Hyperliquid Testnet" : "模拟运行";
-  head.querySelector("p").textContent = testnet ? "确认计划、检查资金、预览订单，再由钱包签名。当前由你手动发起测试交易。" : "预置场景，仅用于模拟。";
+  head.querySelector("p").textContent = testnet ? "确认计划、检查资金、预览订单，授权测试网助手后单独确认交易。" : "预置场景，仅用于模拟。";
   if (testnet) {
     flow.append(node("p","note","策略创建模型："+(run.model || "未记录")+" · 本次下单由用户决定"));
     $("order-followup").replaceChildren();

@@ -53,3 +53,29 @@ test("wallet refusal, pending request and authorization failures give actionable
   assert.match(walletError({code:4900}),/断开/);
   assert.equal(walletError({message:"测试网请求失败"}),"测试网请求失败");
 });
+
+test('agent approval uses current wallet chain but is bound to Hyperliquid Testnet',async()=>{
+  const {approvalEnvelope}=await import('./testnet.js');
+  const packet=approvalEnvelope('0x'+'12'.repeat(20),'0x1',1794486000000);
+  assert.equal(packet.typed.domain.chainId,1);
+  assert.equal(packet.action.signatureChainId,'0x1');
+  assert.equal(packet.action.hyperliquidChain,'Testnet');
+  assert.equal(packet.typed.primaryType,'HyperliquidTransaction:ApproveAgent');
+  assert.equal(envelope(11137,{p:'1000',s:'0.01'},'0x'+'12'.repeat(16),Date.now()).typed.domain.chainId,1337);
+});
+
+test('local test signer produces a recoverable canonical signature once, and rejects mainnet or larger orders',async()=>{
+  const {createTestnetSigner}=await import('./vendor/hl-agent.js');
+  const {recoverTypedDataAddress}=await import('viem');
+  const signer=createTestnetSigner();
+  const packet=envelope(11137,{p:'1000',s:'0.01'},'0x'+'12'.repeat(16),Date.now());
+  const signature=await signer.signOrder(packet);
+  assert.equal((await recoverTypedDataAddress({...packet.typed,signature})).toLowerCase(),signer.address.toLowerCase());
+  await assert.rejects(()=>signer.signOrder(packet),/已使用/);
+  const mainnet=structuredClone(packet);mainnet.typed.message.source='a';
+  await assert.rejects(()=>createTestnetSigner().signOrder(mainnet),/无效/);
+  const large=envelope(11137,{p:'1000',s:'0.1'},'0x'+'12'.repeat(16),Date.now());
+  await assert.rejects(()=>createTestnetSigner().signOrder(large),/10 USDC/);
+  const tampered=structuredClone(packet);tampered.action.orders[0].a=10001;
+  await assert.rejects(()=>createTestnetSigner().signOrder(tampered),/无效/);
+});
