@@ -160,11 +160,16 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"trade-v3-20261115",defaultTestBudget:"20"});
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if (url.pathname === "/api/market/catalog" && request.method === "GET") return marketCatalog();
     if (url.pathname === "/api/market/candles" && request.method === "GET") return snapshot(request);
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
-    if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+    if (!url.pathname.startsWith("/api/")) {
+      const asset=await env.ASSETS.fetch(request);
+      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","trade-v3-20261115");
+      return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
+    }
 
     if (request.method === "GET" && url.pathname === "/api/ai/status") {
       return respond({

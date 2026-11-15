@@ -67,3 +67,13 @@ test("long assistant replies can be sent back on the next user turn", () => {
   ] });
   assert.equal(value.messages.length, 3);
 });
+
+test('release endpoint is public and mutable assets cannot retain stale trade code',async()=>{
+  const {default:worker}=await import('./worker.js');
+  const release=await worker.fetch(new Request('https://oasis.test/api/release'),{});
+  assert.equal(release.status,200);assert.equal(release.headers.get('cache-control'),'no-store');
+  const info=await release.json();assert.equal(info.version,'trade-v3-20261115');assert.equal(info.defaultTestBudget,'20');
+  const asset=await worker.fetch(new Request('https://oasis.test/app.js?v=trade-v3-20261115'),{ASSETS:{fetch:async()=>new Response('app source',{headers:{'cache-control':'public,max-age=3600'}})}});
+  assert.equal(asset.headers.get('cache-control'),'no-store');assert.equal(asset.headers.get('x-oasis-release'),info.version);
+  assert.equal(await asset.text(),'app source');
+});

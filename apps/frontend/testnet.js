@@ -403,7 +403,7 @@ export function testnetPanel(run,review) {
           if(!root.isConnected)return;
           await checkAccount();
           if(!signer) {
-            const {createTestnetSigner}=await import("./vendor/hl-agent.js");
+            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=trade-v3-20261115");
             signer=createTestnetSigner(budget);session.signer=signer;
           }
           // Reconcile an uncertain earlier request before sending another approval.

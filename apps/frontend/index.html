@@ -5,18 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#f8f8f4"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css"/>
+  <link rel="stylesheet" href="/styles.css?v=trade-v3-20261115"/>
 </head>
 <body>
   <div id="workspace" class="workspace">
     <header class="app-header"><div class="header-inner">
       <a class="wordmark" href="/" aria-label="Oasis 首页"><i aria-hidden="true"></i>Oasis</a>
-      <nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button></nav>
+      <nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button><button data-tab="testnet">测试交易</button></nav>
       <button class="ghost" id="account-button" hidden>登录</button>
     </div></header>
     <div class="content">
       <main>
-        <section id="page-overview" class="app-page">
+        <section id="page-overview" class="app-page"><div class="direct-test-link"><button type="button" class="ghost" id="direct-test">直接测试一笔 ETH 交易 ↗</button></div>
           <div class="welcome"><h1>今天想了解什么行情？</h1><p>问行情、学指标，或从一个模拟策略开始。</p></div>
 
           <form id="goal-form" class="prompt"><label for="goal" class="sr-only">策略想法</label><textarea id="goal" rows="3" required maxlength="2000" placeholder="例如：我想每周定投 ETH，但希望在市场波动较大时暂停……"></textarea><small id="question-context" role="status"></small><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">开始讨论 ↗</button></div></form>
@@ -59,10 +59,15 @@
         </section>
         <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看交易计划、准备测试交易和核对运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
 
+        <section id="page-testnet" class="app-page hidden">
+          <div class="page-heading"><div><span class="status-pill">Hyperliquid Testnet · 测试资产 · 交易台 v3</span><h2>测试一笔 ETH 交易</h2><p>填写金额，连接钱包预览，再授权并单独确认订单。</p></div></div>
+          <div id="testnet-direct-host"></div>
+        </section>
+        <footer class="release-footer"><span id="release-label">交易台 v3</span><span id="release-status" role="status"></span><button type="button" id="reload-release" class="ghost" hidden>加载最新版本</button></footer>
       </main>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js" type="module"></script>
+  <script src="/app.js?v=trade-v3-20261115" type="module"></script>
 </body>
 </html>

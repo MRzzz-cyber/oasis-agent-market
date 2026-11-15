@@ -1,9 +1,10 @@
-import {testnetPanel} from "./testnet.js";
+import {testnetPanel} from "./testnet.js?v=trade-v3-20261115";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
-const tabs = ["overview", "market", "create", "strategies"];
+const tabs = ["overview", "market", "create", "strategies", "testnet"];
+const UI_RELEASE="trade-v3-20261115";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -189,6 +190,28 @@ function showTab(tab) {
   });
   toggleMarket(tab === "market");
   if (tab === "strategies") refreshStrategies();
+  if (tab === "testnet") mountDirectTestnet();
+}
+function mountDirectTestnet() {
+  const host=$("testnet-direct-host");if(host.children.length)return;
+  const key="oasis-direct-testnet-active-v3";
+  let run;
+  try{run=JSON.parse(localStorage.getItem(key));}catch{}
+  if(!run || !/^[a-f0-9-]{36}$/i.test(run.id || "") || run.mode!=="testnet") {
+    run={id:crypto.randomUUID(),mode:"testnet",source:"direct",asset:"ETH",testBudget:"20",goal:"单次手动测试：在 Hyperliquid 测试网买入 ETH。金额由用户在预览中确认。",terms:{asset:"ETH",maxOrder:"20",quoteAsset:"USDC",capital:"20",cadence:"按信号触发",stopPercent:""},createdAt:new Date().toISOString()};
+    try{localStorage.setItem(key,JSON.stringify(run));}catch{}
+  }
+  host.append(testnetPanel(run));
+}
+async function checkRelease() {
+  $("release-label").textContent="交易台 v3 · "+UI_RELEASE;
+  $("reload-release").onclick=()=>location.reload();
+  try {
+    const response=await fetch("/api/release",{cache:"no-store"});
+    const release=await response.json();
+    if(!response.ok || release.version!==UI_RELEASE){$("release-status").textContent="发现版本不一致，请加载最新版本后交易";$("reload-release").hidden=false;return;}
+    $("release-status").textContent="部署版本已核对";
+  }catch{$("release-status").textContent="暂时无法核对部署版本";}
 }
 function node(tag, cls, text) {
   const el = document.createElement(tag); if (cls) el.className = cls;
@@ -531,8 +554,9 @@ async function refreshStrategies() {
       details.append(node("summary", "", "原始目标"), node("p", "", item.goal));
       info.appendChild(details);
     }
-    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "准备测试交易" : "运行模拟策略") : "补全旧策略");
+    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "打开测试交易" : "运行模拟策略") : "补全旧策略");
     btn.addEventListener("click", async () => {
+      if(item.asset==="ETH"){showTab("testnet");return;}
       if (!item.terms) {
         if (chatBusy) { toast("请等待模型回复完成"); return; }
         state.goal = item.goal; state.conversation = [];
@@ -875,3 +899,7 @@ $("create-strategy").addEventListener("click", async () => {
 checkAiStatus();
 
 $("ai-retry").addEventListener("click", () => { if (state.conversation.at(-1)?.role === "user") sendToRealModel(); else toast("请输入新的消息后发送"); });
+
+$("direct-test").onclick=()=>showTab("testnet");
+checkRelease();
+if(new URLSearchParams(location.search).get("trade")==="testnet")showTab("testnet");
