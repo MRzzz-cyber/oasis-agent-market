@@ -34,6 +34,7 @@
   "vars": {
     "PRIVY_APP_ID": "cmwhzs2zd026t0gjpx4uzetpq",
     "OASIS_AUTH_ISSUER": "https://oasis-agent-market.zqsanjingshou.workers.dev",
-    "OASIS_AUTH_KEY_ID": "oasis-auth-v1"
+    "OASIS_AUTH_KEY_ID": "oasis-auth-v1",
+    "PRIVY_CLIENT_ID": "client-WY6fjhnce2T7bWb2NMPcLtBZoQbw1KfrYz4yAJTTUZw8M"
   }
 }
