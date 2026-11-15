@@ -16,6 +16,7 @@ const routes = new Map([
   ["/vendor/hl-hash.js", ["vendor/hl-hash.js", "text/javascript; charset=utf-8"]],
   ["/vendor/hl-agent.js", ["vendor/hl-agent.js", "text/javascript; charset=utf-8"]],
   ["/testnet.js", ["testnet.js", "text/javascript; charset=utf-8"]],
+  ["/markdown.js", ["markdown.js", "text/javascript; charset=utf-8"]],
   ["/eye-logo.js", ["eye-logo.js", "text/javascript; charset=utf-8"]],
   ["/brand/oasis-eye.svg", ["brand/oasis-eye.svg", "image/svg+xml"]],
   ["/brand/favicon.svg", ["brand/favicon.svg", "image/svg+xml"]],
@@ -50,7 +51,7 @@ export function createAppServer() {
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
-      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"eye-v5-20261115",defaultTestBudget:"20"});return;}
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"markdown-v6-20261115",defaultTestBudget:"20"});return;}
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "GET" && url.pathname === "/api/status") {
         send(res, 200, { ok: true, app: "Oasis", network: "Base Sepolia", mode: "simulation", realPaymentsEnabled: false, services: SAMPLE_SERVICES });

@@ -24,3 +24,17 @@ main{max-width:1100px;margin:auto;padding:28px clamp(24px,4vw,76px) 24px}#page-o
 .assistant-emblem{width:66px;height:48px;border:0;background:none;border-radius:0}.assistant-emblem .oasis-eye{width:64px;height:45px}
 .assistant-avatar.oasis-eye{display:block;width:30px;height:21px;margin:0 0 9px}
 @media(max-width:580px){.wordmark .oasis-eye{width:28px;height:20px}.app-header .wordmark{font-size:21px}.rail-logo .oasis-eye{width:31px;height:23px}.assistant-emblem{width:56px;height:40px}.assistant-emblem .oasis-eye{width:54px;height:38px}}
+
+/* Readable model answers, including streamed and restored conversations. */
+.markdown-body{font-size:14px;line-height:1.85;overflow-wrap:anywhere;min-width:0}
+.chat-message .markdown-body p{white-space:normal;margin:0 0 14px}
+.markdown-body>:first-child{margin-top:0}.markdown-body>:last-child{margin-bottom:0}
+.markdown-body strong{font-weight:750;color:var(--text,#edf1eb)}
+.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6{font-size:15px;line-height:1.6;margin:24px 0 10px;font-weight:750}
+.markdown-body ul,.markdown-body ol{padding-left:24px;margin:10px 0 18px}.markdown-body li{padding-left:3px;margin:5px 0}
+.markdown-body blockquote{margin:16px 0;padding:8px 14px;border-left:3px solid #a9d77d;color:#a8b4a8;background:#ffffff04}
+.markdown-body code{font:0.9em ui-monospace,SFMono-Regular,Consolas,monospace;background:#ffffff0b;border-radius:4px;padding:2px 5px}
+.markdown-body pre{overflow-x:auto;white-space:pre;padding:16px;background:#090e0b;border:1px solid #ffffff15;border-radius:10px;margin:16px 0}
+.markdown-body pre code{padding:0;background:none}.markdown-body a{color:#b6ee86;text-decoration:underline;text-underline-offset:3px}
+.markdown-body hr{border:0;border-top:1px solid #ffffff18;margin:22px 0}.markdown-table{overflow-x:auto;margin:16px 0}
+.markdown-body table{border-collapse:collapse;width:100%;font-size:13px}.markdown-body th,.markdown-body td{text-align:left;border:1px solid #ffffff18;padding:9px 12px}.markdown-body th{background:#ffffff08;font-weight:700}
