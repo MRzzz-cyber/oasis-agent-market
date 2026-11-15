@@ -1,17 +1,18 @@
-import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=mainnet-guide-v14-20261116';
-import {renderAccountButton} from "./account-avatar.js?v=mainnet-guide-v14-20261116";
-import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=mainnet-guide-v14-20261116";
-import {conversationGuide,fundingState,tradeBudget,OFFICIAL_TRADE_URL} from "./conversation-guide.js?v=mainnet-guide-v14-20261116";
-import {setMarkdown} from "./markdown.js?v=mainnet-guide-v14-20261116";
-import {initEyeMotion} from "./eye-logo.js?v=mainnet-guide-v14-20261116";
-import {initWorkbench} from "./workbench.js?v=mainnet-guide-v14-20261116";
-import {testnetPanel} from "./testnet.js?v=mainnet-guide-v14-20261116";
+import {nativeTrade} from './mainnet-trade.js?v=native-mainnet-v15-20261116';
+import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=native-mainnet-v15-20261116';
+import {renderAccountButton} from "./account-avatar.js?v=native-mainnet-v15-20261116";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=native-mainnet-v15-20261116";
+import {conversationGuide,fundingState,tradeBudget} from "./conversation-guide.js?v=native-mainnet-v15-20261116";
+import {setMarkdown} from "./markdown.js?v=native-mainnet-v15-20261116";
+import {initEyeMotion} from "./eye-logo.js?v=native-mainnet-v15-20261116";
+import {initWorkbench} from "./workbench.js?v=native-mainnet-v15-20261116";
+import {testnetPanel} from "./testnet.js?v=native-mainnet-v15-20261116";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="mainnet-guide-v14-20261116";
+const UI_RELEASE="native-mainnet-v15-20261116";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -506,6 +507,7 @@ async function sendToRealModel() {
     for (const id of ["ai-retry", "create-strategy", "change-model"]) $(id).disabled = false;
     $("model-primary").disabled = !availableModels.length;
     persistConversation();renderChatChoices();renderFundingCard();
+    const guide=conversationGuide(state.conversation);if(guide.stage==='funds'&&!$('chat-trade-plan').children.length)showChatTradePlan(guide.budget);
   }
 }
 function renderChatChoices() {
@@ -522,21 +524,13 @@ function renderChatChoices() {
   }
   actions.append(grid,node("p","note guide-freeform","也可以在下面直接输入，或调整你的想法。选择选项不会自动授权或提交交易。"));
 }
-function fundingAction(info){if(info.kind==='connect'||info.kind==='external')return workbench.openTradingWallet();if(info.kind==='ready')return showChatTradePlan();return workbench.openFunds();}
 function renderFundingCard(){
- const host=$('chat-funding-card');host.replaceChildren();const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds'||$('chat-trade-plan').querySelector('.mainnet-plan'))return;
+ const host=$('chat-funding-card');host.replaceChildren();const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds'||$('chat-trade-plan').children.length)return;
  const info=fundingState(workbench.funds(),guide.budget),card=node('section','funding-cta guided-funding'),copy=node('div');copy.append(node('span','funding-network-label','Hyperliquid Mainnet · 真实资金'),node('strong','',info.title),node('p','note',info.body));
- let button;if(info.kind==='fund'){button=node('a','primary',info.action+' ↗');button.href=OFFICIAL_TRADE_URL;button.target='_blank';button.rel='noopener noreferrer';}else{button=node('button','primary',info.action);button.type='button';button.onclick=()=>fundingAction(info);}card.append(copy,button);host.append(card);
+ const button=node('button','primary','站内预览买入');button.type='button';button.onclick=()=>showChatTradePlan();card.append(copy,button);host.append(card);
 }
-window.addEventListener('oasis:funds-updated',()=>{if(state.conversation.length){renderFundingCard();const amount=$('mainnet-plan-amount');if(amount)updateMainnetPlanFunding(amount.value);}});
-function chooseMainnetBudget(amount){const value=tradeBudget(amount);addChat('user','我选择 ETH 主网现货买入，本次买入预算 '+value+' USDC，费用另计。先确认计划与资金，不代表授权下单。');persistConversation();renderChatChoices();renderFundingCard();showChatTradePlan(value);}
-function updateMainnetPlanFunding(amount){
- const host=$('mainnet-plan-funding');if(!host)return;host.replaceChildren();let budget;try{budget=tradeBudget(amount);}catch(e){host.append(node('p','note',e.message));return;}
- const wallet=workbench.funds(),info=fundingState(wallet,budget);host.append(node('strong','',info.title),node('p','note',info.body));if(wallet.address)host.append(node('code','mainnet-plan-address',wallet.address));
- if(info.kind!=='fund'&&info.kind!=='ready'){const connect=node('button','primary',info.action);connect.type='button';connect.onclick=()=>fundingAction(info);host.append(connect);return;}
- const steps=node('ol','mainnet-handoff-steps');for(const text of ['在官网连接上方同一钱包地址。','在官网选择 Spot 现货 → UETH/USDC（ETH 现货），不要选 ETH 永续。','手动填写本次预算 '+budget+' USDC；检查数量、价格和手续费，再由你确认订单。'])steps.append(node('li','',text));host.append(steps);
- const official=node('a','primary',info.kind==='fund'?'前往官网入金并准备现货交易 ↗':'前往官网确认 ETH 现货交易 ↗');official.href=OFFICIAL_TRADE_URL;official.target='_blank';official.rel='noopener noreferrer';host.append(official,node('p','note','金额不会自动填入官网；跳转不代表已提交或成交。'));
-}
+window.addEventListener('oasis:funds-updated',()=>{if(state.conversation.length)renderFundingCard();});
+function chooseMainnetBudget(amount){const value=tradeBudget(amount);addChat('user','我选择 ETH 主网现货买入，本次买入预算 '+value+' USDC，费用另计。请站内预览，由我单独授权并确认订单。');persistConversation();renderChatChoices();showChatTradePlan(value);}
 async function startChatSimulation() {
   const host=$("chat-trade-plan");
   if(host.querySelector(".ten-trade"))return toast("当前已有测试交易，请先完成或核对回执。");
@@ -553,13 +547,10 @@ async function startChatSimulation() {
   }catch(e){toast(e.message);}
 }
 function showChatTradePlan(amount=conversationGuide(state.conversation).budget||10){
- const host=$('chat-trade-plan');host.replaceChildren();const card=node('section','conversation-plan mainnet-plan');card.append(node('span','status-pill','主网现货 · 真实资金'),node('h3','','确认 ETH 买入计划'),node('p','note','先核对计划与资金，最终在 Hyperliquid 官网连接外部钱包并确认真实订单。Oasis 当前不在站内签署主网订单。'));
- const label=node('label','plan-amount','本次买入预算（USDC，费用另计）'),input=node('input','');input.id='mainnet-plan-amount';input.type='number';input.min='10';input.step='0.01';input.value=String(amount);input.setAttribute('aria-label','ETH 主网买入预算');label.append(input);card.append(label);
- const presets=node('div','mainnet-amount-presets');for(const value of [10,50]){const button=node('button','ghost',value===10?'10 USDC 小额体验':'50 USDC');button.type='button';button.onclick=()=>{input.value=String(value);input.dispatchEvent(new Event('input'));};presets.append(button);}card.append(presets,node('p','note','10 USDC 为预算选项，可能不足以覆盖交易所最低名义金额、数量精度及费用；请在官网复核，Oasis 不会自动提高你的预算。'));
- const confirm=node('button','primary','确认计划，检查资金');confirm.type='button';const status=node('p','note');status.setAttribute('role','status');const funding=node('div','mainnet-plan-funding');funding.id='mainnet-plan-funding';funding.hidden=true;
- input.oninput=()=>{funding.hidden=true;funding.replaceChildren();status.textContent='金额已修改，请重新确认计划。';};
- confirm.onclick=()=>{try{const budget=tradeBudget(input.value);addChat('user','我确认 ETH 主网现货买入计划，本次买入预算 '+budget+' USDC，费用另计；只检查资金，订单由我在官网单独确认。');persistConversation();funding.hidden=false;updateMainnetPlanFunding(budget);renderChatChoices();renderFundingCard();status.textContent='计划已确认，尚未提交订单。';}catch(e){status.textContent=e.message;}};
- card.append(confirm,status,funding);host.append(card);renderFundingCard();host.scrollIntoView({behavior:'smooth',block:'nearest'});
+ const host=$('chat-trade-plan');host.replaceChildren(nativeTrade({budget:amount,getWallet:workbench.wallet,pickWallet:workbench.openFunds,openDeposit:workbench.openDeposit,
+ onBudget:value=>{const guide=conversationGuide(state.conversation);if(guide.budget!==Number(value)){addChat('user','ETH 主网现货，本次买入预算 '+value+' USDC，费用另计；请预览，不自动下单。');persistConversation();renderChatChoices();}},
+ onReceipt:record=>{const db=readDemoState(),id='mainnet:'+record.cloid,prior=db.runs.find(r=>r.id===id);const run={...prior,id,mode:'mainnet',asset:'ETH',createdAt:new Date(record.nonce).toISOString(),goal:'站内 ETH 现货买入',status:record.status,receipt:record};if(prior)Object.assign(prior,run);else db.runs.push(run);writeDemoState(db);}
+ }));renderFundingCard();host.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function beginConversation() {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
@@ -574,6 +565,7 @@ function beginConversation() {
   $("draft-panel").open=false;
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
+  const guide=conversationGuide(state.conversation);if(guide.stage==='funds')showChatTradePlan(guide.budget);
   renderChatChoices();
   sendToRealModel();
   makeDraftSummary();
@@ -596,7 +588,7 @@ async function refreshStrategies(){
   persistConversation();const [items,runs]=await Promise.all([request('/api/strategies'),request('/api/runs')]);state.strategies=items;
   $('run-panel').classList.add('hidden');const root=$('strategy-list');root.replaceChildren();
   const search=$('history-search').value.trim().toLowerCase(),conversations=conversationStore().list();
-  for(const [key,label,count] of [['conversations','历史对话',conversations.length],['strategies','已存策略',items.length],['archive','旧版记录',runs.length]]){const b=document.querySelector('[data-history-filter="'+key+'"]');b.textContent=label+' '+count;b.setAttribute('aria-pressed',String(historyFilter===key));}
+  for(const [key,label,count] of [['conversations','历史对话',conversations.length],['strategies','已存策略',items.length],['archive','交易与旧版记录',runs.length]]){const b=document.querySelector('[data-history-filter="'+key+'"]');b.textContent=label+' '+count;b.setAttribute('aria-pressed',String(historyFilter===key));}
   const matches=record=>!search||JSON.stringify(record).toLowerCase().includes(search);
   function card(title,summary,meta,label,open){const article=node('article','record-card');const info=node('div','record-info');info.append(node('strong','',title),node('p','record-summary',summary),node('small','record-meta',meta));const button=node('button','ghost',label);button.type='button';button.onclick=open;article.append(info,button);root.append(article);return info;}
   if(historyFilter==='conversations')for(const record of conversations.filter(matches)){
@@ -607,13 +599,14 @@ async function refreshStrategies(){
     const info=card(historyTitle(item.goal),item.terms?item.asset+' · '+item.terms.cadence+' · 单次上限 '+item.terms.maxOrder+' '+item.terms.quoteAsset:'早期保存的策略草案',historyDate(item.createdAt)+' · 历史草案'+(item.model?' · '+item.model:''),'继续讨论',()=>restoreConversation({id:'strategy-'+item.id,goal:item.goal,messages:cleanMessages(item.conversation).length?item.conversation:[{role:'user',content:item.goal}],modelId:item.modelId,createdAt:item.createdAt}));
     const details=node('details','record-terms');details.append(node('summary','','查看策略内容'),node('p','',item.goal||''));if(item.terms){const terms=node('dl','record-parameters');for(const [label,value] of [['标的',item.asset],['执行节奏',item.terms.cadence],['单次上限',item.terms.maxOrder+' '+item.terms.quoteAsset],['投资预算',item.terms.capital],['暂停回撤',item.terms.stopPercent?item.terms.stopPercent+'%':null]])if(value){terms.append(node('dt','',label),node('dd','',String(value)));}details.append(terms);}details.append(node('small','note','保存的参数仅供回顾，继续使用前需重新研究与确认。'));info.append(details);
   }
-  if(historyFilter==='archive')for(const run of [...runs].reverse().filter(matches))card(run.asset+' · '+(run.mode==='testnet'?'旧版测试记录':'旧版模拟记录'),historyTitle(run.goal||'历史运行快照'),historyDate(run.createdAt)+' · '+historicalStatus(run),'查看记录',()=>showArchivedRun(run));
-  if(!root.children.length){const empty=node('div','history-empty');empty.append(node('span','',search?'没有找到匹配记录':historyFilter==='conversations'?'还没有保存的对话':historyFilter==='strategies'?'还没有保存的策略':'暂无旧版记录'),node('p','note',search?'试试币种、关键词或模型名称。':historyFilter==='conversations'?'新对话会自动保存在这里。早期未保存的对话无法恢复，可在已存策略里继续讨论。':'与 Oasis 讨论后，可以选择保存策略。'));root.append(empty);}
+  if(historyFilter==='archive')for(const run of [...runs].reverse().filter(matches))card(run.asset+' · '+(run.mode==='mainnet'?'主网现货订单':run.mode==='testnet'?'旧版测试记录':'旧版模拟记录'),historyTitle(run.goal||'历史运行快照'),historyDate(run.createdAt)+' · '+historicalStatus(run),'查看记录',()=>run.mode==='mainnet'?showMainnetReceipt(run):showArchivedRun(run));
+  if(!root.children.length){const empty=node('div','history-empty');empty.append(node('span','',search?'没有找到匹配记录':historyFilter==='conversations'?'还没有保存的对话':historyFilter==='strategies'?'还没有保存的策略':'暂无交易或旧版记录'),node('p','note',search?'试试币种、关键词或模型名称。':historyFilter==='conversations'?'新对话会自动保存在这里。早期未保存的对话无法恢复，可在已存策略里继续讨论。':'与 Oasis 讨论后，可以选择保存策略。'));root.append(empty);}
 }
 document.querySelectorAll('[data-history-filter]').forEach(b=>b.onclick=()=>{historyFilter=b.dataset.historyFilter;refreshStrategies();});
 $('history-search').oninput=()=>refreshStrategies();
 $('history-new-chat').onclick=()=>{if(chatBusy)return toast('请等待当前模型回复完成');persistConversation();$('goal').value='';showTab('overview');$('goal').focus();};
 window.addEventListener('pagehide',persistConversation);
+function showMainnetReceipt(run){const r=run.receipt,root=$('decision');$('run-panel').classList.remove('hidden');const head=$('run-panel').querySelector('.activity-head');head.querySelector('h3').textContent='主网交易回执';head.querySelector('p').textContent='实际订单号与交易所返回结果';head.querySelector('.status-pill').textContent='Hyperliquid Mainnet';$('flowchart').replaceChildren();$('order-followup').replaceChildren();root.replaceChildren(node('h3','','主网 ETH 现货订单'),node('p','',r.message),node('p','note','账户 '+r.address),node('p','note','客户订单号 '+r.cloid),node('p','note','预算 '+r.budget+' USDC · 限价 '+r.p+' · 数量 '+r.s+' UETH'),node('p','note','订单号 '+(r.oid||'待核对')));const b=node('button','ghost','打开站内交易与核对');b.onclick=()=>{showTab('create');showChatTradePlan(r.budget);};root.append(b);$('run-panel').scrollIntoView({block:'start'});}
 async function reviewTestnet(run, quote, output) {
   if (!run.modelId) throw Error("旧策略未记录模型 ID，请用工作台重新保存后再评审");
   const headers = {"content-type":"application/json"};
@@ -886,6 +879,7 @@ $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
   $("chat-trade-plan").replaceChildren();
   try { appendUserMessage(value); } catch (error) { toast(error.message); return; }
+  const guide=conversationGuide(state.conversation);if(guide.stage==='funds')showChatTradePlan(guide.budget);
   state.goal = (state.goal + "；补充要求：" + value).slice(-2000); $("chat-input").value = "";
   makeDraftSummary();
   sendToRealModel();

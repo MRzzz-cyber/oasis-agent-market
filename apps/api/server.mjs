@@ -1,3 +1,4 @@
+import {mainnetQuote} from '../frontend/mainnet-quote.js';
 import {overview} from "../frontend/market-overview.js";
 import {testnetBook} from "../frontend/testnet-quotes.js";
 import { snapshot, marketCatalog } from "../frontend/candles.js";
@@ -20,6 +21,8 @@ const routes = new Map([
   ["/privy-setup.js", ["privy-setup.js", "text/javascript; charset=utf-8"]],
   ["/privy-keygen.js", ["privy-keygen.js", "text/javascript; charset=utf-8"]],
   ["/privy-setup.css", ["privy-setup.css", "text/css; charset=utf-8"]],
+  ["/mainnet-order-core.js", ["mainnet-order-core.js", "text/javascript; charset=utf-8"]],
+  ["/mainnet-trade.js", ["mainnet-trade.js", "text/javascript; charset=utf-8"]],
   ["/mainnet-wallet.js", ["mainnet-wallet.js", "text/javascript; charset=utf-8"]],
   ["/account-avatar.js", ["account-avatar.js", "text/javascript; charset=utf-8"]],
   ["/privy-wallet.js", ["privy-wallet.js", "text/javascript; charset=utf-8"]],
@@ -57,14 +60,15 @@ export function createAppServer() {
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://127.0.0.1");
+      if(url.pathname === "/api/mainnet/quote"){const r=await mainnetQuote(new Request(url,{method:req.method}));res.writeHead(r.status,Object.fromEntries(r.headers));res.end(await r.text());return;}
       if(req.method === "GET" && url.pathname === "/api/market/overview"){const result=await overview();res.writeHead(result.status,Object.fromEntries(result.headers));res.end(await result.text());return;}
       if (req.method === "GET" && ["/api/market/candles","/api/market/catalog","/api/testnet/book"].includes(url.pathname)) {
         const result = url.pathname === "/api/testnet/book" ? await testnetBook(new Request(url)) : url.pathname.endsWith("/catalog") ? await marketCatalog() : await snapshot(new Request(url));
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
-      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"mainnet-guide-v14-20261116",defaultTestBudget:"20"});return;}
-      if(req.method === "GET" && url.pathname === "/api/wallet/config"){send(res,200,{enabled:false,appId:null,mode:"user-controlled",network:"hyperliquid-mainnet",executionEnabled:false});return;}
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"native-mainnet-v15-20261116",defaultTestBudget:"20"});return;}
+      if(req.method === "GET" && url.pathname === "/api/wallet/config"){send(res,200,{enabled:false,appId:null,mode:"user-controlled",network:"hyperliquid-mainnet",executionEnabled:true,transfersEnabled:false});return;}
       if(req.method === "GET" && /^\/vendor\/privy\/[a-zA-Z0-9_.-]+\.(js|css)$/.test(url.pathname)){const body=await readFile(path.join(webDir,url.pathname));res.writeHead(200,{"content-type":url.pathname.endsWith(".css")?"text/css":"text/javascript","cache-control":"no-store"});res.end(body);return;}
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "GET" && url.pathname === "/api/status") {
