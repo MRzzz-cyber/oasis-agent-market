@@ -72,8 +72,8 @@ test('release endpoint is public and mutable assets cannot retain stale trade co
   const {default:worker}=await import('./worker.js');
   const release=await worker.fetch(new Request('https://oasis.test/api/release'),{});
   assert.equal(release.status,200);assert.equal(release.headers.get('cache-control'),'no-store');
-  const info=await release.json();assert.equal(info.version,'wallet-simple-v11-20261116');assert.equal(info.defaultTestBudget,'20');
-  const asset=await worker.fetch(new Request('https://oasis.test/app.js?v=wallet-simple-v11-20261116'),{ASSETS:{fetch:async()=>new Response('app source',{headers:{'cache-control':'public,max-age=3600'}})}});
+  const info=await release.json();assert.equal(info.version,'records-v12-20261116');assert.equal(info.defaultTestBudget,'20');
+  const asset=await worker.fetch(new Request('https://oasis.test/app.js?v=records-v12-20261116'),{ASSETS:{fetch:async()=>new Response('app source',{headers:{'cache-control':'public,max-age=3600'}})}});
   assert.equal(asset.headers.get('cache-control'),'no-store');assert.equal(asset.headers.get('x-oasis-release'),info.version);
   assert.equal(await asset.text(),'app source');
 });

@@ -165,7 +165,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"wallet-simple-v11-20261116",defaultTestBudget:"20"});
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"records-v12-20261116",defaultTestBudget:"20"});
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if(url.pathname === "/api/market/overview" && request.method === "GET")return overview();
     if (url.pathname === "/api/market/catalog" && request.method === "GET") return marketCatalog();
@@ -174,7 +174,7 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) {
       const asset=await env.ASSETS.fetch(request);
-      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","wallet-simple-v11-20261116");
+      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","records-v12-20261116");
       if(url.pathname.startsWith("/privy-setup")){headers.set("referrer-policy","no-referrer");headers.set("x-frame-options","DENY");headers.set("content-security-policy","default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");}
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }
