@@ -70,6 +70,33 @@ async function funds(address) {
   return usdc?clean(decimal(atoms(usdc.total)-atoms(usdc.hold))):"0";
 }
 const element=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
+// Keep the provider chosen by the user for account access and signing.
+const announcedWallets=new Map();
+if(typeof window!=="undefined") {
+  window.addEventListener("eip6963:announceProvider",event=>{
+    const entry=event.detail;
+    if(entry?.provider && typeof entry.provider.request==="function" && typeof entry.info?.uuid==="string") {
+      announcedWallets.set(entry.info.uuid,{name:String(entry.info.name || "浏览器钱包").slice(0,80),provider:entry.provider});
+    }
+  });
+}
+export function walletChoices(announced,ethereum) {
+  const choices=[...announced];
+  const legacy=Array.isArray(ethereum?.providers)?ethereum.providers:[ethereum];
+  for(const provider of legacy) {
+    if(typeof provider?.request!=="function" || choices.some(choice=>choice.provider===provider))continue;
+    const name=provider.isRabby?"Rabby":provider.isOkxWallet || provider.isOKExWallet?"OKX Wallet":provider.isMetaMask?"MetaMask":"浏览器钱包";
+    choices.push({name,provider});
+  }
+  return choices;
+}
+export function walletError(error) {
+  if(error?.code===4001)return "你取消了钱包请求。请重新选择钱包后连接。";
+  if(error?.code===-32002)return "钱包已有待处理请求，请点击浏览器右上角对应钱包扩展，完成或取消请求后再试。";
+  if(error?.code===4100)return "钱包尚未授权 Oasis，请在所选钱包中允许此网站连接。";
+  if(error?.code===4900 || error?.code===4901)return "钱包连接已断开，请解锁所选钱包后重新连接。";
+  return error?.message || "操作失败，请检查钱包扩展中的提示。";
+}
 export function testnetPanel(run,review) {
   const root=document.createElement("section");
   root.className="ten-trade";
@@ -118,7 +145,7 @@ export function testnetPanel(run,review) {
   root.append(note,form,result);
   function button(text,handler) {
     const b=element("button",text);b.type="button";b.className="ghost";
-    b.onclick=async()=>{b.disabled=true;try{await handler();}catch(e){result.textContent=e?.message||"操作失败";detail.textContent=result.textContent;}finally{b.disabled=false;}};
+    b.onclick=async()=>{b.disabled=true;const label=b.textContent;b.textContent="处理中…";result.textContent="正在处理，请留意所选钱包扩展的连接或签名请求。";try{await handler();}catch(e){result.textContent=walletError(e);detail.textContent=result.textContent;}finally{b.disabled=false;b.textContent=label;}};
     form.append(b);return b;
   }
   function showRecord(rec) {
@@ -168,23 +195,65 @@ export function testnetPanel(run,review) {
     });
     details.append(assess,output);
   }
+  const walletBox=element("div","");walletBox.className="wallet-connection";
+  const walletLabel=element("label","选择交易钱包");
+  const walletSelect=element("select","");walletSelect.setAttribute("aria-label","选择交易钱包");
+  walletLabel.append(walletSelect);walletBox.append(walletLabel);
+  const walletStatus=element("p","连接仅用于读取账户；预览订单后才会请求交易签名。");
+  walletStatus.setAttribute("role","status");walletBox.append(walletStatus);
+  root.insertBefore(walletBox,form);
+  let choices=[];
+  function updateWallets() {
+    if(!root.isConnected)return;
+    const selected=walletSelect.value===""?null:choices[Number(walletSelect.value)]?.provider;
+    choices=walletChoices(announcedWallets.values(),window.ethereum);
+    walletSelect.replaceChildren();
+    const placeholder=element("option",choices.length?"请选择钱包":"未检测到钱包，请解锁扩展后重新检测");placeholder.value="";
+    walletSelect.append(placeholder);
+    choices.forEach((choice,index)=>{const option=element("option",choice.name);option.value=String(index);walletSelect.append(option);});
+    const index=choices.findIndex(choice=>choice.provider===selected);
+    walletSelect.value=index>=0?String(index):choices.length===1?"0":"";
+  }
+  function discoverWallets() {
+    window.dispatchEvent(new Event("eip6963:requestProvider"));
+    updateWallets();
+    setTimeout(updateWallets,200);
+  }
+  button("重新检测钱包",async()=>{discoverWallets();walletStatus.textContent="请选择与领取测试币相同的钱包和账户。";});
+  setTimeout(discoverWallets,0);
   button("连接钱包，预览 10U 测试单",async()=>{
-    const wallet=window.ethereum;
-    if(!wallet)throw Error("请用已安装 EVM 钱包的浏览器打开");
-    const [address]=await wallet.request({method:"eth_requestAccounts"});
+    const selected=walletSelect.value;
+    const choice=selected===""?null:choices[Number(selected)];
+    if(!choice)throw Error("请先选择钱包；未显示时请解锁扩展并点击重新检测钱包。");
+    const wallet=choice.provider;
+    walletStatus.textContent="正在请求 "+choice.name+" 连接，请打开该钱包扩展查看待处理请求。";
+    const accounts=await wallet.request({method:"eth_requestAccounts"});
+    const address=accounts?.[0];
+    if(!/^0x[0-9a-f]{40}$/i.test(address || ""))throw Error("未获得有效钱包地址，请解锁钱包并允许网站连接。");
+    if(!root.isConnected)return;
+    walletStatus.textContent="已连接 "+choice.name+" · "+address;
+    note.textContent="当前读取 Hyperliquid 测试网现货账户。钱包已授权时可能直接返回地址；订单预览后再请求签名。";
     advance(1,"钱包已连接："+address+"。正在检查测试网现货余额和盘口。余额不足时，请先在 Hyperliquid 测试网准备测试资金，再重新预览。");
     const market=spotMarket(await post("/info",{type:"spotMeta"}));
     const [free,book]=await Promise.all([funds(address),post("/info",{type:"l2Book",coin:market.coin})]);
     const ask=book.levels[1][0]?.px;
     if(!ask)throw Error("暂无卖单，可稍后重新预览");
+    walletStatus.textContent="已连接 "+choice.name+" · "+address+" · 现货可用 "+free+" 测试 USDC";
+    if(atoms(free)<10n*unit) {
+      const perp=await post("/info",{type:"clearinghouseState",user:address}).catch(()=>null);
+      const withdrawable=perp?.withdrawable;
+      const extra=withdrawable?" 合约账户可划转余额 "+withdrawable+" 测试 USDC。":"";
+      throw Error("当前地址 "+address+" 的测试网现货可用余额为 "+free+" USDC。"+extra+"请核对领取地址；若资金在 Perps，请在官方测试网划转到 Spot，再重新预览。");
+    }
     const quotedAt=Date.now();
     const order=tenOrder(ask,free,market.decimals);
     if(!root.isConnected)return;
     form.replaceChildren();
+    walletSelect.disabled=true;
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
     result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
     advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。报价有效期 30 秒。");
-      button("重新报价",()=>root.replaceWith(testnetPanel(run,review)));
+      button("更换钱包或重新报价",()=>root.replaceWith(testnetPanel(run,review)));
       button("确认 10U，去钱包签名",async()=>{
         if(!root.isConnected)return;
         if(localStorage.getItem(key)){showRecord(JSON.parse(localStorage.getItem(key)));return;}

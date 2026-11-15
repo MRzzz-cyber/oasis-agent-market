@@ -31,3 +31,25 @@ test("10U preview produces an exact, valid notional at the observed 950 ask",asy
   }
   assert.throws(()=>tenOrder("950","9.99",4),/余额不足/);
 });
+
+
+test("wallet selection preserves EIP-6963 providers and deduplicates legacy injection",async()=>{
+  const {walletChoices}=await import("./testnet.js");
+  const rabby={isRabby:true,request:async()=>[]};
+  const metamask={isMetaMask:true,request:async()=>[]};
+  const choices=walletChoices([{name:"Rabby",provider:rabby}],{providers:[metamask,rabby]});
+  assert.equal(choices.length,2);
+  assert.equal(choices[0].provider,rabby);
+  assert.equal(choices[1].provider,metamask);
+  assert.equal(choices[1].name,"MetaMask");
+  assert.deepEqual(walletChoices([],undefined),[]);
+});
+
+test("wallet refusal, pending request and authorization failures give actionable errors",async()=>{
+  const {walletError}=await import("./testnet.js");
+  assert.match(walletError({code:-32002}),/待处理请求/);
+  assert.match(walletError({code:4001}),/取消/);
+  assert.match(walletError({code:4100}),/尚未授权/);
+  assert.match(walletError({code:4900}),/断开/);
+  assert.equal(walletError({message:"测试网请求失败"}),"测试网请求失败");
+});
