@@ -145,7 +145,7 @@ export function walletChoices(announced,ethereum) {
 export function availableWallets() {
   window.dispatchEvent(new Event("eip6963:requestProvider"));
   const embedded=accountWallet();
-  return [...(embedded?[embedded]:[]),...walletChoices(announcedWallets.values(),window.ethereum)];
+  return [...(embedded?[embedded]:[]),...walletChoices(announcedWallets.values(),{providers:[...(Array.isArray(window.ethereum?.providers)?window.ethereum.providers:[window.ethereum]),window.okxwallet].filter(Boolean)})];
 }
 export function walletError(error) {
   if(/chainid.*(?:same|match)/i.test(error?.message || ""))return "钱包拒绝了 Hyperliquid 订单签名域。请使用测试网交易助手授权，再单独确认订单。";
@@ -311,7 +311,7 @@ export function testnetPanel(run,review) {
   let connecting=false;
   function updateWallets() {
     if(!root.isConnected || connecting)return;
-    const choices=walletChoices(announcedWallets.values(),window.ethereum);
+    const choices=walletChoices(announcedWallets.values(),{providers:[...(Array.isArray(window.ethereum?.providers)?window.ethereum.providers:[window.ethereum]),window.okxwallet].filter(Boolean)});
     walletList.replaceChildren();
     if(!choices.length) {
       const empty=element("div","");empty.className="wallet-empty";
@@ -420,7 +420,7 @@ export function testnetPanel(run,review) {
           if(!root.isConnected)return;
           await checkAccount();
           if(!signer) {
-            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=mainnet-wallet-v10-20261116");
+            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=wallet-simple-v11-20261116");
             signer=createTestnetSigner(budget);session.signer=signer;
           }
           // Reconcile an uncertain earlier request before sending another approval.
