@@ -20,17 +20,21 @@ test("typed signature binds testnet, IOC, spot pair, cloid, nonce and expiry",()
   assert.equal(packet.typed.message.connectionId,"0xb31c71c656a73c7dccabef85d44a285375b98ce93c186e96df5b2070f3805a6f");
 });
 
-test("10U preview produces an exact, valid notional at the observed 950 ask",async()=>{
-  const {tenOrder}=await import("./testnet.js");
-  const order=tenOrder("950","10",4);
-  assert.deepEqual(order,{p:"1000",s:"0.01",cost:"10"});
-  for(const ask of ["950.12","3033.5","55","2020.9"]) {
-    const q=tenOrder(ask,"10",4);
-    assert.equal(q.cost,"10");
-    assert.ok(Number(q.p)<=Number(ask)*1.1);
-  }
-  assert.throws(()=>tenOrder("950","9.99",4),/余额不足/);
+test("10U preview preserves the actual ask and blocks rounding or reference-price shortfalls",async()=>{
+  const {tenOrder,checkTenMinimum}=await import("./testnet.js");
+  assert.deepEqual(tenOrder("1000","10",4,"1000"),{p:"1000",s:"0.01",cost:"10"});
+  for(const ask of ["500","1250","2000"])assert.equal(tenOrder(ask,"999",4,ask).p,ask);
+  assert.throws(()=>tenOrder("950","999",4,"950"),/至少需要 10.07/);
+  assert.throws(()=>tenOrder("1000","999",4,"950"),/10 USDC|10 测试 USDC/);
+  assert.throws(()=>tenOrder("950","9.99",4,"950"),/余额不足/);
+  assert.throws(()=>tenOrder("1000","999",4,undefined),/格式无效/);
+  assert.throws(()=>tenOrder("0","999",4,"1"),/价格无效/);
+  assert.throws(()=>tenOrder("1000","999",9,"1000"),/精度/);
+  assert.throws(()=>checkTenMinimum({p:"1000",s:"0.01"},"950","950"),/不足最低 10/);
+  assert.throws(()=>checkTenMinimum({p:"1000",s:"0.01"},"1001","1000"),/高于预览限价/);
+  assert.throws(()=>checkTenMinimum({p:"1000",s:"0.011"},"1000","1000"),/超过 10/);
 });
+
 
 
 test("wallet selection preserves EIP-6963 providers and deduplicates legacy injection",async()=>{
@@ -101,7 +105,7 @@ test('agent verification accepts explicit no-expiry entries and rejects expired,
 
 test('quote check distinguishes stale, missing, mismatched and clock-skewed data',async()=>{
   const {checkBook}=await import('./testnet.js');const now=Date.now();
-  const book={coin:'@1137',time:now-100,checkedAt:now,levels:[[{px:'46'}],[{px:'950'}]]};
+  const book={coin:'@1137',markPx:'950',time:now-100,checkedAt:now,levels:[[{px:'46'}],[{px:'950'}]]};
   assert.equal(checkBook(book,'@1137'),'950');
   assert.throws(()=>checkBook({...book,time:now-45000},'@1137'),/过期 45 秒/);
   assert.throws(()=>checkBook({...book,levels:[[],[]]},'@1137'),/暂无卖单/);
