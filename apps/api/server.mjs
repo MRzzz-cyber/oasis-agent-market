@@ -43,6 +43,7 @@ export function createAppServer() {
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"trade-v3-20261115",defaultTestBudget:"20"});return;}
       const parts = url.pathname.split("/").filter(Boolean);
       if (req.method === "GET" && url.pathname === "/api/status") {
         send(res, 200, { ok: true, app: "Oasis", network: "Base Sepolia", mode: "simulation", realPaymentsEnabled: false, services: SAMPLE_SERVICES });
