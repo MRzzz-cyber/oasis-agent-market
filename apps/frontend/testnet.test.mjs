@@ -58,6 +58,8 @@ test('agent approval uses current wallet chain but is bound to Hyperliquid Testn
   const {approvalEnvelope}=await import('./testnet.js');
   const packet=approvalEnvelope('0x'+'12'.repeat(20),'0x1',1794486000000);
   assert.equal(packet.typed.domain.chainId,1);
+  assert.ok(packet.action.agentName.length<=16);
+  assert.equal(packet.action.agentName,'OasisTest');
   assert.equal(packet.action.signatureChainId,'0x1');
   assert.equal(packet.action.hyperliquidChain,'Testnet');
   assert.equal(packet.typed.primaryType,'HyperliquidTransaction:ApproveAgent');
@@ -78,4 +80,16 @@ test('local test signer produces a recoverable canonical signature once, and rej
   await assert.rejects(()=>createTestnetSigner().signOrder(large),/10 USDC/);
   const tampered=structuredClone(packet);tampered.action.orders[0].a=10001;
   await assert.rejects(()=>createTestnetSigner().signOrder(tampered),/无效/);
+});
+
+
+test('agent verification accepts explicit no-expiry entries and rejects expired, missing or unrelated agents',async()=>{
+  const {isActiveAgent}=await import('./testnet.js');
+  const address='0x'+'12'.repeat(20),now=1000;
+  assert.equal(isActiveAgent([{address,validUntil:null}],address,now),true);
+  assert.equal(isActiveAgent([{address,validUntil:1001}],address,now),true);
+  assert.equal(isActiveAgent([{address,validUntil:1000}],address,now),false);
+  assert.equal(isActiveAgent([{address}],address,now),false);
+  assert.equal(isActiveAgent([{address:'0x'+'34'.repeat(20),validUntil:null}],address,now),false);
+  assert.equal(isActiveAgent([],address,now),false);
 });
