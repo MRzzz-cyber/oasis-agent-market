@@ -116,7 +116,7 @@ async function browserDemoRequest(path, options = {}) {
   // Conversation plans are local records, not saved recurring strategies or spend requests.
   if (method === "POST" && path === "/api/trade-plans") {
     const body=JSON.parse(options.body || "{}");
-    if(body.asset!=="ETH" || !["10","10.10"].includes(body.amount) || body.network!=="hyperliquid-testnet")demoError("此入口仅支持确认的 10 或 10.10 测试 USDC 上限买入 ETH");
+    if(body.asset!=="ETH" || (!/^\d{1,4}(?:\.\d{1,2})?$/.test(String(body.amount)) || Number(body.amount)<10 || Number(body.amount)>1000) || body.network!=="hyperliquid-testnet")demoError("此入口支持 ETH 测试网买入，金额需为 10–1000 测试 USDC");
     if(typeof body.goal!=="string" || body.goal.trim().length<4 || body.goal.length>2000)demoError("请补充交易目标");
     if(body.mode==="simulation" && body.amount!=="10")demoError("本地模拟入口固定为 10 USDC");
     const run={id:crypto.randomUUID(),strategyId:null,source:"conversation",asset:"ETH",testBudget:body.amount,
@@ -452,7 +452,7 @@ function renderChatChoices() {
   const choices=[
     ["继续了解行情",()=>{ $("chat-input").value="请说明当前判断的依据、风险和还缺少的数据，不生成交易指令。";$("chat-form").requestSubmit(); }],
     ["模拟买入 ETH · 10 USDC",()=>startChatSimulation()],
-    ["测试网买入 ETH · 上限 10.10 USDC",()=>showChatTradePlan()]
+    ["测试网买入 ETH",()=>showChatTradePlan()]
   ];
   for(const [label,handler] of choices){const b=node("button","ghost",label);b.type="button";b.onclick=()=>{if(chatBusy)return toast("请等待当前回复完成");handler();};actions.append(b);}
 }
@@ -463,7 +463,7 @@ async function startChatSimulation() {
     const run=await request("/api/trade-plans",{method:"POST",body:JSON.stringify({asset:"ETH",amount:"10",network:"hyperliquid-testnet",mode:"simulation",goal:state.goal,model:state.modelName,modelId:state.model})});
     state.run=run;
     const card=node("section","conversation-plan");
-    card.append(node("span","status-pill","本地模拟 · 不连接钱包"),node("h3","模拟买入 ETH · 10 USDC"),node("p","note","使用预置回撤 1% 的演示样本，没有实时市场判断、模型投票或真实付款。"));
+    card.append(node("span","status-pill","本地模拟 · 不连接钱包"),node("h3","","模拟买入 ETH · 10 USDC"),node("p","note","使用预置回撤 1% 的演示样本，没有实时市场判断、模型投票或真实付款。"));
     const approve=node("button","primary","确认创建本地模拟订单");approve.type="button";
     const output=node("p","note");output.setAttribute("role","status");
     approve.onclick=async()=>{approve.disabled=true;try{state.run=await request("/api/runs/"+run.id+"/approve",{method:"POST",body:"{}"});output.textContent="已创建 10 USDC 的 ETH 本地模拟订单，没有提交交易所。";}catch(e){output.textContent=e.message;approve.disabled=false;}};
@@ -476,20 +476,22 @@ function showChatTradePlan() {
   if(host.querySelector(".ten-trade")){host.scrollIntoView({behavior:"smooth",block:"start"});return;}
   host.replaceChildren();
   const card=node("section","conversation-plan");
-  card.append(node("span","status-pill","待你确认 · 仅测试网"),node("h3","用最多 10.10 测试 USDC 买入 ETH"),node("p","note","这是你选择的一次手动测试，不代表 AI 已判断满足原策略条件。"));
+  card.append(node("span","status-pill","待你确认 · 仅测试网"),node("h3","","准备一笔 ETH 测试交易"),node("p","note","这是你选择的一次手动测试，不代表 AI 已判断满足原策略条件。"));
   const list=node("dl","conversation-plan-terms");
-  for(const [label,value] of [["交易网络","Hyperliquid Testnet"],["标的 / 方向","ETH（UETH）/ 买入"],["金额上限","10.10 测试 USDC · 费用另计"],["执行方式","限价买入 · 未成交部分撤销"]])list.append(node("dt","",label),node("dd","",value));
+  for(const [label,value] of [["交易网络","Hyperliquid Testnet"],["标的 / 方向","ETH（UETH）/ 买入"],["金额上限","由下方填写 · 费用另计"],["执行方式","限价买入 · 未成交部分撤销"]])list.append(node("dt","",label),node("dd","",value));
+  const amountLabel=node("label","plan-amount","测试金额上限（测试 USDC）");
+  const amountInput=node("input","");amountInput.type="number";amountInput.min="10";amountInput.max="1000";amountInput.step="0.01";amountInput.value="20";amountInput.setAttribute("aria-label","交易计划测试金额");amountLabel.append(amountInput);card.append(amountLabel);
   const controls=node("div","action-row");
-  const change=node("button","ghost","修改计划");change.type="button";change.onclick=()=>{$("chat-input").value="我想调整这次测试交易：";$("chat-input").focus();toast("当前执行入口固定为 ETH / 上限 10.10 测试 USDC，其他金额可先讨论并保存为策略。");};
+  const change=node("button","ghost","修改计划");change.type="button";change.onclick=()=>{amountInput.focus();};
   const connect=node("button","primary","确认计划，连接钱包并预览");connect.type="button";
   const error=node("p","note");error.setAttribute("role","status");
   connect.onclick=async()=>{
     if(chatBusy)return toast("请等待当前回复完成");
     connect.disabled=true;
     try {
-      const run=await request("/api/trade-plans",{method:"POST",body:JSON.stringify({asset:"ETH",amount:"10.10",network:"hyperliquid-testnet",goal:state.goal,model:state.modelName,modelId:state.model})});
+      const run=await request("/api/trade-plans",{method:"POST",body:JSON.stringify({asset:"ETH",amount:amountInput.value.trim(),network:"hyperliquid-testnet",goal:state.goal,model:state.modelName,modelId:state.model})});
       state.run=run;
-      addChat("user","我确认本次计划：在 Hyperliquid 测试网手动买入 ETH，金额上限 10.10 测试 USDC，费用另计。先预览，提交前由我单独确认。");
+      addChat("user","我确认本次计划：在 Hyperliquid 测试网手动买入 ETH，金额上限 "+run.testBudget+" 测试 USDC，费用另计。先预览，提交前由我单独确认。");
       const panel=testnetPanel(run,reviewTestnet);host.replaceChildren(panel);
       panel.querySelector(".wallet-connection button")?.click();
       panel.scrollIntoView({behavior:"smooth",block:"start"});
@@ -529,7 +531,7 @@ async function refreshStrategies() {
       details.append(node("summary", "", "原始目标"), node("p", "", item.goal));
       info.appendChild(details);
     }
-    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "准备 10U 测试交易" : "运行模拟策略") : "补全旧策略");
+    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "准备测试交易" : "运行模拟策略") : "补全旧策略");
     btn.addEventListener("click", async () => {
       if (!item.terms) {
         if (chatBusy) { toast("请等待模型回复完成"); return; }

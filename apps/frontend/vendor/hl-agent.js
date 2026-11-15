@@ -5084,8 +5084,9 @@ function tt(t2) {
 
 // scripts/vendor-hl-agent.mjs
 function createTestnetSigner(budget = "10") {
-  if (!["10", "10.10"].includes(budget)) throw Error("\u65E0\u6548\u6D4B\u8BD5\u9884\u7B97");
-  const cap = budget === "10.10" ? 101000000000000000n : 100000000000000000n;
+  if (!/^\d{1,4}(?:\.\d{1,2})?$/.test(String(budget)) || Number(budget) < 10 || Number(budget) > 1e3) throw Error("\u6D4B\u8BD5\u91D1\u989D\u9700\u5728 10\u20131000 USDC \u4E4B\u95F4");
+  const [whole, part = ""] = String(budget).split(".");
+  const cap = (BigInt(whole) * 100000000n + BigInt(part.padEnd(8, "0"))) * 100000000n;
   const account = privateKeyToAccount(generatePrivateKey());
   let used = false;
   return {
@@ -5095,8 +5096,8 @@ function createTestnetSigner(budget = "10") {
       if (used || packet.action?.type !== "order" || packet.action.orders.length !== 1 || packet.action.grouping !== "na" || !order?.b || order.r || order.a < 1e4 || order.t?.limit?.tif !== "Ioc" || packet.expiresAfter <= Date.now() || packet.typed?.domain?.chainId !== 1337 || packet.typed.message?.source !== "b" || packet.typed.message.connectionId !== et(packet)) throw Error("\u6D4B\u8BD5\u7B7E\u540D\u8BF7\u6C42\u65E0\u6548\u6216\u5DF2\u4F7F\u7528");
       const atomic = (value) => {
         if (!/^\d{1,14}(\.\d{1,8})?$/.test(value)) throw Error("\u6D4B\u8BD5\u91D1\u989D\u683C\u5F0F\u65E0\u6548");
-        const [whole, part = ""] = value.split(".");
-        return BigInt(whole) * 100000000n + BigInt(part.padEnd(8, "0"));
+        const [whole2, part2 = ""] = value.split(".");
+        return BigInt(whole2) * 100000000n + BigInt(part2.padEnd(8, "0"));
       };
       const notional = atomic(order.p) * atomic(order.s);
       if (notional < 100000000000000000n || notional > cap) throw Error("\u6D4B\u8BD5\u8BA2\u5355\u5FC5\u987B\u81F3\u5C11 10 USDC \u4E14\u4E0D\u8D85\u8FC7\u786E\u8BA4\u7684 " + budget + " USDC \u4E0A\u9650");

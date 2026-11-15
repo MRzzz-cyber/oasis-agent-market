@@ -4,8 +4,9 @@ import {generatePrivateKey, privateKeyToAccount} from 'viem/accounts';
 import {createL1ActionHash} from '../apps/frontend/vendor/hl-hash.js';
 
 export function createTestnetSigner(budget="10") {
-  if(!["10","10.10"].includes(budget))throw Error("无效测试预算");
-  const cap=budget==="10.10"?101000000000000000n:100000000000000000n;
+  if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(String(budget)) || Number(budget)<10 || Number(budget)>1000)throw Error("测试金额需在 10–1000 USDC 之间");
+  const [whole,part=""]=String(budget).split(".");
+  const cap=(BigInt(whole)*100000000n+BigInt(part.padEnd(8,"0")))*100000000n;
   const account=privateKeyToAccount(generatePrivateKey());
   let used=false;
   return {

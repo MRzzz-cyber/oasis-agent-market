@@ -123,7 +123,7 @@ test('explicit 10.10 cap permits a 10.07 order at the real 950 ask without chang
   assert.throws(()=>checkTenMinimum(order,'950','950'),/超过 10/);
   checkTenMinimum(order,'950','950','10.10');
   assert.throws(()=>checkTenMinimum(order,'950','940','10.10'),/不足最低/);
-  assert.throws(()=>tenOrder('950','999',4,'950','100'),/无效测试预算/);
+  assert.throws(()=>tenOrder('950','999',4,'950','1001'),/测试金额需/);
 });
 
 test('signer binds the explicit cap and rejects larger notional or an implicit budget increase',async()=>{
@@ -137,5 +137,18 @@ test('signer binds the explicit cap and rejects larger notional or an implicit b
   await assert.rejects(()=>signer.signOrder(packet),/已使用/);
   const tooLarge=envelope(11137,{p:'950',s:'0.0107'},'0x'+'12'.repeat(16),Date.now());
   await assert.rejects(()=>createTestnetSigner('10.10').signOrder(tooLarge),/上限/);
-  assert.throws(()=>createTestnetSigner('100'),/无效测试预算/);
+  assert.throws(()=>createTestnetSigner('1001'),/测试金额需/);
+});
+
+
+test('custom 20 USDC test order uses real ask and satisfies minimum notional',async()=>{
+  const {tenOrder,checkTenMinimum}=await import('./testnet.js');
+  assert.deepEqual(tenOrder('950','999',4,'950','20'),{p:'950',s:'0.021',cost:'19.95'});
+  const order=tenOrder('950','999',4,'950','35');
+  assert.ok(Number(order.cost)<=35);checkTenMinimum(order,'950','950','35');
+  assert.throws(()=>tenOrder('950','19',4,'950','20'),/余额不足/);
+  const {createTestnetSigner}=await import('./vendor/hl-agent.js');
+  const packet=envelope(11137,{p:'950',s:'0.021'},'0x'+'12'.repeat(16),Date.now());
+  await createTestnetSigner('20').signOrder(packet);
+  await assert.rejects(()=>createTestnetSigner('10.10').signOrder(packet),/上限/);
 });
