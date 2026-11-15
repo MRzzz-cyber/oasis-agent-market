@@ -52,7 +52,7 @@
               <label>投资预算（可选）<input id="draft-capital" type="number" min="0.000001" step="any" placeholder="例如月度预算 500"/></label>
               <label>暂停回撤 %（可选）<input id="draft-stop" type="number" min="0.01" max="100" step="any" placeholder="例如 5"/></label>
             </div>
-            <p class="note">ETH 可进入 10 测试 USDC 手动交易流程，其他标的使用模拟样本。保存后展示下一步。</p>
+            <p class="note">ETH 可进入自定金额的测试网手动交易流程，其他标的使用模拟样本。保存后展示下一步。</p>
             <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 服务采购付款关闭 · ETH 支持用户签名测试网交易</small></details>
             <button class="primary" id="create-strategy">保存策略并查看执行流程</button>
           </div></details>

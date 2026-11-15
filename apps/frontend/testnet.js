@@ -48,7 +48,7 @@ export function sizeOrder(budget,price,balance,szDecimals) {
 }
 // Preserve the confirmed cap. Never inflate the limit to manufacture notional.
 export function tenOrder(ask, free, decimals, referencePrice, budget="10") {
-  if(!["10","10.10"].includes(budget))throw Error("无效测试预算");
+  if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(String(budget)) || atoms(budget)<10n*unit || atoms(budget)>1000n*unit)throw Error("测试金额需在 10–1000 USDC 之间，最多两位小数");
   if(!Number.isInteger(decimals) || decimals<0 || decimals>8)throw Error("无效市场数量精度");
   const price=atoms(ask),reference=atoms(referencePrice),cap=atoms(budget);
   if(price<=0n || reference<=0n)throw Error("测试网报价或参考价格无效");
@@ -60,12 +60,12 @@ export function tenOrder(ask, free, decimals, referencePrice, budget="10") {
   const minimumSize=minimumLots*step;
   const minimumCost=(minimumSize*price+unit-1n)/unit;
   if(minimumCost>cap)throw Error("当前盘口无法在 "+budget+" 测试 USDC 上限内下单：最低数量 "+clean(decimal(minimumSize))+" UETH，按卖一 "+ask+" 计算至少需要 "+clean(decimal(minimumCost))+" 测试 USDC（费用另计）。未请求签名，也未提交订单；请等待报价变化或明确调整测试预算。");
-  const order=sizeOrder(clean(decimal(minimumCost)),ask,free,decimals);
+  const order=sizeOrder(budget,ask,free,decimals);
   checkTenMinimum(order,ask,referencePrice,budget);
   return order;
 }
 export function checkTenMinimum(order,ask,referencePrice,budget="10") {
-  if(!["10","10.10"].includes(budget))throw Error("无效测试预算");
+  if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(String(budget)) || atoms(budget)<10n*unit || atoms(budget)>1000n*unit)throw Error("测试金额需在 10–1000 USDC 之间，最多两位小数");
   const price=atoms(ask),reference=atoms(referencePrice),size=atoms(order.s),limit=atoms(order.p);
   if(price<=0n || reference<=0n || limit*size>atoms(budget)*unit)throw Error("测试订单超过 "+budget+" USDC 上限或报价无效");
   if(price>limit)throw Error("当前卖价高于预览限价，请重新报价后确认。");
@@ -151,8 +151,9 @@ export function walletError(error) {
 export function testnetPanel(run,review) {
   const root=document.createElement("section");
   root.className="ten-trade";
-  const budget=run.testBudget || "10";
-  if(!["10","10.10"].includes(budget)){root.textContent="无效测试预算，请重新确认计划";return root;}
+  let budget=run.testBudget || "20";
+  try{budget=localStorage.getItem("oasis-hl-test-budget:"+run.id) || budget;}catch{}
+  if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(String(budget)) || Number(budget)<10 || Number(budget)>1000){root.textContent="测试金额需在 10–1000 USDC 之间，请重新确认计划";return root;}
   const progress=element("ol","");progress.className="execution-flow";
   progress.setAttribute("aria-label","测试交易执行流程");
   const detail=element("div","");detail.className="execution-detail";
@@ -238,9 +239,17 @@ export function testnetPanel(run,review) {
     }
     return root;
   }
-  if(atoms(run.terms.maxOrder)<atoms(budget)) {
-    result.textContent="这条策略的上限低于本次测试预算，无法使用此入口。"; return root;
-  }
+  const amountBox=element("div","");amountBox.className="test-amount";
+  const amountLabel=element("label","本次测试金额上限（测试 USDC，费用另计）");
+  const amountInput=element("input","");amountInput.type="number";amountInput.min="10";amountInput.max="1000";amountInput.step="0.01";amountInput.value=budget;amountInput.setAttribute("aria-label","本次测试金额上限");
+  amountLabel.append(amountInput);
+  const applyAmount=element("button","应用金额");applyAmount.type="button";applyAmount.className="ghost";
+  applyAmount.onclick=()=>{
+    const value=amountInput.value.trim();
+    if(!/^\d{1,4}(?:\.\d{1,2})?$/.test(value) || Number(value)<10 || Number(value)>1000){result.textContent="请输入 10–1000 测试 USDC，最多两位小数";return;}
+    try{localStorage.setItem("oasis-hl-test-budget:"+run.id,value);root.replaceWith(testnetPanel({...run,testBudget:value},review));}catch{result.textContent="无法保存本次测试金额，请检查浏览器存储权限";}
+  };
+  amountBox.append(amountLabel,applyAmount,element("small","本次是独立手动测试，金额以此处预览为准，不自动执行原策略。"));root.insertBefore(amountBox,result);
   const details=element("details","");details.append(element("summary","查看交易规则与模型评审"));
   details.append(element("p","Hyperliquid 测试网 UETH/USDC · 手动限价买入 · 未立即成交的部分撤销。原策略上限 "+run.terms.maxOrder+" "+run.terms.quoteAsset+"，本次独立指定上限 "+budget+" 测试 USDC。策略触发和暂停条件由你核对。"));
   root.append(details);
@@ -320,6 +329,7 @@ export function testnetPanel(run,review) {
   refresh.onclick=discoverWallets;
   walletTrigger.onclick=()=>{discoverWallets();dialog.showModal();};
   async function connectWallet(choice) {
+    if(amountInput.value.trim()!==budget)throw Error("金额已修改，请先点击应用金额，再连接钱包预览。");
     const wallet=choice.provider;
     walletStatus.textContent="正在请求 "+choice.name+" 连接，请打开该钱包扩展查看待处理请求。";
     const accounts=await wallet.request({method:"eth_requestAccounts"});
@@ -343,6 +353,7 @@ export function testnetPanel(run,review) {
     const order=tenOrder(ask,free,market.decimals,book.markPx,budget);
     if(!root.isConnected)return;
     form.replaceChildren();
+    amountInput.disabled=true;applyAmount.disabled=true;
     walletTrigger.onclick=()=>{const next=testnetPanel(run,review);root.replaceWith(next);next.querySelector(".wallet-connection button")?.click();};
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
     result.textContent="买入 "+order.s+" UETH · 预计成交额 "+order.cost+" 测试 USDC，预算上限 "+budget+"（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");

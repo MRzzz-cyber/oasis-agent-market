@@ -146,7 +146,7 @@ test('conversation testnet plan needs no saved strategy and preserves explicit 1
   assert.equal(run.source,'conversation');assert.equal(run.mode,'testnet');assert.equal(run.strategyId,null);
   assert.equal(run.terms.maxOrder,'10');assert.equal(run.terms.quoteAsset,'USDC');assert.equal(run.modelId,'vendor/model');
   assert.equal((await api('/api/strategies')).length,0);assert.equal((await api('/api/runs'))[0].id,run.id);
-  for(const invalid of [{amount:'100'},{asset:'BTC'},{network:'mainnet'},{mode:'mainnet'}])await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({asset:'ETH',amount:'10',network:'hyperliquid-testnet',goal:'测试交易计划',...invalid})}));
+  for(const invalid of [{amount:'1001'},{asset:'BTC'},{network:'mainnet'},{mode:'mainnet'}])await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({asset:'ETH',amount:'10',network:'hyperliquid-testnet',goal:'测试交易计划',...invalid})}));
 });
 test('conversation simulation stays local and needs explicit confirmation',async()=>{
   const {api}=await demoContext();
@@ -165,5 +165,15 @@ test('conversation plans persist the explicit 10.10 cap and do not upgrade exist
   assert.equal(run.testBudget,'10.10');assert.equal(run.terms.maxOrder,'10.10');
   const records=await api('/api/runs');assert.equal(records.find(r=>r.id===old.id).testBudget,'10');
   assert.equal((await api('/api/strategies')).length,0);
-  await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({...input,amount:'10.11'})}));
+  await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({...input,amount:'1001'})}));
+});
+
+
+test('conversation accepts custom test amounts without changing simulation or earlier runs',async()=>{
+  const {api}=await demoContext();
+  const input={asset:'ETH',amount:'20',network:'hyperliquid-testnet',goal:'测试一笔ETH买入'};
+  const run=await api('/api/trade-plans',{method:'POST',body:JSON.stringify(input)});
+  assert.equal(run.testBudget,'20');assert.equal(run.terms.maxOrder,'20');
+  await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({...input,amount:'9.99'})}));
+  await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({...input,mode:'simulation'})}));
 });
