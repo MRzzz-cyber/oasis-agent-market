@@ -98,3 +98,14 @@ test('agent verification accepts explicit no-expiry entries and rejects expired,
   assert.equal(isActiveAgent([{address:'0x'+'34'.repeat(20),validUntil:null}],address,now),false);
   assert.equal(isActiveAgent([],address,now),false);
 });
+
+test('quote check distinguishes stale, missing, mismatched and clock-skewed data',async()=>{
+  const {checkBook}=await import('./testnet.js');const now=Date.now();
+  const book={coin:'@1137',time:now-100,checkedAt:now,levels:[[{px:'46'}],[{px:'950'}]]};
+  assert.equal(checkBook(book,'@1137'),'950');
+  assert.throws(()=>checkBook({...book,time:now-45000},'@1137'),/过期 45 秒/);
+  assert.throws(()=>checkBook({...book,levels:[[],[]]},'@1137'),/暂无卖单/);
+  assert.throws(()=>checkBook({...book,coin:'@1'},'@1137'),/交易对不匹配/);
+  assert.throws(()=>checkBook({...book,checkedAt:undefined},'@1137'),/时间信息异常/);
+  assert.throws(()=>checkBook({...book,time:now-120000,checkedAt:now-120000},'@1137'),/同步系统时间/);
+});

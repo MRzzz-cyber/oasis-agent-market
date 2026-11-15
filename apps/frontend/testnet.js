@@ -4,9 +4,25 @@ const API="https://api.hyperliquid-testnet.xyz";
 const TOKEN="0xe4371d8166f362d6578725f11e0a14f3";
 const unit=100000000n;
 async function post(path,body) {
+  if(path==="/info" && body.type==="l2Book") {
+    const response=await fetch("/api/testnet/book?coin="+encodeURIComponent(body.coin),{cache:"no-store",signal:AbortSignal.timeout(18000)});
+    const book=await response.json();
+    if(!response.ok)throw Error(book.error || "测试网报价获取失败");
+    return book;
+  }
   const response=await fetch(API+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw Error("测试网请求失败（"+response.status+"）");
   return response.json();
+}
+export function checkBook(book,coin) {
+  if(book?.coin!==coin)throw Error("报价交易对不匹配，请重新预览");
+  if(!book.levels?.[1]?.[0]?.px)throw Error("测试网暂无卖单，当前无法买入；请稍后重新报价");
+  if(!Number.isFinite(book.time) || !Number.isFinite(book.checkedAt))throw Error("报价时间信息异常，请重新报价");
+  const age=book.checkedAt-book.time;
+  if(age>30000)throw Error("测试网盘口已过期 "+Math.floor(age/1000)+" 秒，请重新报价；持续过期时请稍后再试");
+  if(age < -5000)throw Error("交易所报价时间异常，请稍后重新报价");
+  if(Math.abs(Date.now()-book.checkedAt)>60000)throw Error("电脑时间与报价服务器相差超过 1 分钟，请先同步系统时间，再重新预览");
+  return book.levels[1][0].px;
 }
 function atoms(value) {
   if(!/^\d{1,14}(\.\d{1,8})?$/.test(String(value)))throw Error("金额或价格格式无效");
@@ -308,8 +324,7 @@ export function testnetPanel(run,review) {
     advance(1,"钱包已连接："+address+"。正在检查测试网现货余额和盘口。余额不足时，请先在 Hyperliquid 测试网准备测试资金，再重新预览。");
     const market=spotMarket(await post("/info",{type:"spotMeta"}));
     const [free,book]=await Promise.all([funds(address),post("/info",{type:"l2Book",coin:market.coin})]);
-    const ask=book.levels[1][0]?.px;
-    if(!ask)throw Error("暂无卖单，可稍后重新预览");
+    const ask=checkBook(book,market.coin);
     walletStatus.textContent=address.slice(0,6)+"…"+address.slice(-4)+" · 现货可用 "+free+" 测试 USDC";
     if(atoms(free)<10n*unit) {
       const perp=await post("/info",{type:"clearinghouseState",user:address}).catch(()=>null);
@@ -323,6 +338,7 @@ export function testnetPanel(run,review) {
     walletTrigger.onclick=()=>{const next=testnetPanel(run,review);root.replaceWith(next);next.querySelector(".wallet-connection button")?.click();};
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
     result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
+    result.textContent+=" 盘口买一 "+(book.levels[0]?.[0]?.px || "暂无")+"，卖一 "+ask+"；测试网报价不代表真实 ETH 行情。";
     advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。提交前重新核对最新盘口，保留本次限价和数量。");
       button("更换钱包或重新报价",()=>root.replaceWith(testnetPanel(run,review)));
       const sessionKey=run.id+":"+address.toLowerCase();
@@ -400,8 +416,8 @@ export function testnetPanel(run,review) {
         await checkAccount();
         if(!signer || !await reconcileApproval())throw Error("测试网助手尚未获得有效授权，请先完成授权或核对状态。");
         const book=await post("/info",{type:"l2Book",coin:market.coin});
-        if(!book.levels[1][0]?.px || !Number.isFinite(book.time) || Date.now()-book.time>30000)throw Error("最新盘口不可用，请重新报价");
-        if(atoms(book.levels[1][0].px)>atoms(order.p))throw Error("当前卖价高于预览限价，请重新报价后确认。");
+        const freshAsk=checkBook(book,market.coin);
+        if(atoms(freshAsk)>atoms(order.p))throw Error("当前卖价高于预览限价，请重新报价后确认。");
         sizeOrder(budget,order.p,await funds(address),market.decimals);
         const packet=envelope(market.asset,order,cloid,Date.now());
         const {action,nonce,expiresAfter}=packet;

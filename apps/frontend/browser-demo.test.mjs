@@ -139,3 +139,19 @@ test("existing USDT ETH strategy starts a testnet run with its saved model and n
   assert.equal(run.proposedOrder,undefined);
   assert.equal((await api("/api/runs/"+run.id)).id,run.id);
 });
+
+test('conversation testnet plan needs no saved strategy and preserves explicit 10 USDC terms',async()=>{
+  const {api}=await demoContext();
+  const run=await api('/api/trade-plans',{method:'POST',body:JSON.stringify({asset:'ETH',amount:'10',network:'hyperliquid-testnet',goal:'先用10测试USDC试买ETH',model:'Selected model',modelId:'vendor/model'})});
+  assert.equal(run.source,'conversation');assert.equal(run.mode,'testnet');assert.equal(run.strategyId,null);
+  assert.equal(run.terms.maxOrder,'10');assert.equal(run.terms.quoteAsset,'USDC');assert.equal(run.modelId,'vendor/model');
+  assert.equal((await api('/api/strategies')).length,0);assert.equal((await api('/api/runs'))[0].id,run.id);
+  for(const invalid of [{amount:'100'},{asset:'BTC'},{network:'mainnet'},{mode:'mainnet'}])await assert.rejects(()=>api('/api/trade-plans',{method:'POST',body:JSON.stringify({asset:'ETH',amount:'10',network:'hyperliquid-testnet',goal:'测试交易计划',...invalid})}));
+});
+test('conversation simulation stays local and needs explicit confirmation',async()=>{
+  const {api}=await demoContext();
+  const run=await api('/api/trade-plans',{method:'POST',body:JSON.stringify({asset:'ETH',amount:'10',network:'hyperliquid-testnet',mode:'simulation',goal:'模拟买入ETH测试流程'})});
+  assert.equal(run.source,'conversation');assert.equal(run.status,'awaiting_approval');assert.equal(run.order,undefined);
+  const order=await api('/api/runs/'+run.id+'/approve',{method:'POST',body:'{}'});
+  assert.equal(order.status,'simulated');assert.equal(order.order.simulated,true);assert.equal(order.order.amount,'10');
+});

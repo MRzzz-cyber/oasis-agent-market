@@ -176,3 +176,14 @@ dialog::backdrop{background:#19291e66}
 .wallet-empty{text-align:center;padding:24px 12px;border:1px dashed var(--line);border-radius:12px}.wallet-empty strong{font-size:14px}.wallet-empty p{font-size:12px}
 @media(max-width:600px){.ten-trade{padding:16px;border-radius:14px}.execution-flow{gap:4px}.execution-flow button{padding:10px 5px;gap:4px;border-radius:8px}.execution-flow strong{font-size:11px}.execution-flow small{font-size:10px}.execution-number{margin-bottom:2px}.wallet-connection{padding:14px;gap:10px;flex-wrap:wrap}.wallet-connection>div{flex-basis:calc(100% - 52px)}.wallet-connection button{width:100%}.trade-actions{align-items:stretch}.trade-actions button{flex-grow:1}.wallet-dialog{padding:22px}.ten-trade .trade-title{font-size:20px}}
 @media(prefers-reduced-motion:reduce){.wallet-option{transition:none}}
+
+/* Conversation first; full strategy editing is optional. */
+#page-create{grid-template-columns:minmax(0,1fr);max-width:920px;margin-left:auto;margin-right:auto}
+#draft-panel{width:100%;margin-top:24px;background:#f0f3ed;padding:18px 22px}
+#draft-panel>summary{font-size:14px;color:var(--green);font-weight:550}.draft-content{padding-top:20px}
+.chat-next-actions{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0 18px}.chat-next-actions>span{width:100%;margin-bottom:2px}.chat-next-actions button{font-size:12px;padding:8px 12px;background:white}
+.chat-next-actions button:last-child{color:var(--green);border-color:#a9c0b1;background:#f0f6ef}
+.chat-trade-plan:empty{display:none}.chat-trade-plan{margin-bottom:20px}.chat-trade-plan .ten-trade{margin-top:0}
+.conversation-plan{padding:24px;border:1px solid #cfdfd1;background:white;border-radius:15px}.conversation-plan h3{margin:10px 0;font-size:22px;letter-spacing:-.03em}
+.conversation-plan-terms{display:grid;grid-template-columns:100px 1fr;gap:12px 20px;margin:20px 0;padding:18px 0;border-block:1px solid var(--line);font-size:13px}.conversation-plan-terms dt{color:var(--muted)}.conversation-plan-terms dd{margin:0}.conversation-plan .action-row{justify-content:space-between}.conversation-plan .note:empty{display:none}
+@media(max-width:580px){.conversation-plan{padding:18px}.conversation-plan-terms{grid-template-columns:80px 1fr;gap:10px}.conversation-plan .action-row button{width:100%}.chat-next-actions button{flex-grow:1}}
