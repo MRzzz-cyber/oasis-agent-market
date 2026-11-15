@@ -174,6 +174,7 @@ export default {
     if (!url.pathname.startsWith("/api/")) {
       const asset=await env.ASSETS.fetch(request);
       const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","privy-v8-20261115");
+      if(url.pathname.startsWith("/privy-setup")){headers.set("referrer-policy","no-referrer");headers.set("x-frame-options","DENY");headers.set("content-security-policy","default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");}
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }
 
