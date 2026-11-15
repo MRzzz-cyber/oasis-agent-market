@@ -43,6 +43,11 @@ test("wallet selection preserves EIP-6963 providers and deduplicates legacy inje
   assert.equal(choices[1].provider,metamask);
   assert.equal(choices[1].name,"MetaMask");
   assert.deepEqual(walletChoices([],undefined),[]);
+  const legacyProxy={isMetaMask:true,request:async()=>[]};
+  const modern=walletChoices([{name:"MetaMask",provider:metamask}],{providers:[legacyProxy,rabby]});
+  assert.equal(modern.length,2);
+  assert.equal(modern[0].provider,metamask);
+  assert.equal(modern[1].provider,rabby);
 });
 
 test("wallet refusal, pending request and authorization failures give actionable errors",async()=>{

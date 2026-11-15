@@ -101,7 +101,7 @@ if(typeof window!=="undefined") {
   window.addEventListener("eip6963:announceProvider",event=>{
     const entry=event.detail;
     if(entry?.provider && typeof entry.provider.request==="function" && typeof entry.info?.uuid==="string") {
-      announcedWallets.set(entry.info.uuid,{name:String(entry.info.name || "浏览器钱包").slice(0,80),provider:entry.provider});
+      announcedWallets.set(entry.info.uuid,{name:String(entry.info.name || "浏览器钱包").slice(0,80),icon:entry.info.icon,provider:entry.provider});
     }
   });
 }
@@ -111,6 +111,9 @@ export function walletChoices(announced,ethereum) {
   for(const provider of legacy) {
     if(typeof provider?.request!=="function" || choices.some(choice=>choice.provider===provider))continue;
     const name=provider.isRabby?"Rabby":provider.isOkxWallet || provider.isOKExWallet?"OKX Wallet":provider.isMetaMask?"MetaMask":"浏览器钱包";
+    // Prefer EIP-6963 over legacy proxies announcing the same known wallet.
+    const brand=value=>String(value).toLowerCase().replace(/ wallet|\s/g,"");
+    if(name!=="浏览器钱包" && choices.some(choice=>brand(choice.name)===brand(name)))continue;
     choices.push({name,provider});
   }
   return choices;
@@ -148,7 +151,9 @@ export function testnetPanel(run,review) {
     if(message)steps[index][1]=message;
     stepButtons.forEach((b,i)=>{
       b.dataset.state=i<stage?"done":i===stage?"current":"pending";
-      b.textContent=steps[i][0]+" · "+(i<stage?"完成":i===stage?"当前步骤":"待进行");
+      const number=element("span",i<stage?"✓":String(i+1).padStart(2,"0"));
+      number.className="execution-number";
+      b.replaceChildren(number,element("strong",steps[i][0]),element("small",i<stage?"已完成":i===stage?"当前步骤":"待进行"));
       if(i===stage)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current");
     });
     selectStep(index);
@@ -160,15 +165,17 @@ export function testnetPanel(run,review) {
   root.append(progress,detail);
   advance(0);
   const title=element("h3","用 10 测试 USDC 试买 ETH");
-  root.append(title);
+  title.className="trade-title";root.append(title);
   const budget="10";
   const cloid="0x"+run.id.replaceAll("-","");
   if(!/^0x[0-9a-f]{32}$/i.test(cloid))return root;
   const key="oasis-hl-test-order:"+run.id;
-  const note=element("p","本次最高买入金额 10 测试 USDC（费用另计）。连接钱包后先预览；兼容签名需要授权测试网交易助手，再单独确认订单。");
+  const note=element("p","本次买入上限 10 测试 USDC，费用另计。先连接钱包预览，再授权助手并确认订单。");
   const form=element("div",""),result=element("p","");
+  form.className="trade-actions";result.className="trade-feedback";
   result.setAttribute("role","status");
-  root.append(note,form,result);
+  note.className="trade-intro";
+  root.append(note,result,form);
   function button(text,handler) {
     const b=element("button",text);b.type="button";b.className="ghost";
     b.onclick=async()=>{b.disabled=true;b.dataset.busy="true";const label=b.textContent;b.textContent="处理中…";result.textContent="正在处理，请留意所选钱包扩展的连接或签名请求。";try{await handler();}catch(e){result.textContent=walletError(e);detail.textContent=result.textContent;}finally{delete b.dataset.busy;b.disabled=b.dataset.blocked==="true";b.textContent=label;}};
@@ -177,6 +184,7 @@ export function testnetPanel(run,review) {
   function showRecord(rec) {
     advance(4,rec.message+"。本次账户："+rec.address+"。客户订单号："+cloid);
     title.textContent="测试网订单回执";
+    const changeWallet=root.querySelector(".wallet-connection button");if(changeWallet)changeWallet.hidden=true;
     form.replaceChildren();note.textContent="测试网 · "+rec.address+" · 买入 "+rec.s+" UETH · 限价 "+rec.p+" USDC";
     result.textContent=rec.message+" · 客户订单号 "+cloid;
     button("查询交易所状态",async()=>{
@@ -222,49 +230,87 @@ export function testnetPanel(run,review) {
     details.append(assess,output);
   }
   const walletBox=element("div","");walletBox.className="wallet-connection";
-  const walletLabel=element("label","选择交易钱包");
-  const walletSelect=element("select","");walletSelect.setAttribute("aria-label","选择交易钱包");
-  walletLabel.append(walletSelect);walletBox.append(walletLabel);
-  const walletStatus=element("p","连接用于读取账户；预览后可以单独授权测试网交易助手。");
-  walletStatus.setAttribute("role","status");walletBox.append(walletStatus);
-  root.insertBefore(walletBox,form);
-  let choices=[];
+  const walletBadge=element("span","◇");walletBadge.className="wallet-account-icon";walletBadge.setAttribute("aria-hidden","true");
+  const walletCopy=element("div","");
+  const walletName=element("strong","连接你的交易钱包");
+  const walletStatus=element("p","选择领取测试币的钱包，连接后读取账户余额。");
+  walletStatus.setAttribute("role","status");walletCopy.append(walletName,walletStatus);
+  const walletTrigger=element("button","连接钱包");walletTrigger.type="button";walletTrigger.className="primary";
+  walletTrigger.setAttribute("aria-haspopup","dialog");
+  walletBox.append(walletBadge,walletCopy,walletTrigger);
+  root.insertBefore(walletBox,result);
+
+  const dialog=element("dialog","");dialog.className="wallet-dialog";
+  const headingId="wallet-heading-"+run.id;
+  dialog.setAttribute("aria-labelledby",headingId);
+  const dialogHead=element("div","");dialogHead.className="wallet-dialog-head";
+  const heading=element("h2","连接交易钱包");heading.id=headingId;
+  const close=element("button","×");close.type="button";close.className="wallet-dialog-close";close.setAttribute("aria-label","关闭钱包选择");close.onclick=()=>dialog.close();
+  dialogHead.append(heading,close);
+  const description=element("p","选择领取测试币的钱包。连接后预览订单，交易需要另行授权和确认。");
+  const descriptionId="wallet-description-"+run.id;description.id=descriptionId;dialog.setAttribute("aria-describedby",descriptionId);
+  const walletList=element("div","");walletList.className="wallet-list";
+  const dialogFoot=element("div","");dialogFoot.className="wallet-dialog-foot";
+  const network=element("span","Hyperliquid Testnet");
+  const refresh=element("button","重新检测");refresh.type="button";
+  dialogFoot.append(network,refresh);
+  dialog.append(dialogHead,description,walletList,dialogFoot);root.append(dialog);
+  dialog.addEventListener("click",event=>{
+    const box=dialog.getBoundingClientRect();
+    if(event.target===dialog && (event.clientX<box.left || event.clientX>box.right || event.clientY<box.top || event.clientY>box.bottom))dialog.close();
+  });
+  let connecting=false;
   function updateWallets() {
-    if(!root.isConnected)return;
-    const selected=walletSelect.value===""?null:choices[Number(walletSelect.value)]?.provider;
-    choices=walletChoices(announcedWallets.values(),window.ethereum);
-    walletSelect.replaceChildren();
-    const placeholder=element("option",choices.length?"请选择钱包":"未检测到钱包，请解锁扩展后重新检测");placeholder.value="";
-    walletSelect.append(placeholder);
-    choices.forEach((choice,index)=>{const option=element("option",choice.name);option.value=String(index);walletSelect.append(option);});
-    const index=choices.findIndex(choice=>choice.provider===selected);
-    walletSelect.value=index>=0?String(index):choices.length===1?"0":"";
+    if(!root.isConnected || connecting)return;
+    const choices=walletChoices(announcedWallets.values(),window.ethereum);
+    walletList.replaceChildren();
+    if(!choices.length) {
+      const empty=element("div","");empty.className="wallet-empty";
+      empty.append(element("strong","还未检测到钱包"),element("p","请安装或解锁 EVM 钱包扩展，再点击重新检测。"));walletList.append(empty);
+    }
+    for(const choice of choices) {
+      const row=element("button","");row.type="button";row.className="wallet-option";
+      const icon=element("span",choice.name.slice(0,1).toUpperCase());icon.className="wallet-option-icon";icon.setAttribute("aria-hidden","true");
+      if(typeof choice.icon==="string" && /^data:image\/(?:png|jpeg|webp|gif|svg\+xml)[;,]/i.test(choice.icon)) {
+        const img=document.createElement("img");img.src=choice.icon;img.alt="";
+        img.onerror=()=>icon.replaceChildren(document.createTextNode(choice.name.slice(0,1).toUpperCase()));icon.replaceChildren(img);
+      }
+      const copy=element("span","");copy.className="wallet-option-copy";copy.append(element("strong",choice.name),element("small","已检测到 · 浏览器钱包"));
+      const arrow=element("span","↗");arrow.className="wallet-option-arrow";arrow.setAttribute("aria-hidden","true");row.append(icon,copy,arrow);
+      row.onclick=async()=>{
+        if(connecting)return;
+        connecting=true;walletTrigger.disabled=true;dialog.close();
+        walletTrigger.textContent="连接中…";
+        result.textContent="正在连接钱包，请留意浏览器中的钱包请求。";
+        try {await connectWallet(choice);}
+        catch(error){result.textContent=walletError(error);detail.textContent=result.textContent;}
+        finally{connecting=false;walletTrigger.disabled=false;walletTrigger.textContent="更换钱包";}
+      };
+      walletList.append(row);
+    }
   }
   function discoverWallets() {
     window.dispatchEvent(new Event("eip6963:requestProvider"));
-    updateWallets();
-    setTimeout(updateWallets,200);
+    updateWallets();setTimeout(updateWallets,200);
   }
-  button("重新检测钱包",async()=>{discoverWallets();walletStatus.textContent="请选择与领取测试币相同的钱包和账户。";});
-  setTimeout(discoverWallets,0);
-  button("连接钱包，预览 10U 测试单",async()=>{
-    const selected=walletSelect.value;
-    const choice=selected===""?null:choices[Number(selected)];
-    if(!choice)throw Error("请先选择钱包；未显示时请解锁扩展并点击重新检测钱包。");
+  refresh.onclick=discoverWallets;
+  walletTrigger.onclick=()=>{discoverWallets();dialog.showModal();};
+  async function connectWallet(choice) {
     const wallet=choice.provider;
     walletStatus.textContent="正在请求 "+choice.name+" 连接，请打开该钱包扩展查看待处理请求。";
     const accounts=await wallet.request({method:"eth_requestAccounts"});
     const address=accounts?.[0];
     if(!/^0x[0-9a-f]{40}$/i.test(address || ""))throw Error("未获得有效钱包地址，请解锁钱包并允许网站连接。");
     if(!root.isConnected)return;
-    walletStatus.textContent="已连接 "+choice.name+" · "+address;
+    walletName.textContent=choice.name;walletBadge.textContent="✓";
+    walletStatus.textContent=address.slice(0,6)+"…"+address.slice(-4)+" · 已连接";walletStatus.title=address;
     note.textContent="当前读取 Hyperliquid 测试网现货账户。钱包已授权时可能直接返回地址；订单预览后再请求测试网助手授权。";
     advance(1,"钱包已连接："+address+"。正在检查测试网现货余额和盘口。余额不足时，请先在 Hyperliquid 测试网准备测试资金，再重新预览。");
     const market=spotMarket(await post("/info",{type:"spotMeta"}));
     const [free,book]=await Promise.all([funds(address),post("/info",{type:"l2Book",coin:market.coin})]);
     const ask=book.levels[1][0]?.px;
     if(!ask)throw Error("暂无卖单，可稍后重新预览");
-    walletStatus.textContent="已连接 "+choice.name+" · "+address+" · 现货可用 "+free+" 测试 USDC";
+    walletStatus.textContent=address.slice(0,6)+"…"+address.slice(-4)+" · 现货可用 "+free+" 测试 USDC";
     if(atoms(free)<10n*unit) {
       const perp=await post("/info",{type:"clearinghouseState",user:address}).catch(()=>null);
       const withdrawable=perp?.withdrawable;
@@ -274,7 +320,7 @@ export function testnetPanel(run,review) {
     const order=tenOrder(ask,free,market.decimals);
     if(!root.isConnected)return;
     form.replaceChildren();
-    walletSelect.disabled=true;
+    walletTrigger.onclick=()=>{const next=testnetPanel(run,review);root.replaceWith(next);next.querySelector(".wallet-connection button")?.click();};
     note.textContent="测试钱包 "+address+" · 可用 "+free+" 测试 USDC";
     result.textContent="买入 "+order.s+" UETH · 最高成交额 10 测试 USDC（费用另计）。当前卖一 "+ask+"，本单限价 "+order.p+" USDC/UETH。"+(atoms(order.p)<atoms(ask)?"限价低于卖一，若卖价不降，本单将撤销。":"实际成交取决于签名提交时的盘口。");
     advance(2,result.textContent+" 可用余额 "+free+" 测试 USDC。提交前重新核对最新盘口，保留本次限价和数量。");
@@ -284,7 +330,7 @@ export function testnetPanel(run,review) {
       const session=testnetSessions.get(sessionKey);
       let signer=session.signer,approved=session.approved;
       const approvalStatus=element("p",approved?"测试网助手已验证，请确认订单。":"测试网助手待授权，授权验证成功后开放交易。");
-      approvalStatus.setAttribute("role","status");form.append(approvalStatus);
+      approvalStatus.setAttribute("role","status");approvalStatus.className="trade-approval-status";form.append(approvalStatus);
       const isApproved=async()=>{
         if(!signer)return false;
         const agents=await post("/info",{type:"extraAgents",user:address});
@@ -300,12 +346,12 @@ export function testnetPanel(run,review) {
         if(approved)advance(3,approvalStatus.textContent);
         return approved;
       };
-      const consent=element("label","");
+      const consent=element("label","");consent.className="trade-consent";
       const checkbox=element("input","");checkbox.type="checkbox";
       consent.append(checkbox,element("span","我同意授权测试网交易助手。协议授权覆盖本测试账户交易，10 USDC 为 Oasis 本次订单限制。密钥仅保存在当前页面内存；刷新会丢失密钥，但授权仍需在官方 API 页面撤销。"));
       form.append(consent);
       const apiLink=element("a","在官方测试网管理或撤销 API 授权");
-      apiLink.href="https://app.hyperliquid-testnet.xyz/API";apiLink.target="_blank";apiLink.rel="noopener noreferrer";form.append(apiLink);
+      apiLink.href="https://app.hyperliquid-testnet.xyz/API";apiLink.target="_blank";apiLink.rel="noopener noreferrer";apiLink.className="trade-permission-link";form.append(apiLink);
       const checkAccount=async()=>{
         const accounts=await wallet.request({method:"eth_accounts"});
         if(accounts[0]?.toLowerCase()!==address.toLowerCase())throw Error("钱包账户已变化，请重新连接");
@@ -373,8 +419,9 @@ export function testnetPanel(run,review) {
         } catch {rec.message="提交结果未确认，请查询原订单";}
         localStorage.setItem(key,JSON.stringify(rec));showRecord(rec);
       });
+      confirmOrder.classList.replace("ghost","primary");
       confirmOrder.dataset.blocked=String(!approved);
       confirmOrder.disabled=!approved;
-  });
+  }
   return root;
 }
