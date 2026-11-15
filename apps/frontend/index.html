@@ -4,15 +4,16 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
+  <link rel="icon" href="/brand/favicon.svg?v=eye-v5-20261115" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=workbench-v4-20261115"/>
-  <link rel="stylesheet" href="/workbench.css?v=workbench-v4-20261115"/>
+  <link rel="stylesheet" href="/styles.css?v=eye-v5-20261115"/>
+  <link rel="stylesheet" href="/workbench.css?v=eye-v5-20261115"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
-    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页">O</a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="策略与记录" aria-label="策略与记录">◷</button><span class="rail-bottom">TEST</span></aside>
+    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页"><span data-oasis-eye></span></a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="策略与记录" aria-label="策略与记录">◷</button><span class="rail-bottom">TEST</span></aside>
     <header class="app-header"><div class="header-inner">
-      <a class="wordmark" href="/" aria-label="Oasis 首页"><i aria-hidden="true"></i>Oasis</a>
+      <a class="wordmark" href="/" aria-label="Oasis 首页"><span data-oasis-eye></span>Oasis</a>
       <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button><button data-tab="testnet">测试交易</button></nav>
       <button class="ghost" id="account-button" hidden>登录</button>
     </div></header>
@@ -26,7 +27,7 @@
     <div class="content"><div class="workbench-bar"><button type="button" id="toggle-watch" aria-label="显示市场列表">☰</button><span>AI 交易助手 <span class="bar-divider">/</span> <b id="workbench-asset">ETH</b></span><span class="environment-badge">测试网执行</span></div>
       <main>
         <section id="page-overview" class="app-page"><div class="direct-test-link"><button type="button" class="ghost" id="direct-test">直接测试一笔 ETH 交易 ↗</button></div>
-          <div class="welcome"><div class="assistant-emblem">O</div><span class="eyebrow">YOUR MARKET, IN CONTEXT</span><h1>从一个判断，<br/>到一份交易计划。</h1><p>先看懂行情，再和 Oasis 一起明确行动。每一笔交易由你确认。</p></div>
+          <div class="welcome"><div class="assistant-emblem"><span data-oasis-eye></span></div><span class="eyebrow">YOUR MARKET, IN CONTEXT</span><h1>从一个判断，<br/>到一份交易计划。</h1><p>先看懂行情，再和 Oasis 一起明确行动。每一笔交易由你确认。</p></div>
           <div class="selected-quote"><span class="coin-symbol" data-coin="ETH">E</span><strong id="selected-market">ETH</strong><b id="selected-market-price">行情读取中</b><span id="selected-market-change">—</span><small>主网永续 / 实时参考</small></div>
           <div id="prompt-guides" class="prompt-guides" aria-label="引导问题"></div>
 
@@ -88,6 +89,6 @@
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=workbench-v4-20261115" type="module"></script>
+  <script src="/app.js?v=eye-v5-20261115" type="module"></script>
 </body>
 </html>

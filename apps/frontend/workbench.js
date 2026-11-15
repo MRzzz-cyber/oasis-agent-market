@@ -1,4 +1,4 @@
-import {availableWallets} from './testnet.js?v=workbench-v4-20261115';
+import {availableWallets} from './testnet.js?v=eye-v5-20261115';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];
