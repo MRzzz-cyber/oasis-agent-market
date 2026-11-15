@@ -1,13 +1,14 @@
-import {setMarkdown} from "./markdown.js?v=markdown-v6-20261115";
-import {initEyeMotion} from "./eye-logo.js?v=markdown-v6-20261115";
-import {initWorkbench} from "./workbench.js?v=markdown-v6-20261115";
-import {testnetPanel} from "./testnet.js?v=markdown-v6-20261115";
+import {conversationGuide,fundingState} from "./conversation-guide.js?v=guided-v7-20261115";
+import {setMarkdown} from "./markdown.js?v=guided-v7-20261115";
+import {initEyeMotion} from "./eye-logo.js?v=guided-v7-20261115";
+import {initWorkbench} from "./workbench.js?v=guided-v7-20261115";
+import {testnetPanel} from "./testnet.js?v=guided-v7-20261115";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="markdown-v6-20261115";
+const UI_RELEASE="guided-v7-20261115";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -401,6 +402,7 @@ async function sendToRealModel() {
   if (!googleLogin && !code) { $("ai-usage").textContent = "请先输入私人体验码，才能调用真实 API。"; return; }
   if (!state.model) { $("ai-usage").textContent = "请先返回策略工作台，选择一个 OpenRouter 模型。"; return; }
   chatBusy = true;
+  $("chat-next-actions").replaceChildren();$("chat-funding-card").replaceChildren();
   const button = $("chat-submit"); button.disabled = true; button.textContent = "模型思考中…";
   for (const id of ["ai-retry", "create-strategy", "change-model", "model-primary"]) $(id).disabled = true;
   $("ai-usage").textContent = "正在调用 " + (state.modelName || state.model) + " · 实时流式响应";
@@ -462,8 +464,7 @@ async function sendToRealModel() {
     if (usage?.prompt_tokens != null) parts.push("输入 " + usage.prompt_tokens + " tokens");
     if (usage?.completion_tokens != null) parts.push("输出 " + usage.completion_tokens + " tokens");
     $("ai-usage").textContent = parts.join(" · ");
-    renderChatChoices();
-    renderFundingCard();
+
   } catch (error) {
     if (assistantText && !assistantText.textContent.trim()) {
       assistantText.closest(".chat-message")?.remove();
@@ -478,26 +479,33 @@ async function sendToRealModel() {
     chatBusy = false; button.disabled = false; button.textContent = "发送";
     for (const id of ["ai-retry", "create-strategy", "change-model"]) $(id).disabled = false;
     $("model-primary").disabled = !availableModels.length;
+    renderChatChoices();renderFundingCard();
   }
 }
 function renderChatChoices() {
   const actions=$("chat-next-actions");actions.replaceChildren();
-  actions.append(node("span","note","接下来，你想怎么进行？"));
-  const choices=[
-    ["继续了解行情",()=>{ $("chat-input").value="请说明当前判断的依据、风险和还缺少的数据，不生成交易指令。";$("chat-form").requestSubmit(); }],
-    ["钱包与资金",()=>workbench.openFunds()],
-    ["本地模拟 · ETH",()=>startChatSimulation()],
-    ["测试网买入 ETH",()=>showChatTradePlan()]
-  ];
-  for(const [label,handler] of choices){const b=node("button","ghost",label);b.type="button";b.onclick=()=>{if(chatBusy)return toast("请等待当前回复完成");handler();};actions.append(b);}
+  if(chatBusy || state.conversation.at(-1)?.role!=="assistant")return;
+  const guide=conversationGuide(state.conversation);
+  const progress=node("div","guide-progress");
+  for(const [step,label] of [["research","行情研究"],["plan","确认计划"],["funds","准备资金"]]){const item=node("span",step===guide.stage?"active":"",label);if(step===guide.stage)item.setAttribute("aria-current","step");progress.append(item);}
+  actions.append(progress,node("h3","guide-title",guide.title));
+  const grid=node("div","reply-options");
+  for(const choice of guide.choices){
+    const b=node("button","reply-option");b.type="button";b.append(node("strong","",choice.title),node("small","",choice.description),node("span","reply-arrow","↗"));
+    b.onclick=()=>{if(chatBusy)return; if(choice.kind==="funds")return workbench.openFunds();if(choice.kind==="preview")return showChatTradePlan();$("chat-input").value=choice.text;$("chat-form").requestSubmit();};grid.append(b);
+  }
+  actions.append(grid,node("p","note guide-freeform","也可以在下面直接输入，或调整你的想法。选择选项不会自动授权或提交交易。"));
 }
 function renderFundingCard() {
   const host=$("chat-funding-card");host.replaceChildren();
-  if(!/买|购入|计划|资金|充值/.test(state.goal))return;
-  const card=node("section","funding-cta");
-  const copy=node("div");copy.append(node("span","funding-cta-icon","▣"),node("strong","","先检查交易资金"),node("p","note","连接现有钱包，查看测试网 USDC 和 UETH。余额与订单数量由界面核对。"));
-  const b=node("button","primary","钱包与资金 →");b.type="button";b.onclick=()=>workbench.openFunds();card.append(copy,b);host.append(card);
+  const guide=conversationGuide(state.conversation);
+  if(chatBusy || state.conversation.at(-1)?.role!=="assistant" || guide.stage!=="funds")return;
+  const info=fundingState(workbench.funds(),guide.budget);
+  const card=node("section","funding-cta guided-funding");
+  const copy=node("div");copy.append(node("span","funding-cta-icon","▣"),node("span","funding-network-label","Hyperliquid Testnet · 测试资产"),node("strong","",info.title),node("p","note",info.body));
+  const b=node("button","primary",info.action);b.type="button";b.onclick=()=>info.kind==="ready"?showChatTradePlan():workbench.openFunds();card.append(copy,b);host.append(card);
 }
+window.addEventListener("oasis:funds-updated",()=>{if(state.conversation.length)renderFundingCard();});
 async function startChatSimulation() {
   const host=$("chat-trade-plan");
   if(host.querySelector(".ten-trade"))return toast("当前已有测试交易，请先完成或核对回执。");
@@ -522,7 +530,7 @@ function showChatTradePlan() {
   const list=node("dl","conversation-plan-terms");
   for(const [label,value] of [["交易网络","Hyperliquid Testnet"],["标的 / 方向","ETH（UETH）/ 买入"],["金额上限","由下方填写 · 费用另计"],["执行方式","限价买入 · 未成交部分撤销"]])list.append(node("dt","",label),node("dd","",value));
   const amountLabel=node("label","plan-amount","测试金额上限（测试 USDC）");
-  const amountInput=node("input","");amountInput.type="number";amountInput.min="10";amountInput.max="1000";amountInput.step="0.01";amountInput.value="20";amountInput.setAttribute("aria-label","交易计划测试金额");amountLabel.append(amountInput);card.append(amountLabel);
+  const amountInput=node("input","");amountInput.type="number";amountInput.min="10";amountInput.max="1000";amountInput.step="0.01";amountInput.value=String(conversationGuide(state.conversation).budget || 20);amountInput.setAttribute("aria-label","交易计划测试金额");amountLabel.append(amountInput);card.append(amountLabel);
   const controls=node("div","action-row");
   const change=node("button","ghost","修改计划");change.type="button";change.onclick=()=>{amountInput.focus();};
   const connect=node("button","primary","确认计划，连接钱包并预览");connect.type="button";
@@ -581,7 +589,7 @@ async function refreshStrategies() {
         state.goal = item.goal; state.conversation = [];
         $("goal").value = item.goal; $("chat-messages").replaceChildren();
         for (const message of item.conversation || [{ role: "user", content: item.goal }]) addChat(message.role, message.content);
-        makeDraftSummary(); showTab("create");
+        makeDraftSummary(); renderChatChoices();renderFundingCard(); showTab("create");
         toast("请补全并确认单次上限；保存后会创建新策略"); return;
       }
       btn.disabled = true;

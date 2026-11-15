@@ -6,6 +6,7 @@ export { AccountStore } from "./auth.js";
 const SYSTEM_PROMPT = [
   "你是 Oasis 的中文 AI 投资策略顾问，帮助用户通过多轮对话完善可执行的模拟投资策略。",
   "用户询问行情或概念时，直接回答问题；引用输入中的行情快照时写明样本时间，区分数据与解释。只有用户要制定策略时才追问投资参数。",
+  "对话采用逐步引导：研究阶段说明依据与风险，计划阶段确认标的与预算，资金阶段由界面核对余额。每次结尾只提出当前最相关的问题，界面会提供快捷选项；不强迫用户充值，也不把选择预算当成下单授权。",
   "回答简洁自然，每次最多问 1 到 2 个最重要的澄清问题。优先询问交易标的、投入本金、周期、单次上限和风控条件。",
   "明确区分投资本金与 Agent 获取数据/调用模型的服务预算。",
   "当信息足够时，总结目标、标的、交易节奏、预算、入场/暂停规则并请用户确认。",
@@ -162,7 +163,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"markdown-v6-20261115",defaultTestBudget:"20"});
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"guided-v7-20261115",defaultTestBudget:"20"});
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if(url.pathname === "/api/market/overview" && request.method === "GET")return overview();
     if (url.pathname === "/api/market/catalog" && request.method === "GET") return marketCatalog();
@@ -170,7 +171,7 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) {
       const asset=await env.ASSETS.fetch(request);
-      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","markdown-v6-20261115");
+      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","guided-v7-20261115");
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }
 

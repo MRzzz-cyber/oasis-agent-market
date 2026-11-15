@@ -38,3 +38,17 @@ main{max-width:1100px;margin:auto;padding:28px clamp(24px,4vw,76px) 24px}#page-o
 .markdown-body pre code{padding:0;background:none}.markdown-body a{color:#b6ee86;text-decoration:underline;text-underline-offset:3px}
 .markdown-body hr{border:0;border-top:1px solid #ffffff18;margin:22px 0}.markdown-table{overflow-x:auto;margin:16px 0}
 .markdown-body table{border-collapse:collapse;width:100%;font-size:13px}.markdown-body th,.markdown-body td{text-align:left;border:1px solid #ffffff18;padding:9px 12px}.markdown-body th{background:#ffffff08;font-weight:700}
+
+.chat-next-actions{display:block;margin:20px 0 12px;padding-top:20px;border-top:1px solid var(--line)}
+.chat-next-actions:empty{display:none}.guide-progress{display:flex;gap:22px;margin-bottom:18px;font-size:11px;color:var(--muted)}
+.guide-progress span{padding-bottom:7px;border-bottom:2px solid transparent}.guide-progress .active{color:var(--green);border-color:var(--green)}
+.guide-title{font-size:14px;font-weight:650;margin:0 0 12px}.reply-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.reply-option{position:relative;padding:15px 35px 15px 16px;text-align:left;border:1px solid var(--line);border-radius:12px;background:#181e19;min-height:82px;color:var(--ink)}
+.reply-option:hover{border-color:#739366;background:#202d21}.reply-option:focus-visible{outline:2px solid var(--green)}
+.reply-option strong,.reply-option small{display:block}.reply-option strong{font-size:13px;font-weight:650}.reply-option small{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+.reply-arrow{position:absolute;right:15px;top:16px;color:var(--green)}.guide-freeform{font-size:11px;margin:12px 0 0}
+.guided-funding{max-width:470px;display:block;margin:22px 0;background:#19231b;border:1px solid #364b38;border-radius:20px;padding:22px}
+.guided-funding .funding-network-label{display:block;color:var(--muted);font-size:10px;margin:0 0 8px;letter-spacing:.3px}
+.guided-funding strong{display:block;font-size:17px;margin-bottom:8px}.guided-funding .funding-cta-icon{float:left;margin:3px 14px 12px 0;font-size:21px;color:var(--green)}
+.guided-funding .primary{width:100%;margin-top:12px;border-radius:24px;padding:12px}.guided-funding .note{line-height:1.7}
+@media(max-width:600px){.reply-options{grid-template-columns:1fr}.guide-progress{gap:18px}.guided-funding{padding:18px}}
