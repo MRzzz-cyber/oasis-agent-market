@@ -1,4 +1,4 @@
-import {availableWallets} from './testnet.js?v=privy-v8-20261115';
+import {availableWallets} from './testnet.js?v=header-v9-20261116';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];
@@ -71,6 +71,7 @@ export function initWorkbench({prompt,trade,account}) {
   $('watch-search').oninput=render;$('watch-refresh').onclick=load;
   document.querySelectorAll('[data-watch-group]').forEach(b=>b.onclick=()=>{group=b.dataset.watchGroup;setGroup();render();});
   $('toggle-watch').onclick=()=>document.body.classList.toggle('watch-open');
+  $('header-wallet-open').onclick=()=>openFunds();
   $('wallet-open').onclick=()=>openFunds();$('wallet-close').onclick=()=>closeFunds();$('funding-backdrop').onclick=closeFunds;
   $('funds-trade').onclick=()=>{closeFunds();trade();};$('account-wallet-login').onclick=account;
   const drawer=$('funding-drawer');

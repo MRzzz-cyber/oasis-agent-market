@@ -1,15 +1,16 @@
-import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=privy-v8-20261115";
-import {conversationGuide,fundingState} from "./conversation-guide.js?v=privy-v8-20261115";
-import {setMarkdown} from "./markdown.js?v=privy-v8-20261115";
-import {initEyeMotion} from "./eye-logo.js?v=privy-v8-20261115";
-import {initWorkbench} from "./workbench.js?v=privy-v8-20261115";
-import {testnetPanel} from "./testnet.js?v=privy-v8-20261115";
+import {renderAccountButton} from "./account-avatar.js?v=header-v9-20261116";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=header-v9-20261116";
+import {conversationGuide,fundingState} from "./conversation-guide.js?v=header-v9-20261116";
+import {setMarkdown} from "./markdown.js?v=header-v9-20261116";
+import {initEyeMotion} from "./eye-logo.js?v=header-v9-20261116";
+import {initWorkbench} from "./workbench.js?v=header-v9-20261116";
+import {testnetPanel} from "./testnet.js?v=header-v9-20261116";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="privy-v8-20261115";
+const UI_RELEASE="header-v9-20261116";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -321,7 +322,7 @@ let googleLogin = false;
 let currentUser = null;
 function renderAccount() {
   const pending = currentUser && !currentUser.active;
-  $("account-button").textContent = currentUser?.email || "使用 Google 登录";
+  renderAccountButton($("account-button"),currentUser);
   $("account-title").textContent = pending ? "首次登录 · 激活账号" : currentUser ? "我的账号" : "登录 Oasis";
   $("account-note").textContent = currentUser?.email || "首次登录后，输入私人体验码即可使用策略顾问。";
   $("google-login").hidden = Boolean(currentUser);

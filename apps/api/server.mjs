@@ -20,6 +20,7 @@ const routes = new Map([
   ["/privy-setup.js", ["privy-setup.js", "text/javascript; charset=utf-8"]],
   ["/privy-keygen.js", ["privy-keygen.js", "text/javascript; charset=utf-8"]],
   ["/privy-setup.css", ["privy-setup.css", "text/css; charset=utf-8"]],
+  ["/account-avatar.js", ["account-avatar.js", "text/javascript; charset=utf-8"]],
   ["/privy-wallet.js", ["privy-wallet.js", "text/javascript; charset=utf-8"]],
   ["/account-wallet.js", ["account-wallet.js", "text/javascript; charset=utf-8"]],
   ["/conversation-guide.js", ["conversation-guide.js", "text/javascript; charset=utf-8"]],
@@ -58,7 +59,7 @@ export function createAppServer() {
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
-      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"privy-v8-20261115",defaultTestBudget:"20"});return;}
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"header-v9-20261116",defaultTestBudget:"20"});return;}
       if(req.method === "GET" && url.pathname === "/api/wallet/config"){send(res,200,{enabled:false,appId:null,mode:"user-controlled",network:"hyperliquid-testnet"});return;}
       if(req.method === "GET" && /^\/vendor\/privy\/[a-zA-Z0-9_.-]+\.(js|css)$/.test(url.pathname)){const body=await readFile(path.join(webDir,url.pathname));res.writeHead(200,{"content-type":url.pathname.endsWith(".css")?"text/css":"text/javascript","cache-control":"no-store"});res.end(body);return;}
       const parts = url.pathname.split("/").filter(Boolean);
