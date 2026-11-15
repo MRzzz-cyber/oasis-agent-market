@@ -35,13 +35,13 @@
           <small id="market-count" role="status"></small><p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="市场 K 线及成交量"></canvas>
           <div id="market-insights" class="market-insights" aria-label="已收盘 K 线指标"></div><div class="market-controls"><button type="button" class="ghost" id="market-reload">刷新行情</button><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
-          <div class="page-heading"><div><h2>策略工作台</h2><p>通过对话调整草案，确认参数后保存。</p></div><button class="ghost" id="new-idea">新建策略</button></div>
+          <div class="page-heading"><div><h2>策略工作台</h2><p>先讨论，再选择模拟或测试网交易。策略保存为可选。</p></div><button class="ghost" id="new-idea">新对话</button></div>
           <div class="conversation panel">
             <div class="conversation-top"><div><strong>策略顾问</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><label class="ghost inline-model-picker"><span aria-hidden="true">更换模型 ▾</span><select id="change-model" aria-label="更换模型" disabled></select></label></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
-            <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+            <div id="chat-messages" class="chat-messages" aria-live="polite"></div><div id="chat-next-actions" class="chat-next-actions" aria-label="对话下一步"></div><div id="chat-trade-plan" class="chat-trade-plan" aria-live="polite"></div>
             <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="补充你的偏好，例如：单次最多 80 USDT，回撤超过 5% 就暂停。"></textarea><button class="primary" id="chat-submit" type="submit">发送</button></form><p id="ai-usage" class="note"></p>
           </div>
-          <div id="draft-panel" class="panel draft-panel hidden">
+          <details id="draft-panel" class="panel draft-panel hidden"><summary>查看完整策略 · 可选</summary><div class="draft-content">
             <div class="draft-head"><div><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
             <p class="note">可直接修改参数。继续对话会重新整理草案。</p>
             <div id="draft-summary" class="draft-form">
@@ -54,8 +54,8 @@
             </div>
             <p class="note">ETH 可进入 10 测试 USDC 手动交易流程，其他标的使用模拟样本。保存后展示下一步。</p>
             <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 服务采购付款关闭 · ETH 支持用户签名测试网交易</small></details>
-            <button class="primary" id="create-strategy">保存并查看执行流程</button>
-          </div>
+            <button class="primary" id="create-strategy">保存策略并查看执行流程</button>
+          </div></details>
         </section>
         <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看交易计划、准备测试交易和核对运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
 

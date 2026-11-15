@@ -113,6 +113,18 @@ async function browserDemoRequest(path, options = {}) {
     };
     db.strategies.push(strategy); writeDemoState(db); return strategy;
   }
+  // Conversation plans are local records, not saved recurring strategies or spend requests.
+  if (method === "POST" && path === "/api/trade-plans") {
+    const body=JSON.parse(options.body || "{}");
+    if(body.asset!=="ETH" || body.amount!=="10" || body.network!=="hyperliquid-testnet")demoError("此入口仅支持 10 测试 USDC 买入 ETH");
+    if(typeof body.goal!=="string" || body.goal.trim().length<4 || body.goal.length>2000)demoError("请补充交易目标");
+    const run={id:crypto.randomUUID(),strategyId:null,source:"conversation",asset:"ETH",
+      terms:{asset:"ETH",maxOrder:"10",quoteAsset:"USDC",capital:"10",cadence:"按信号触发",stopPercent:""},
+      goal:body.goal,model:body.model,modelId:body.modelId,mode:"testnet",status:"manual_testnet",createdAt:new Date().toISOString()};
+    if(body.mode && !["testnet","simulation"].includes(body.mode))demoError("不支持此交易模式");
+    const record=body.mode==="simulation"?{...simulateRun({id:null,asset:"ETH",terms:run.terms,goal:run.goal,model:run.model}),source:"conversation"}:run;
+    db.runs.push(record);writeDemoState(db);return record;
+  }
   if (method === "GET" && path === "/api/runs") return db.runs;
   if (method === "POST" && path === "/api/runs") {
     let body; try { body = JSON.parse(options.body || "{}"); } catch { demoError("输入格式不正确"); }
@@ -416,6 +428,7 @@ async function sendToRealModel() {
     if (usage?.prompt_tokens != null) parts.push("输入 " + usage.prompt_tokens + " tokens");
     if (usage?.completion_tokens != null) parts.push("输出 " + usage.completion_tokens + " tokens");
     $("ai-usage").textContent = parts.join(" · ");
+    renderChatChoices();
   } catch (error) {
     if (assistantText && !assistantText.textContent.trim()) {
       assistantText.closest(".chat-message")?.remove();
@@ -432,6 +445,58 @@ async function sendToRealModel() {
     $("model-primary").disabled = !availableModels.length;
   }
 }
+function renderChatChoices() {
+  const actions=$("chat-next-actions");actions.replaceChildren();
+  actions.append(node("span","note","接下来，你想怎么进行？"));
+  const choices=[
+    ["继续了解行情",()=>{ $("chat-input").value="请说明当前判断的依据、风险和还缺少的数据，不生成交易指令。";$("chat-form").requestSubmit(); }],
+    ["模拟买入 ETH · 10 USDC",()=>startChatSimulation()],
+    ["测试网买入 ETH · 10 USDC",()=>showChatTradePlan()]
+  ];
+  for(const [label,handler] of choices){const b=node("button","ghost",label);b.type="button";b.onclick=()=>{if(chatBusy)return toast("请等待当前回复完成");handler();};actions.append(b);}
+}
+async function startChatSimulation() {
+  const host=$("chat-trade-plan");
+  if(host.querySelector(".ten-trade"))return toast("当前已有测试交易，请先完成或核对回执。");
+  try {
+    const run=await request("/api/trade-plans",{method:"POST",body:JSON.stringify({asset:"ETH",amount:"10",network:"hyperliquid-testnet",mode:"simulation",goal:state.goal,model:state.modelName,modelId:state.model})});
+    state.run=run;
+    const card=node("section","conversation-plan");
+    card.append(node("span","status-pill","本地模拟 · 不连接钱包"),node("h3","模拟买入 ETH · 10 USDC"),node("p","note","使用预置回撤 1% 的演示样本，没有实时市场判断、模型投票或真实付款。"));
+    const approve=node("button","primary","确认创建本地模拟订单");approve.type="button";
+    const output=node("p","note");output.setAttribute("role","status");
+    approve.onclick=async()=>{approve.disabled=true;try{state.run=await request("/api/runs/"+run.id+"/approve",{method:"POST",body:"{}"});output.textContent="已创建 10 USDC 的 ETH 本地模拟订单，没有提交交易所。";}catch(e){output.textContent=e.message;approve.disabled=false;}};
+    card.append(approve,output);host.replaceChildren(card);
+    addChat("user","我选择先模拟买入 ETH，金额 10 USDC，不发起测试网或主网交易。");
+  }catch(e){toast(e.message);}
+}
+function showChatTradePlan() {
+  const host=$("chat-trade-plan");
+  if(host.querySelector(".ten-trade")){host.scrollIntoView({behavior:"smooth",block:"start"});return;}
+  host.replaceChildren();
+  const card=node("section","conversation-plan");
+  card.append(node("span","status-pill","待你确认 · 仅测试网"),node("h3","用 10 测试 USDC 买入 ETH"),node("p","note","这是你选择的一次手动测试，不代表 AI 已判断满足原策略条件。"));
+  const list=node("dl","conversation-plan-terms");
+  for(const [label,value] of [["交易网络","Hyperliquid Testnet"],["标的 / 方向","ETH（UETH）/ 买入"],["金额上限","10 测试 USDC · 费用另计"],["执行方式","限价买入 · 未成交部分撤销"]])list.append(node("dt","",label),node("dd","",value));
+  const controls=node("div","action-row");
+  const change=node("button","ghost","修改计划");change.type="button";change.onclick=()=>{$("chat-input").value="我想调整这次测试交易：";$("chat-input").focus();toast("当前执行入口固定为 ETH / 10 测试 USDC，其他金额可先讨论并保存为策略。");};
+  const connect=node("button","primary","确认计划，连接钱包并预览");connect.type="button";
+  const error=node("p","note");error.setAttribute("role","status");
+  connect.onclick=async()=>{
+    if(chatBusy)return toast("请等待当前回复完成");
+    connect.disabled=true;
+    try {
+      const run=await request("/api/trade-plans",{method:"POST",body:JSON.stringify({asset:"ETH",amount:"10",network:"hyperliquid-testnet",goal:state.goal,model:state.modelName,modelId:state.model})});
+      state.run=run;
+      addChat("user","我确认本次计划：在 Hyperliquid 测试网手动买入 ETH，金额上限 10 测试 USDC，费用另计。先预览，提交前由我单独确认。");
+      const panel=testnetPanel(run,reviewTestnet);host.replaceChildren(panel);
+      panel.querySelector(".wallet-connection button")?.click();
+      panel.scrollIntoView({behavior:"smooth",block:"start"});
+    }catch(e){error.textContent=e.message;connect.disabled=false;}
+  };
+  controls.append(change,connect);card.append(list,controls,error);host.append(card);
+  host.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
 function beginConversation() {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
   if (googleLogin && !currentUser?.active) { openAccount(); return; }
@@ -440,8 +505,11 @@ function beginConversation() {
   updateModelLabels();
   if (!state.model) { toast("请先在策略工作台中选择一个 OpenRouter 模型"); showTab("overview"); return; }
   state.conversation = [];
+  $("chat-next-actions").replaceChildren();$("chat-trade-plan").replaceChildren();
+  $("draft-panel").open=false;
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
+  renderChatChoices();
   sendToRealModel();
   makeDraftSummary();
   $("draft-panel").classList.remove("hidden");
@@ -492,6 +560,12 @@ async function refreshStrategies() {
       actions.append(select, resume);
     }
     article.append(info, actions); root.appendChild(article);
+  }
+  for(const run of runs.filter(item=>item.source==="conversation").reverse()) {
+    const article=node("article","strategy-card");
+    const info=node("div");info.append(node("strong","",run.mode==="testnet"?"ETH · 对话测试交易":"ETH · 对话模拟订单"),node("p","note","10 测试 USDC · "+new Date(run.createdAt).toLocaleString("zh-CN")));
+    const resume=node("button","ghost","查看交易 / 回执");resume.type="button";resume.onclick=()=>{state.run=run;renderRunContent();$("run-panel").scrollIntoView({behavior:"smooth",block:"start"});};
+    article.append(info,resume);root.append(article);
   }
   if (!state.run) {
     try { state.run = runs.find(run => run.id === localStorage.getItem(demoStorageKey+":active-run")) || null; } catch {}
