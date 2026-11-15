@@ -17,8 +17,8 @@ test('testnet chain balance is never displayed as mainnet and chain changes reje
  let reads=0;const changed={request:async p=>p.method==='eth_chainId'?(reads++?'0xaa36a7':'0x1'):p.method==='eth_accounts'?[address]:'0xde0b6b3a7640000'};await assert.rejects(readNativeBalance(changed,address));
  const provider={request:async p=>p.method==='eth_chainId'?'0x1':p.method==='eth_accounts'?[address]:'0xde0b6b3a7640000'};const native=await readNativeBalance(provider,address);assert.equal(native.symbol,'ETH');assert.equal(displayAmount(native.amount),'1');
 });
-test('mainnet funds never satisfy a testnet order budget',()=>{
- assert.equal(fundingState({connected:true,network:'hyperliquid-mainnet',status:'ready',available:999},20).kind,'mainnet');
+test('testnet funds never satisfy a mainnet plan budget',()=>{
+ assert.equal(fundingState({connected:true,network:'hyperliquid-testnet',status:'ready',available:999},20).kind,'check');
 });
 test('native wallet view reads official mainnet USDC without using testnet token IDs',async()=>{
  const calls=[];const provider={request:async p=>{calls.push(p);if(p.method==='eth_chainId')return '0xa4b1';if(p.method==='eth_accounts')return [address];if(p.method==='eth_getBalance')return '0x0';return '0x'+(12345678n).toString(16).padStart(64,'0');}};

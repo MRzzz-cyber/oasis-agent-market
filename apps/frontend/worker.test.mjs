@@ -72,8 +72,11 @@ test('release endpoint is public and mutable assets cannot retain stale trade co
   const {default:worker}=await import('./worker.js');
   const release=await worker.fetch(new Request('https://oasis.test/api/release'),{});
   assert.equal(release.status,200);assert.equal(release.headers.get('cache-control'),'no-store');
-  const info=await release.json();assert.equal(info.version,'deposit-v13-20261116');assert.equal(info.defaultTestBudget,'20');
-  const asset=await worker.fetch(new Request('https://oasis.test/app.js?v=deposit-v13-20261116'),{ASSETS:{fetch:async()=>new Response('app source',{headers:{'cache-control':'public,max-age=3600'}})}});
+  const info=await release.json();assert.equal(info.version,'mainnet-guide-v14-20261116');assert.equal(info.defaultTestBudget,'20');
+  const asset=await worker.fetch(new Request('https://oasis.test/app.js?v=mainnet-guide-v14-20261116'),{ASSETS:{fetch:async()=>new Response('app source',{headers:{'cache-control':'public,max-age=3600'}})}});
   assert.equal(asset.headers.get('cache-control'),'no-store');assert.equal(asset.headers.get('x-oasis-release'),info.version);
   assert.equal(await asset.text(),'app source');
 });
+
+
+test('different advisor models receive the same honest mainnet conversion flow',async()=>{const systems=[];for(const model of ['vendor/model-a','vendor/model-b']){await streamOpenRouterChat({model,messages:[{role:'user',content:'我想买 ETH'}],env:{OPENROUTER_API_KEY:'fixture'},fetchImpl:async(url,init)=>{const messages=JSON.parse(init.body).messages;systems.push(messages.find(m=>m.role==='system').content);return new Response('data: [DONE]\n\n',{headers:{'content-type':'text/event-stream'}});}});}assert.equal(systems[0],systems[1]);assert.match(systems[0],/10 USDC 小额体验/);assert.match(systems[0],/最终真实订单由用户在 Hyperliquid 官网/);assert.match(systems[0],/不能把旧测试签名/);});

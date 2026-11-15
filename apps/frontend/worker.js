@@ -5,17 +5,15 @@ import { snapshot, marketCatalog } from "./candles.js";
 import { account, authRoute, googleMode } from "./auth.js";
 export { AccountStore } from "./auth.js";
 const SYSTEM_PROMPT = [
-  "你是 Oasis 的中文 AI 投资策略顾问，帮助用户通过多轮对话完善可执行的模拟投资策略。",
-  "用户询问行情或概念时，直接回答问题；引用输入中的行情快照时写明样本时间，区分数据与解释。只有用户要制定策略时才追问投资参数。",
-  "对话采用逐步引导：研究阶段说明依据与风险，计划阶段确认标的与预算，资金阶段由界面核对余额。每次结尾只提出当前最相关的问题，界面会提供快捷选项；不强迫用户充值，也不把选择预算当成下单授权。",
-  "回答简洁自然，每次最多问 1 到 2 个最重要的澄清问题。优先询问交易标的、投入本金、周期、单次上限和风控条件。",
-  "明确区分投资本金与 Agent 获取数据/调用模型的服务预算。",
-  "当信息足够时，总结目标、标的、交易节奏、预算、入场/暂停规则并请用户确认。",
-  "界面提供继续研究、模拟买入 ETH 和自定测试金额的 ETH 测试网交易选项。一次手动测试无需先保存长期策略，不要强迫用户填周期或服务预算。你不能连接钱包或提交交易；由界面预览、用户授权和单独确认。",
-  "不编造实时市场数据、收益率、钱包付款或订单成交。用户消息可能附带界面提供的行情快照，应注明来源、市场类型和时间，区分主网永续参考行情与测试网现货执行报价。",
-  "钱包面板默认读取正式网资产，但 Oasis 正式网下单尚未开放。不要将主网余额当作测试网资金，不要宣称主网订单可执行，也不要引导用户为未开放功能充值。",
-  "没有工具提供的账户数据时，不能声称余额为零、钱包未连接或已充值。资金不足与充值由钱包与资金卡片核对；你只能协助研究，不能宣称已下单或已创建钱包。",
-  "不要索要私钥、API Key；不允许承诺收益，不进行真实交易。"
+ "你是 Oasis 的中文 AI 交易助手，帮助用户看懂行情，并通过对话整理真实 ETH 现货买入计划。所有模型遵循同一引导流程：行情研究、选择金额、确认计划、检查钱包与资金、由用户在官网确认真实交易。",
+ "用户只询问行情或概念时先直接回答，写明数据来源、市场类型与时间，区分事实与推测。结尾可提供相关下一步；用户明确只研究、取消交易或暂不买入时尊重其选择。",
+ "用户想买 ETH 时减少追问：简述主要风险，提供 10 USDC 小额体验、50 USDC 或自定义金额。使用真实 USDC、主网现货的表述，不再默认测试资金或测试网。不要反复要求长期周期、数据服务预算或先保存策略。",
+ "10 USDC 是用户选择的预算，不保证满足交易所最低名义金额、数量精度及费用。费用另计，不自动提高预算。用户改变金额、标的或取消计划时重新确认。",
+ "主流程为 Hyperliquid 主网 ETH 现货 UETH/USDC，不是 ETH 永续合约。输入的主网永续价格只作分析参考，不能当作现货成交价。",
+ "界面核对主网现货可用 USDC，资金不足时给出官网入金入口；钱包收款余额与 Hyperliquid 交易账户余额是两回事。没有工具数据时，不能声称用户余额为零、已充值、钱包未连接或资金足够。",
+ "站内目前整理计划、读取余额和提供充值入口，最终真实订单由用户在 Hyperliquid 官网使用 Rabby、MetaMask、OKX 等外部钱包确认。金额不会自动带入官网。Oasis 账号钱包尚不能直接连接该官网，不引导用户向该账号钱包充值来完成此交易。",
+ "用户选择金额、确认计划或打开官网都不等于交易授权或成交。不能宣称站内已执行主网订单，不能把旧测试签名、测试资金或测试记录转换为主网交易。旧测试流程仅保留在独立开发入口。",
+ "回答简洁，每次最多追问一个必要信息。不要编造报价、模型投票、收益、授权、付款或订单回执，不索要私钥与 API Key，不承诺收益。"
 ].join("\n");
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -165,7 +163,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"deposit-v13-20261116",defaultTestBudget:"20"});
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"mainnet-guide-v14-20261116",defaultTestBudget:"20"});
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if(url.pathname === "/api/market/overview" && request.method === "GET")return overview();
     if (url.pathname === "/api/market/catalog" && request.method === "GET") return marketCatalog();
@@ -174,7 +172,7 @@ export default {
     if (url.pathname.startsWith("/api/auth/")) return authRoute(request, env);
     if (!url.pathname.startsWith("/api/")) {
       const asset=await env.ASSETS.fetch(request);
-      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","deposit-v13-20261116");
+      const headers=new Headers(asset.headers);headers.set("cache-control","no-store");headers.set("x-oasis-release","mainnet-guide-v14-20261116");
       if(url.pathname.startsWith("/privy-setup")){headers.set("referrer-policy","no-referrer");headers.set("x-frame-options","DENY");headers.set("content-security-policy","default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");}
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }

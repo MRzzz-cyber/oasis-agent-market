@@ -1,17 +1,17 @@
-import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=deposit-v13-20261116';
-import {renderAccountButton} from "./account-avatar.js?v=deposit-v13-20261116";
-import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=deposit-v13-20261116";
-import {conversationGuide,fundingState} from "./conversation-guide.js?v=deposit-v13-20261116";
-import {setMarkdown} from "./markdown.js?v=deposit-v13-20261116";
-import {initEyeMotion} from "./eye-logo.js?v=deposit-v13-20261116";
-import {initWorkbench} from "./workbench.js?v=deposit-v13-20261116";
-import {testnetPanel} from "./testnet.js?v=deposit-v13-20261116";
+import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=mainnet-guide-v14-20261116';
+import {renderAccountButton} from "./account-avatar.js?v=mainnet-guide-v14-20261116";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=mainnet-guide-v14-20261116";
+import {conversationGuide,fundingState,tradeBudget,OFFICIAL_TRADE_URL} from "./conversation-guide.js?v=mainnet-guide-v14-20261116";
+import {setMarkdown} from "./markdown.js?v=mainnet-guide-v14-20261116";
+import {initEyeMotion} from "./eye-logo.js?v=mainnet-guide-v14-20261116";
+import {initWorkbench} from "./workbench.js?v=mainnet-guide-v14-20261116";
+import {testnetPanel} from "./testnet.js?v=mainnet-guide-v14-20261116";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="deposit-v13-20261116";
+const UI_RELEASE="mainnet-guide-v14-20261116";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -510,7 +510,7 @@ async function sendToRealModel() {
 }
 function renderChatChoices() {
   const actions=$("chat-next-actions");actions.replaceChildren();
-  if(chatBusy || state.conversation.at(-1)?.role!=="assistant")return;
+  if(chatBusy || !state.conversation.length)return;
   const guide=conversationGuide(state.conversation);
   const progress=node("div","guide-progress");
   for(const [step,label] of [["research","行情研究"],["plan","确认计划"],["funds","准备资金"]]){const item=node("span",step===guide.stage?"active":"",label);if(step===guide.stage)item.setAttribute("aria-current","step");progress.append(item);}
@@ -518,20 +518,25 @@ function renderChatChoices() {
   const grid=node("div","reply-options");
   for(const choice of guide.choices){
     const b=node("button","reply-option");b.type="button";b.append(node("strong","",choice.title),node("small","",choice.description),node("span","reply-arrow","↗"));
-    b.onclick=()=>{if(chatBusy)return; if(choice.kind==="funds")return workbench.openFunds();if(choice.kind==="preview")return showChatTradePlan();$("chat-input").value=choice.text;$("chat-form").requestSubmit();};grid.append(b);
+    b.onclick=()=>{if(chatBusy)return; if(choice.kind==="funds")return showChatTradePlan();if(choice.kind==="preview")return showChatTradePlan();if(choice.kind==="custom")return showChatTradePlan();if(choice.kind==="budget")return chooseMainnetBudget(choice.amount);$("chat-input").value=choice.text;$("chat-form").requestSubmit();};grid.append(b);
   }
   actions.append(grid,node("p","note guide-freeform","也可以在下面直接输入，或调整你的想法。选择选项不会自动授权或提交交易。"));
 }
-function renderFundingCard() {
-  const host=$("chat-funding-card");host.replaceChildren();
-  const guide=conversationGuide(state.conversation);
-  if(chatBusy || state.conversation.at(-1)?.role!=="assistant" || guide.stage!=="funds")return;
-  const info=fundingState(workbench.funds(),guide.budget);
-  const card=node("section","funding-cta guided-funding");
-  const copy=node("div");copy.append(node("span","funding-cta-icon","▣"),node("span","funding-network-label","Hyperliquid Testnet · 测试资产"),node("strong","",info.title),node("p","note",info.body));
-  const b=node("button","primary",info.action);b.type="button";b.onclick=()=>info.kind==="ready"?showChatTradePlan():workbench.openFunds();card.append(copy,b);host.append(card);
+function fundingAction(info){if(info.kind==='connect'||info.kind==='external')return workbench.openTradingWallet();if(info.kind==='ready')return showChatTradePlan();return workbench.openFunds();}
+function renderFundingCard(){
+ const host=$('chat-funding-card');host.replaceChildren();const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds')return;
+ const info=fundingState(workbench.funds(),guide.budget),card=node('section','funding-cta guided-funding'),copy=node('div');copy.append(node('span','funding-network-label','Hyperliquid Mainnet · 真实资金'),node('strong','',info.title),node('p','note',info.body));
+ let button;if(info.kind==='fund'){button=node('a','primary',info.action+' ↗');button.href=OFFICIAL_TRADE_URL;button.target='_blank';button.rel='noopener noreferrer';}else{button=node('button','primary',info.action);button.type='button';button.onclick=()=>fundingAction(info);}card.append(copy,button);host.append(card);
 }
-window.addEventListener("oasis:funds-updated",()=>{if(state.conversation.length)renderFundingCard();});
+window.addEventListener('oasis:funds-updated',()=>{if(state.conversation.length){renderFundingCard();const amount=$('mainnet-plan-amount');if(amount)updateMainnetPlanFunding(amount.value);}});
+function chooseMainnetBudget(amount){const value=tradeBudget(amount);addChat('user','我选择 ETH 主网现货买入，本次买入预算 '+value+' USDC，费用另计。先确认计划与资金，不代表授权下单。');persistConversation();renderChatChoices();renderFundingCard();showChatTradePlan(value);}
+function updateMainnetPlanFunding(amount){
+ const host=$('mainnet-plan-funding');if(!host)return;host.replaceChildren();let budget;try{budget=tradeBudget(amount);}catch(e){host.append(node('p','note',e.message));return;}
+ const wallet=workbench.funds(),info=fundingState(wallet,budget);host.append(node('strong','',info.title),node('p','note',info.body));if(wallet.address)host.append(node('code','mainnet-plan-address',wallet.address));
+ if(info.kind!=='fund'&&info.kind!=='ready'){const connect=node('button','primary',info.action);connect.type='button';connect.onclick=()=>fundingAction(info);host.append(connect);return;}
+ const steps=node('ol','mainnet-handoff-steps');for(const text of ['在官网连接上方同一钱包地址。','在官网选择 Spot 现货 → UETH/USDC（ETH 现货），不要选 ETH 永续。','手动填写本次预算 '+budget+' USDC；检查数量、价格和手续费，再由你确认订单。'])steps.append(node('li','',text));host.append(steps);
+ const official=node('a','primary',info.kind==='fund'?'前往官网入金并准备现货交易 ↗':'前往官网确认 ETH 现货交易 ↗');official.href=OFFICIAL_TRADE_URL;official.target='_blank';official.rel='noopener noreferrer';host.append(official,node('p','note','金额不会自动填入官网；跳转不代表已提交或成交。'));
+}
 async function startChatSimulation() {
   const host=$("chat-trade-plan");
   if(host.querySelector(".ten-trade"))return toast("当前已有测试交易，请先完成或核对回执。");
@@ -547,34 +552,14 @@ async function startChatSimulation() {
     addChat("user","我选择先模拟买入 ETH，金额 10 USDC，不发起测试网或主网交易。");
   }catch(e){toast(e.message);}
 }
-function showChatTradePlan() {
-  const host=$("chat-trade-plan");
-  if(host.querySelector(".ten-trade")){host.scrollIntoView({behavior:"smooth",block:"start"});return;}
-  host.replaceChildren();
-  const card=node("section","conversation-plan");
-  card.append(node("span","status-pill","待你确认 · 仅测试网"),node("h3","","准备一笔 ETH 测试交易"),node("p","note","这是你选择的一次手动测试，不代表 AI 已判断满足原策略条件。"));
-  const list=node("dl","conversation-plan-terms");
-  for(const [label,value] of [["交易网络","Hyperliquid Testnet"],["标的 / 方向","ETH（UETH）/ 买入"],["金额上限","由下方填写 · 费用另计"],["执行方式","限价买入 · 未成交部分撤销"]])list.append(node("dt","",label),node("dd","",value));
-  const amountLabel=node("label","plan-amount","测试金额上限（测试 USDC）");
-  const amountInput=node("input","");amountInput.type="number";amountInput.min="10";amountInput.max="1000";amountInput.step="0.01";amountInput.value=String(conversationGuide(state.conversation).budget || 20);amountInput.setAttribute("aria-label","交易计划测试金额");amountLabel.append(amountInput);card.append(amountLabel);
-  const controls=node("div","action-row");
-  const change=node("button","ghost","修改计划");change.type="button";change.onclick=()=>{amountInput.focus();};
-  const connect=node("button","primary","确认计划，连接钱包并预览");connect.type="button";
-  const error=node("p","note");error.setAttribute("role","status");
-  connect.onclick=async()=>{
-    if(chatBusy)return toast("请等待当前回复完成");
-    connect.disabled=true;
-    try {
-      const run=await request("/api/trade-plans",{method:"POST",body:JSON.stringify({asset:"ETH",amount:amountInput.value.trim(),network:"hyperliquid-testnet",goal:state.goal,model:state.modelName,modelId:state.model})});
-      state.run=run;
-      addChat("user","我确认本次计划：在 Hyperliquid 测试网手动买入 ETH，金额上限 "+run.testBudget+" 测试 USDC，费用另计。先预览，提交前由我单独确认。");
-      const panel=testnetPanel(run,reviewTestnet);host.replaceChildren(panel);
-      panel.querySelector(".wallet-connection button")?.click();
-      panel.scrollIntoView({behavior:"smooth",block:"start"});
-    }catch(e){error.textContent=e.message;connect.disabled=false;}
-  };
-  controls.append(change,connect);card.append(list,controls,error);host.append(card);
-  host.scrollIntoView({behavior:"smooth",block:"nearest"});
+function showChatTradePlan(amount=conversationGuide(state.conversation).budget||10){
+ const host=$('chat-trade-plan');host.replaceChildren();const card=node('section','conversation-plan mainnet-plan');card.append(node('span','status-pill','主网现货 · 真实资金'),node('h3','','确认 ETH 买入计划'),node('p','note','先核对计划与资金，最终在 Hyperliquid 官网连接外部钱包并确认真实订单。Oasis 当前不在站内签署主网订单。'));
+ const label=node('label','plan-amount','本次买入预算（USDC，费用另计）'),input=node('input','');input.id='mainnet-plan-amount';input.type='number';input.min='10';input.step='0.01';input.value=String(amount);input.setAttribute('aria-label','ETH 主网买入预算');label.append(input);card.append(label);
+ const presets=node('div','mainnet-amount-presets');for(const value of [10,50]){const button=node('button','ghost',value===10?'10 USDC 小额体验':'50 USDC');button.type='button';button.onclick=()=>{input.value=String(value);input.dispatchEvent(new Event('input'));};presets.append(button);}card.append(presets,node('p','note','10 USDC 为预算选项，可能不足以覆盖交易所最低名义金额、数量精度及费用；请在官网复核，Oasis 不会自动提高你的预算。'));
+ const confirm=node('button','primary','确认计划，检查资金');confirm.type='button';const status=node('p','note');status.setAttribute('role','status');const funding=node('div','mainnet-plan-funding');funding.id='mainnet-plan-funding';funding.hidden=true;
+ input.oninput=()=>{funding.hidden=true;funding.replaceChildren();status.textContent='金额已修改，请重新确认计划。';};
+ confirm.onclick=()=>{try{const budget=tradeBudget(input.value);addChat('user','我确认 ETH 主网现货买入计划，本次买入预算 '+budget+' USDC，费用另计；只检查资金，订单由我在官网单独确认。');persistConversation();funding.hidden=false;updateMainnetPlanFunding(budget);renderChatChoices();renderFundingCard();status.textContent='计划已确认，尚未提交订单。';}catch(e){status.textContent=e.message;}};
+ card.append(confirm,status,funding);host.append(card);host.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function beginConversation() {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
@@ -899,6 +884,7 @@ $("change-model").addEventListener("change", event => {
 });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
+  $("chat-trade-plan").replaceChildren();
   try { appendUserMessage(value); } catch (error) { toast(error.message); return; }
   state.goal = (state.goal + "；补充要求：" + value).slice(-2000); $("chat-input").value = "";
   makeDraftSummary();
@@ -921,14 +907,14 @@ checkAiStatus();
 
 $("ai-retry").addEventListener("click", () => { if (state.conversation.at(-1)?.role === "user") sendToRealModel(); else toast("请输入新的消息后发送"); });
 
-$("direct-test").onclick=()=>showTab("testnet");
+$("direct-test").onclick=()=>{showTab("create");showChatTradePlan(10);};
 checkRelease();
 if(new URLSearchParams(location.search).get("trade")==="testnet")showTab("testnet");
 
 const workbench=initWorkbench({
   prompt:value=>{if(chatBusy)return toast("请等待当前回复完成");resetStarter();$("goal").value=value;beginConversation();},
   trade:()=>{
-    if(!state.goal)state.goal="准备一笔用户手动确认的 ETH 测试网买入交易";
+    if(!state.goal)state.goal="准备一笔用户手动确认的 ETH 主网现货买入交易";
     makeDraftSummary();showTab("create");showChatTradePlan();
   },account:openAccount
 });

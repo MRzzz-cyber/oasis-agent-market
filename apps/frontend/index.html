@@ -4,17 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
-  <link rel="icon" href="/brand/favicon.svg?v=deposit-v13-20261116" type="image/svg+xml"/>
+  <link rel="icon" href="/brand/favicon.svg?v=mainnet-guide-v14-20261116" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=deposit-v13-20261116"/>
-  <link rel="stylesheet" href="/workbench.css?v=deposit-v13-20261116"/>
+  <link rel="stylesheet" href="/styles.css?v=mainnet-guide-v14-20261116"/>
+  <link rel="stylesheet" href="/workbench.css?v=mainnet-guide-v14-20261116"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
-    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页"><span data-oasis-eye></span></a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="对话与策略记录" aria-label="对话与策略记录">◷</button><span class="rail-bottom">TEST</span></aside>
+    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页"><span data-oasis-eye></span></a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="对话与策略记录" aria-label="对话与策略记录">◷</button><span class="rail-bottom">MAINNET</span></aside>
     <header class="app-header"><div class="header-inner">
       <a class="wordmark" href="/" aria-label="Oasis 首页"><span data-oasis-eye></span>Oasis</a>
-      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">对话与策略</button><button data-tab="testnet">测试交易</button></nav>
+      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">对话与策略</button></nav>
       <div class="header-actions"><button type="button" class="header-wallet" id="header-wallet-open" aria-label="钱包与资金" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M19 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 11h-5a2 2 0 0 0 0 4h5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.5" cy="13" r=".6" fill="currentColor" stroke="none"/></svg><span class="wallet-label-wide">钱包与资金</span><span class="wallet-label-narrow">钱包</span></button><button class="ghost account-chip" id="account-button" hidden>登录</button></div>
     </div></header>
     <aside class="market-sidebar" aria-label="实时市场行情">
@@ -22,11 +22,11 @@
       <div class="watch-tabs"><button class="active" type="button" data-watch-group="crypto">加密</button><button type="button" data-watch-group="stocks">美股</button><button type="button" data-watch-group="macro">宏观</button><button type="button" data-watch-group="all">全部</button></div>
       <label class="watch-search"><span class="sr-only">搜索行情</span><input id="watch-search" placeholder="搜索币种或市场" type="search"/></label>
       <div class="watch-columns"><span>资产 / 永续</span><span>价格 / 24h</span></div><div id="watchlist" class="watchlist"></div>
-      <div class="watch-foot"><span id="watch-count">—</span><button type="button" id="watch-refresh" aria-label="刷新侧栏行情">↻ 刷新</button><small id="watch-status" role="status">正在连接 Hyperliquid…</small><small>主网永续行情 · 测试交易另行报价</small></div>
+      <div class="watch-foot"><span id="watch-count">—</span><button type="button" id="watch-refresh" aria-label="刷新侧栏行情">↻ 刷新</button><small id="watch-status" role="status">正在连接 Hyperliquid…</small><small>主网永续行情 · 现货订单需单独核对</small></div>
     </aside>
-    <div class="content"><div class="workbench-bar"><button type="button" id="toggle-watch" aria-label="显示市场列表">☰</button><span>AI 交易助手 <span class="bar-divider">/</span> <b id="workbench-asset">ETH</b></span><span class="environment-badge">测试网执行</span></div>
+    <div class="content"><div class="workbench-bar"><button type="button" id="toggle-watch" aria-label="显示市场列表">☰</button><span>AI 交易助手 <span class="bar-divider">/</span> <b id="workbench-asset">ETH</b></span><span class="environment-badge">主网行情 · 真实交易计划</span></div>
       <main>
-        <section id="page-overview" class="app-page"><div class="direct-test-link"><button type="button" class="ghost" id="direct-test">直接测试一笔 ETH 交易 ↗</button></div>
+        <section id="page-overview" class="app-page"><div class="direct-test-link"><button type="button" class="ghost" id="direct-test">10 USDC 起，准备 ETH 买入 ↗</button></div>
           <div class="welcome"><div class="assistant-emblem"><span data-oasis-eye></span></div><span class="eyebrow">YOUR MARKET, IN CONTEXT</span><h1>从一个判断，<br/>到一份交易计划。</h1><p>先看懂行情，再和 Oasis 一起明确行动。每一笔交易由你确认。</p></div>
           <div class="selected-quote"><span class="coin-symbol" data-coin="ETH">E</span><strong id="selected-market">ETH</strong><b id="selected-market-price">行情读取中</b><span id="selected-market-change">—</span><small>主网永续 / 实时参考</small></div>
           <div id="prompt-guides" class="prompt-guides" aria-label="引导问题"></div>
@@ -47,7 +47,7 @@
           <small id="market-count" role="status"></small><p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="市场 K 线及成交量"></canvas>
           <div id="market-insights" class="market-insights" aria-label="已收盘 K 线指标"></div><div class="market-controls"><button type="button" class="ghost" id="market-reload">刷新行情</button><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
-          <div class="page-heading"><div><h2>和 Oasis 一起研究</h2><p>先讨论，再选择模拟或测试网交易。策略保存为可选。</p></div><button class="ghost" id="new-idea">新对话</button></div>
+          <div class="page-heading"><div><h2>和 Oasis 一起研究</h2><p>先研究，再确认真实买入计划。策略保存为可选。</p></div><button class="ghost" id="new-idea">新对话</button></div>
           <div class="conversation panel">
             <div class="conversation-top"><div><strong>Oasis · 交易助手</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><label class="ghost inline-model-picker"><span aria-hidden="true">更换模型 ▾</span><select id="change-model" aria-label="更换模型" disabled></select></label></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div><div id="chat-next-actions" class="chat-next-actions" aria-label="对话下一步"></div><div id="chat-funding-card"></div><div id="chat-trade-plan" class="chat-trade-plan" aria-live="polite"></div>
@@ -64,8 +64,8 @@
               <label>投资预算（可选）<input id="draft-capital" type="number" min="0.000001" step="any" placeholder="例如月度预算 500"/></label>
               <label>暂停回撤 %（可选）<input id="draft-stop" type="number" min="0.01" max="100" step="any" placeholder="例如 5"/></label>
             </div>
-            <p class="note">ETH 可进入自定金额的测试网手动交易流程，其他标的使用模拟样本。保存后展示下一步。</p>
-            <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 服务采购付款关闭 · ETH 支持用户签名测试网交易</small></details>
+            <p class="note">ETH 可整理主网现货买入计划；保存策略不代表授权或下单。</p>
+            <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 服务采购付款关闭 · ETH 主网订单由用户在官网确认</small></details>
             <button class="primary" id="create-strategy">保存策略</button>
           </div></details>
         </section>
@@ -84,12 +84,12 @@
       <details class="wallet-asset-details"><summary>交易账户详情 <span>Hyperliquid ↗</span></summary><section class="mainnet-assets"><div class="native-usdc"><span>现货可用 USDC</span><strong id="funds-balance">—</strong></div><div class="native-usdc"><span>永续可提 USDC</span><strong id="funds-perp">—</strong></div><div id="funds-spot-assets" class="spot-assets"></div><p id="funds-status" class="note" role="status">连接后读取交易账户</p><p class="note account-scope">与钱包余额分开计算，不含子账户、金库及其他永续 DEX。</p><a class="wallet-official-link" href="https://app.hyperliquid.xyz/portfolio" target="_blank" rel="noopener noreferrer">在官方查看 ↗</a></section></details>
       <details class="wallet-onboarding" id="funds-wallet-chooser" open><summary><span id="funds-wallet-summary">创建账号钱包</span><small>Oasis</small></summary><div class="account-wallet-note account-wallet-primary"><div class="account-wallet-brand"><span class="wallet-brand-mark">O</span><strong>Oasis 账号钱包</strong><span id="account-wallet-state">登录后创建</span></div><p id="account-wallet-note">登录后创建或恢复你的独立钱包。</p><button type="button" class="primary" id="account-wallet-action">登录并创建钱包</button><button type="button" class="ghost" id="account-wallet-login">账号设置</button></div></details>
       <section class="wallet-external"><div class="assets-section-head"><h3>连接其他钱包</h3><button type="button" class="ghost" id="funds-connect">重新检测</button></div><div id="funds-wallet-list" class="wallet-list" aria-label="已有钱包"></div></section>
-      <p class="wallet-panel-footnote">仅展示主网资产 · 正式网下单暂未开放</p>
+      <p class="wallet-panel-footnote">主网资产 · 真实交易请在官方平台确认</p>
       <button type="button" class="ghost funds-trade" id="funds-trade">返回研究 →</button></dialog><button id="funding-backdrop" class="funding-backdrop" type="button" hidden aria-label="关闭钱包与资金"></button>
       <dialog id="deposit-dialog" class="deposit-dialog" aria-labelledby="deposit-title"><div class="drawer-heading"><div><span class="eyebrow">RECEIVE CRYPTO</span><h2 id="deposit-title">充值</h2></div><button type="button" class="icon-button" id="deposit-close" aria-label="关闭充值">×</button></div><p class="deposit-intro">从其他钱包或交易所转入加密货币</p><div class="deposit-selectors"><label>网络<select id="deposit-network" aria-label="充值网络"></select></label><label>币种<select id="deposit-asset" aria-label="充值币种"><option value="USDC">USDC</option><option value="native" id="deposit-native-option">ETH</option></select></label></div><div class="deposit-code-box"><canvas id="deposit-qr" width="224" height="224" hidden aria-label="收款地址二维码"></canvas><p id="deposit-qr-status" role="status">创建或连接钱包后显示收款码</p></div><p class="deposit-qr-caption">二维码仅包含地址，请在转出平台选择同一网络。</p><div class="deposit-recipient"><div><span>收款地址</span><small id="deposit-selected-network"></small></div><strong id="deposit-wallet-name"></strong><code id="deposit-address">—</code><button type="button" id="deposit-copy" class="ghost" disabled>复制地址</button></div><p id="deposit-contract" class="deposit-contract"></p><p id="deposit-status" class="deposit-status" role="status"></p><button type="button" class="primary" id="deposit-connect">创建或连接钱包</button><button type="button" class="ghost" id="deposit-verify" hidden>重新核对地址</button><details class="deposit-help"><summary>充值说明</summary><p>仅使用所选主网与币种。USDC 为该网络的 Circle 原生 USDC，不是 USDC.e。转出平台可能另有最低金额和手续费，到账时间取决于网络确认。</p><p>资产接收到钱包，不会自动兑换、跨链或入金 Hyperliquid。Oasis 暂未开放主网转出及交易，请按需转入。</p><p>当前余额面板只显示钱包当前网络。接收其他网络资产后，需切换到相应网络查看。</p></details><button type="button" class="ghost deposit-done" id="deposit-done">返回钱包并刷新</button></dialog>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=deposit-v13-20261116" type="module"></script>
+  <script src="/app.js?v=mainnet-guide-v14-20261116" type="module"></script>
 </body>
 </html>
