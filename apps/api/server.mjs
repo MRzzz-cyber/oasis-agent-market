@@ -24,6 +24,8 @@ const routes = new Map([
   ["/account-avatar.js", ["account-avatar.js", "text/javascript; charset=utf-8"]],
   ["/privy-wallet.js", ["privy-wallet.js", "text/javascript; charset=utf-8"]],
   ["/account-wallet.js", ["account-wallet.js", "text/javascript; charset=utf-8"]],
+  ["/deposit.js", ["deposit.js", "text/javascript; charset=utf-8"]],
+  ["/deposit-address.js", ["deposit-address.js", "text/javascript; charset=utf-8"]],
   ["/conversation-history.js", ["conversation-history.js", "text/javascript; charset=utf-8"]],
   ["/conversation-guide.js", ["conversation-guide.js", "text/javascript; charset=utf-8"]],
   ["/markdown.js", ["markdown.js", "text/javascript; charset=utf-8"]],
@@ -61,7 +63,7 @@ export function createAppServer() {
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
-      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"records-v12-20261116",defaultTestBudget:"20"});return;}
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"deposit-v13-20261116",defaultTestBudget:"20"});return;}
       if(req.method === "GET" && url.pathname === "/api/wallet/config"){send(res,200,{enabled:false,appId:null,mode:"user-controlled",network:"hyperliquid-mainnet",executionEnabled:false});return;}
       if(req.method === "GET" && /^\/vendor\/privy\/[a-zA-Z0-9_.-]+\.(js|css)$/.test(url.pathname)){const body=await readFile(path.join(webDir,url.pathname));res.writeHead(200,{"content-type":url.pathname.endsWith(".css")?"text/css":"text/javascript","cache-control":"no-store"});res.end(body);return;}
       const parts = url.pathname.split("/").filter(Boolean);
