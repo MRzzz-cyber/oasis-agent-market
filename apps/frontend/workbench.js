@@ -1,5 +1,5 @@
-import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=wallet-simple-v11-20261116";
-import {availableWallets} from './testnet.js?v=wallet-simple-v11-20261116';
+import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=records-v12-20261116";
+import {availableWallets} from './testnet.js?v=records-v12-20261116';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,text)=>{const n=document.createElement(tag);n.className=cls||'';if(text!=null)n.textContent=text;return n;};
 const preferred=['BTC','ETH','SOL','HYPE','XRP','BNB','DOGE','AVAX','LINK','SUI','ADA','LTC','UNI','AAVE'];

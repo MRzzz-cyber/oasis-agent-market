@@ -4,17 +4,17 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
-  <link rel="icon" href="/brand/favicon.svg?v=wallet-simple-v11-20261116" type="image/svg+xml"/>
+  <link rel="icon" href="/brand/favicon.svg?v=records-v12-20261116" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=wallet-simple-v11-20261116"/>
-  <link rel="stylesheet" href="/workbench.css?v=wallet-simple-v11-20261116"/>
+  <link rel="stylesheet" href="/styles.css?v=records-v12-20261116"/>
+  <link rel="stylesheet" href="/workbench.css?v=records-v12-20261116"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
-    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页"><span data-oasis-eye></span></a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="策略与记录" aria-label="策略与记录">◷</button><span class="rail-bottom">TEST</span></aside>
+    <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页"><span data-oasis-eye></span></a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="对话与策略记录" aria-label="对话与策略记录">◷</button><span class="rail-bottom">TEST</span></aside>
     <header class="app-header"><div class="header-inner">
       <a class="wordmark" href="/" aria-label="Oasis 首页"><span data-oasis-eye></span>Oasis</a>
-      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button><button data-tab="testnet">测试交易</button></nav>
+      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">对话与策略</button><button data-tab="testnet">测试交易</button></nav>
       <div class="header-actions"><button type="button" class="header-wallet" id="header-wallet-open" aria-label="钱包与资金" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M19 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 11h-5a2 2 0 0 0 0 4h5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.5" cy="13" r=".6" fill="currentColor" stroke="none"/></svg><span class="wallet-label-wide">钱包与资金</span><span class="wallet-label-narrow">钱包</span></button><button class="ghost account-chip" id="account-button" hidden>登录</button></div>
     </div></header>
     <aside class="market-sidebar" aria-label="实时市场行情">
@@ -66,10 +66,10 @@
             </div>
             <p class="note">ETH 可进入自定金额的测试网手动交易流程，其他标的使用模拟样本。保存后展示下一步。</p>
             <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 服务采购付款关闭 · ETH 支持用户签名测试网交易</small></details>
-            <button class="primary" id="create-strategy">保存策略并查看执行流程</button>
+            <button class="primary" id="create-strategy">保存策略</button>
           </div></details>
         </section>
-        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看交易计划、准备测试交易和核对运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
+        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><span class="eyebrow">YOUR RESEARCH</span><h2>对话与策略记录</h2><p>接着上次的讨论，或回顾保存的策略。</p></div><button type="button" class="primary" id="history-new-chat">＋ 新对话</button></div><div class="history-toolbar"><div class="history-filters" aria-label="记录类型"><button type="button" data-history-filter="conversations" aria-pressed="true">历史对话</button><button type="button" data-history-filter="strategies" aria-pressed="false">已存策略</button><button type="button" data-history-filter="archive" aria-pressed="false">旧版记录</button></div><input type="search" id="history-search" aria-label="搜索对话与策略" placeholder="搜索对话或策略"/></div><p class="note history-storage-note" id="history-storage-note">对话与策略保存在当前浏览器，按账号区分；暂不跨设备同步。</p><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
 
         <section id="page-testnet" class="app-page hidden">
           <div class="page-heading"><div><span class="status-pill">Hyperliquid Testnet · 测试资产 · 工作台 v4</span><h2>测试一笔 ETH 交易</h2><p>填写金额，连接钱包预览，再授权并单独确认订单。</p></div></div>
@@ -89,6 +89,6 @@
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=wallet-simple-v11-20261116" type="module"></script>
+  <script src="/app.js?v=records-v12-20261116" type="module"></script>
 </body>
 </html>

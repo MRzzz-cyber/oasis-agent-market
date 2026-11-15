@@ -1,16 +1,17 @@
-import {renderAccountButton} from "./account-avatar.js?v=wallet-simple-v11-20261116";
-import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=wallet-simple-v11-20261116";
-import {conversationGuide,fundingState} from "./conversation-guide.js?v=wallet-simple-v11-20261116";
-import {setMarkdown} from "./markdown.js?v=wallet-simple-v11-20261116";
-import {initEyeMotion} from "./eye-logo.js?v=wallet-simple-v11-20261116";
-import {initWorkbench} from "./workbench.js?v=wallet-simple-v11-20261116";
-import {testnetPanel} from "./testnet.js?v=wallet-simple-v11-20261116";
+import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=records-v12-20261116';
+import {renderAccountButton} from "./account-avatar.js?v=records-v12-20261116";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=records-v12-20261116";
+import {conversationGuide,fundingState} from "./conversation-guide.js?v=records-v12-20261116";
+import {setMarkdown} from "./markdown.js?v=records-v12-20261116";
+import {initEyeMotion} from "./eye-logo.js?v=records-v12-20261116";
+import {initWorkbench} from "./workbench.js?v=records-v12-20261116";
+import {testnetPanel} from "./testnet.js?v=records-v12-20261116";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="wallet-simple-v11-20261116";
+const UI_RELEASE="records-v12-20261116";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -287,6 +288,25 @@ async function loadModels() {
     throw error;
   }
 }
+const conversationStores=new Map();
+let conversationId=null,conversationCreatedAt=null,restoringConversation=false,historyFilter='conversations';
+function conversationStore(){const key=demoStorageKey+':conversations';if(!conversationStores.has(key)){let storage;try{storage=localStorage;}catch{}conversationStores.set(key,createConversationStore(storage,key));};return conversationStores.get(key);}
+function persistConversation(){
+  if(restoringConversation||!state.conversation.length)return;
+  conversationId ||= crypto.randomUUID();conversationCreatedAt ||= new Date().toISOString();
+  const stored=conversationStore().save({id:conversationId,createdAt:conversationCreatedAt,goal:state.goal,messages:state.conversation,model:state.modelName,modelId:state.model});
+  $('history-storage-note').textContent=stored?'对话与策略保存在当前浏览器，按账号区分；暂不跨设备同步。':'浏览器存储不可用，本次对话仅保留到页面关闭。';
+}
+function restoreConversation(record){
+  if(chatBusy)return toast('请等待当前模型回复完成');
+  persistConversation();restoringConversation=true;
+  conversationId=record.id;conversationCreatedAt=record.createdAt||new Date().toISOString();
+  state.goal=record.goal||record.messages?.find(m=>m.role==='user')?.content||'';state.conversation=[];
+  $('goal').value=state.goal;$('chat-messages').replaceChildren();$('chat-next-actions').replaceChildren();$('chat-funding-card').replaceChildren();$('chat-trade-plan').replaceChildren();$('chat-input').value='';$('ai-usage').textContent='已恢复历史对话；发送新消息后继续研究。';
+  for(const message of cleanMessages(record.messages))addChat(message.role,message.content);
+  const model=availableModels.find(m=>m.id===record.modelId);if(model){$('model-primary').value=model.id;$('model-primary').dispatchEvent(new Event('change'));}
+  makeDraftSummary();$('draft-panel').open=false;renderChatChoices();renderFundingCard();restoringConversation=false;showTab('create');
+}
 function addChat(role, content) {
   state.conversation.push({ role, content });
   const box = $("chat-messages");
@@ -297,6 +317,7 @@ function addChat(role, content) {
   if (role === "assistant") setMarkdown(paragraph, content);
   msg.appendChild(paragraph); box.appendChild(msg);
   box.scrollTop = box.scrollHeight;
+  if(role==='user')persistConversation();
   return paragraph;
 }
 function makeDraftSummary() {
@@ -314,7 +335,7 @@ function appendUserMessage(value) {
     if ((pending.content + "；补充：" + value).length > 2000) throw Error("待发送消息合计不能超过 2000 字，请先重试上一条");
     pending.content += "；补充：" + value;
     const messages = $("chat-messages").querySelectorAll(".chat-message.user p");
-    messages[messages.length - 1].textContent = pending.content;
+    messages[messages.length - 1].textContent = pending.content;persistConversation();
   } else addChat("user", value);
 }
 let chatBusy = false;
@@ -484,7 +505,7 @@ async function sendToRealModel() {
     chatBusy = false; button.disabled = false; button.textContent = "发送";
     for (const id of ["ai-retry", "create-strategy", "change-model"]) $(id).disabled = false;
     $("model-primary").disabled = !availableModels.length;
-    renderChatChoices();renderFundingCard();
+    persistConversation();renderChatChoices();renderFundingCard();
   }
 }
 function renderChatChoices() {
@@ -558,10 +579,11 @@ function showChatTradePlan() {
 function beginConversation() {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
   if (googleLogin && !currentUser?.active) { openAccount(); return; }
-  state.goal = $("goal").value.trim();
-  if (!state.goal) return;
+  const nextGoal = $("goal").value.trim();
+  if (!nextGoal) return;
   updateModelLabels();
   if (!state.model) { toast("请先在策略工作台中选择一个 OpenRouter 模型"); showTab("overview"); return; }
+  persistConversation();state.goal=nextGoal;conversationId=crypto.randomUUID();conversationCreatedAt=new Date().toISOString();
   state.conversation = [];
   $("chat-next-actions").replaceChildren();$("chat-trade-plan").replaceChildren();$("chat-funding-card").replaceChildren();
   $("draft-panel").open=false;
@@ -574,63 +596,39 @@ function beginConversation() {
   $("chat-input").value = "";
   showTab("create");
 }
-async function refreshStrategies() {
-  const [items, runs] = await Promise.all([request("/api/strategies"), request("/api/runs")]); state.strategies = items;
-  const root = $("strategy-list"); root.replaceChildren();
-  if (!items.length) root.appendChild(node("p", "note", "还没有策略。先在策略工作台与 Oasis 讨论一个投资想法。"));
-  for (const item of items) {
-    const article = node("article", "strategy-card");
-    const info = node("div"); info.append(node("strong", "", item.terms ? item.asset + " · " + item.terms.cadence : item.asset + " · " + item.goal), node("p", "note", (item.terms ? "单次上限 " + item.terms.maxOrder + " " + item.terms.quoteAsset + " · " : "") + (item.model || "未记录模型")));
-    if (item.terms) {
-      const details = node("details", "strategy-goal");
-      details.append(node("summary", "", "原始目标"), node("p", "", item.goal));
-      info.appendChild(details);
-    }
-    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "打开测试交易" : "运行模拟策略") : "补全旧策略");
-    btn.addEventListener("click", async () => {
-      if(item.asset==="ETH"){showTab("testnet");return;}
-      if (!item.terms) {
-        if (chatBusy) { toast("请等待模型回复完成"); return; }
-        state.goal = item.goal; state.conversation = [];
-        $("goal").value = item.goal; $("chat-messages").replaceChildren();
-        for (const message of item.conversation || [{ role: "user", content: item.goal }]) addChat(message.role, message.content);
-        makeDraftSummary(); renderChatChoices();renderFundingCard(); showTab("create");
-        toast("请补全并确认单次上限；保存后会创建新策略"); return;
-      }
-      btn.disabled = true;
-      try {
-        state.run = await request("/api/runs", {method:"POST",body:JSON.stringify({strategyId:item.id, mode:item.asset==="ETH"?"testnet":"simulation"})});
-        await refreshStrategies();
-        $("run-panel").scrollIntoView({behavior:"smooth",block:"start"});
-      }
-      catch (error) { toast(error.message); } finally { btn.disabled = false; }
-    });
-    const history = runs.filter(run => run.strategyId === item.id).reverse();
-    const actions = node("div", "action-row"); actions.appendChild(btn);
-    if (history.length) {
-      const select = node("select", "run-history"); select.setAttribute("aria-label", "选择历史运行");
-      for (const run of history) {
-        const status = ({ manual_testnet: "测试网记录", blocked: "风控暂停", awaiting_approval: "待确认", simulated: "已创建订单", monitoring: "跟踪中", rejected: "已拒绝" })[run.status] || run.status;
-        const option = node("option", "", new Date(run.createdAt).toLocaleString("zh-CN") + " · " + status);
-        option.value = run.id; select.appendChild(option);
-      }
-      const resume = node("button", "ghost", "查看运行记录（" + history.length + "）");
-      resume.addEventListener("click", () => { state.run = history.find(run => run.id === select.value); renderRunContent(); $("run-panel").scrollIntoView({ behavior: "smooth" }); });
-      actions.append(select, resume);
-    }
-    article.append(info, actions); root.appendChild(article);
-  }
-  for(const run of runs.filter(item=>item.source==="conversation").reverse()) {
-    const article=node("article","strategy-card");
-    const info=node("div");info.append(node("strong","",run.mode==="testnet"?"ETH · 对话测试交易":"ETH · 对话模拟订单"),node("p","note",(run.testBudget || "10")+" 测试 USDC 上限 · "+new Date(run.createdAt).toLocaleString("zh-CN")));
-    const resume=node("button","ghost","查看交易 / 回执");resume.type="button";resume.onclick=()=>{state.run=run;renderRunContent();$("run-panel").scrollIntoView({behavior:"smooth",block:"start"});};
-    article.append(info,resume);root.append(article);
-  }
-  if (!state.run) {
-    try { state.run = runs.find(run => run.id === localStorage.getItem(demoStorageKey+":active-run")) || null; } catch {}
-  }
-  if (state.run) renderRunContent();
+function historicalStatus(run){return ({manual_testnet:'测试记录',blocked:'模拟暂停',awaiting_approval:'模拟待确认',simulated:'模拟订单',monitoring:'模拟跟踪',rejected:'已拒绝'})[run.status]||'历史记录';}
+function showArchivedRun(run){
+  const panel=$('run-panel');panel.classList.remove('hidden');const head=panel.querySelector('.activity-head');head.querySelector('h3').textContent='历史记录';head.querySelector('p').textContent='保存时的快照，不代表当前行情或有效交易计划。';head.querySelector('.status-pill').textContent=run.mode==='testnet'?'旧版测试网':'旧版模拟';
+  $('flowchart').replaceChildren();$('order-followup').replaceChildren();$('order-followup').classList.add('hidden');const body=$('decision');body.replaceChildren();
+  body.append(node('h3','',run.asset+' · '+(run.mode==='testnet'?'测试记录':'模拟记录')),node('p','note',historyDate(run.createdAt)),node('p','',run.goal||'未保存原始目标'));
+  let receipt;try{receipt=JSON.parse(localStorage.getItem('oasis-hl-test-order:'+run.id));}catch{}
+  body.append(node('p','note',receipt?.message?'本地回执：'+receipt.message:'记录状态：'+historicalStatus(run)+'。没有已保存的成交回执。'));
+  if(run.terms)body.append(node('p','note','历史参数：'+Object.entries(run.terms).map(([key,value])=>key+' '+value).join(' · ')));
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
+function historyDate(value){return Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'较早记录';}
+async function refreshStrategies(){
+  persistConversation();const [items,runs]=await Promise.all([request('/api/strategies'),request('/api/runs')]);state.strategies=items;
+  $('run-panel').classList.add('hidden');const root=$('strategy-list');root.replaceChildren();
+  const search=$('history-search').value.trim().toLowerCase(),conversations=conversationStore().list();
+  for(const [key,label,count] of [['conversations','历史对话',conversations.length],['strategies','已存策略',items.length],['archive','旧版记录',runs.length]]){const b=document.querySelector('[data-history-filter="'+key+'"]');b.textContent=label+' '+count;b.setAttribute('aria-pressed',String(historyFilter===key));}
+  const matches=record=>!search||JSON.stringify(record).toLowerCase().includes(search);
+  function card(title,summary,meta,label,open){const article=node('article','record-card');const info=node('div','record-info');info.append(node('strong','',title),node('p','record-summary',summary),node('small','record-meta',meta));const button=node('button','ghost',label);button.type='button';button.onclick=open;article.append(info,button);root.append(article);return info;}
+  if(historyFilter==='conversations')for(const record of conversations.filter(matches)){
+    const last=[...record.messages].reverse().find(m=>m.role==='assistant')||record.messages.at(-1);
+    card(record.title,historyTitle(last?.content).slice(0,100),historyDate(record.updatedAt)+' · '+record.messages.length+' 条消息'+(record.model?' · '+record.model:''),'继续对话',()=>restoreConversation(record));
+  }
+  if(historyFilter==='strategies')for(const item of [...items].reverse().filter(matches)){
+    const info=card(historyTitle(item.goal),item.terms?item.asset+' · '+item.terms.cadence+' · 单次上限 '+item.terms.maxOrder+' '+item.terms.quoteAsset:'早期保存的策略草案',historyDate(item.createdAt)+' · 历史草案'+(item.model?' · '+item.model:''),'继续讨论',()=>restoreConversation({id:'strategy-'+item.id,goal:item.goal,messages:cleanMessages(item.conversation).length?item.conversation:[{role:'user',content:item.goal}],modelId:item.modelId,createdAt:item.createdAt}));
+    const details=node('details','record-terms');details.append(node('summary','','查看策略内容'),node('p','',item.goal||''));if(item.terms){const terms=node('dl','record-parameters');for(const [label,value] of [['标的',item.asset],['执行节奏',item.terms.cadence],['单次上限',item.terms.maxOrder+' '+item.terms.quoteAsset],['投资预算',item.terms.capital],['暂停回撤',item.terms.stopPercent?item.terms.stopPercent+'%':null]])if(value){terms.append(node('dt','',label),node('dd','',String(value)));}details.append(terms);}details.append(node('small','note','保存的参数仅供回顾，继续使用前需重新研究与确认。'));info.append(details);
+  }
+  if(historyFilter==='archive')for(const run of [...runs].reverse().filter(matches))card(run.asset+' · '+(run.mode==='testnet'?'旧版测试记录':'旧版模拟记录'),historyTitle(run.goal||'历史运行快照'),historyDate(run.createdAt)+' · '+historicalStatus(run),'查看记录',()=>showArchivedRun(run));
+  if(!root.children.length){const empty=node('div','history-empty');empty.append(node('span','',search?'没有找到匹配记录':historyFilter==='conversations'?'还没有保存的对话':historyFilter==='strategies'?'还没有保存的策略':'暂无旧版记录'),node('p','note',search?'试试币种、关键词或模型名称。':historyFilter==='conversations'?'新对话会自动保存在这里。早期未保存的对话无法恢复，可在已存策略里继续讨论。':'与 Oasis 讨论后，可以选择保存策略。'));root.append(empty);}
+}
+document.querySelectorAll('[data-history-filter]').forEach(b=>b.onclick=()=>{historyFilter=b.dataset.historyFilter;refreshStrategies();});
+$('history-search').oninput=()=>refreshStrategies();
+$('history-new-chat').onclick=()=>{if(chatBusy)return toast('请等待当前模型回复完成');persistConversation();$('goal').value='';showTab('overview');$('goal').focus();};
+window.addEventListener('pagehide',persistConversation);
 async function reviewTestnet(run, quote, output) {
   if (!run.modelId) throw Error("旧策略未记录模型 ID，请用工作台重新保存后再评审");
   const headers = {"content-type":"application/json"};
@@ -915,16 +913,7 @@ $("create-strategy").addEventListener("click", async () => {
     const terms = confirmedDraft();
     const result = await request("/api/strategies", { method: "POST", body: JSON.stringify({ goal: state.goal, budget: $("budget").value, model: state.modelName, modelId: state.model, committee: state.committee, terms, conversation: state.conversation }) });
     state.strategy = result;
-    try {
-      state.run = await request("/api/runs", {method:"POST",body:JSON.stringify({strategyId:result.id,mode:result.asset === "ETH" ? "testnet" : "simulation"})});
-      showTab("strategies");
-      await refreshStrategies();
-      $("run-panel").scrollIntoView({behavior:"smooth",block:"start"});
-      toast("策略已保存，请查看执行流程");
-    } catch (error) {
-      showTab("strategies");
-      toast("策略已保存，准备流程失败："+error.message+"。请从策略列表重试。");
-    }
+    persistConversation();state.run=null;historyFilter='strategies';showTab('strategies');toast('策略已保存，可在记录中查看或继续讨论');
   } catch (error) { toast(error.message); } finally { button.disabled = false; }
 });
 
