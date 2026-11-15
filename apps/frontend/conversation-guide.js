@@ -1,41 +1,39 @@
-// Deterministic UI choices use user intent, never model-generated actions or balances.
-export function conversationGuide(conversation) {
- const users=conversation.filter(m=>m.role==='user').map(m=>String(m.content));
- let asset=null,budget=null,wantsPlan=false;
- for(const text of users){
-  const intent=text.split(/行情上下文/)[0];
-  const coin=intent.match(/\b(BTC|ETH|SOL|HYPE|XRP|BNB)\b/i)?.[1];
-  const nextAsset=coin?.toUpperCase() || (intent.includes('以太坊')?'ETH':intent.includes('比特币')?'BTC':null);
-  if(nextAsset&&nextAsset!==asset){asset=nextAsset;budget=null;}
+// All advisor models share the same user-controlled mainnet journey.
+// Only user messages advance intent; model prose never authorizes a trade.
+export const OFFICIAL_TRADE_URL='https://app.hyperliquid.xyz/trade';
+export function tradeBudget(value){const text=String(value);if(!/^\d{1,9}(?:\.\d{1,2})?$/.test(text)||Number(text)<10)throw Error('请输入至少 10 USDC，最多两位小数；费用另计');return Number(text);}
+export function conversationGuide(conversation){
+ const users=conversation.filter(m=>m.role==='user').map(m=>String(m.content));let asset=null,budget=null,wantsPlan=false;
+ for(const text of users){const intent=text.split(/行情上下文/)[0];const coin=intent.match(/\b(BTC|ETH|SOL|HYPE|XRP|BNB)\b/i)?.[1];const nextAsset=coin?.toUpperCase()||(intent.includes('以太坊')?'ETH':intent.includes('比特币')?'BTC':null);if(nextAsset&&nextAsset!==asset){asset=nextAsset;budget=null;}
   if(/调整|重新选择/.test(intent))budget=null;
-  if(/买入|想买|购入|交易计划|买入计划|测试交易|测试预算|测试金额/.test(intent))wantsPlan=true;
-  if(/不买了|取消(?:交易|买入|计划)|只(?:想)?研究|暂不(?:交易|买入)/.test(intent)){wantsPlan=false;budget=null;}
-  const amount=intent.match(/(?:本次|这次)测试(?:金额|预算)(?:上限)?[：:\s]*(\d+(?:\.\d{1,2})?)\s*(?:测试\s*)?USDC/i);
-  if(amount){const n=Number(amount[1]);budget=n>=10&&n<=1000?n:null;}
+  if(/测试网|测试(?:预算|金额|资金)|测试\s*USDC/.test(intent)){budget=null;wantsPlan=false;continue;}
+  if(/买入|想买|购入|交易计划|买入计划/.test(intent))wantsPlan=true;
+  if(/不买了|取消(?:交易|买入|计划)|只(?:想)?研究|暂不(?:交易|买入)/.test(intent)){wantsPlan=false;budget=null;continue;}
+  const amount=intent.match(/(?:本次|这次)(?:买入|交易)?(?:金额|预算)(?:上限)?[：:\s]*(\d{1,9}(?:\.\d{1,2})?)(?![\d.])\s*(?:USDC|U)(?![A-Za-z])/i);if(amount){try{budget=tradeBudget(amount[1]);}catch{budget=null;}}
  }
- const stage=budget&&asset==='ETH'&&wantsPlan?'funds':wantsPlan?'plan':'research';
- const ticker=asset||'当前标的';
- const choices=[];
+ const stage=budget&&asset==='ETH'&&wantsPlan?'funds':wantsPlan?'plan':'research',ticker=asset||'当前标的',choices=[];
  const prompt=(title,description,text)=>choices.push({kind:'prompt',title,description,text});
  if(stage==='funds'){
-  choices.push({kind:'funds',title:'检查钱包与测试资金',description:'先核对账户余额，再决定是否补充'});
-  choices.push({kind:'preview',title:'预览 ETH 测试订单',description:`上限 ${budget} 测试 USDC · 提交前单独确认`});
-  prompt('调整金额或计划','重新选择本次测试预算',`我想调整 ${ticker} 的测试交易计划，请先列出我需要确认的金额和风险，不执行交易。`);
+  choices.push({kind:'preview',title:'确认 ETH 买入计划',description:`${budget} USDC · 主网现货 · 费用另计`});
+  choices.push({kind:'funds',title:'准备钱包与交易资金',description:'核对真实余额，按需充值'});
+  prompt('调整金额或计划','重新选择预算',`我想调整 ${ticker} 的主网现货买入计划，请先让我重新选择金额，不执行交易。`);
  }else if(stage==='plan'&&asset==='ETH'){
-  for(const amount of [20,50,100])prompt(`${amount} 测试 USDC`,'选择预算，先讨论再预览',`本次测试预算 ${amount} 测试 USDC，只用于 Hyperliquid 测试网 ETH 现货买入。请简要总结计划与风险，不代表我已授权下单。`);
-  prompt('先看风险','暂不选择测试金额',`先解释 ${ticker} 计划可能失败的情形，以及什么情况下应该暂停；暂不执行交易。`);
+  choices.push({kind:'budget',amount:10,title:'10 USDC 小额体验',description:'真实资金 · 费用另计'});
+  choices.push({kind:'budget',amount:50,title:'50 USDC',description:'确认计划后准备资金'});
+  choices.push({kind:'custom',title:'自定义金额',description:'填写本次买入预算'});
+  prompt('先看风险','继续研究，暂不准备资金',`先解释 ${ticker} 计划可能失败的情形和暂停条件，暂不交易，只研究风险。`);
  }else{
   prompt('继续分析走势','补充证据与不同情景',`继续分析 ${ticker}：列出上涨、下跌、横盘三种情景与确认信号，说明缺少的数据，不执行交易。`);
   prompt('检查风险','了解反例与暂停条件',`检查 ${ticker} 当前判断的风险、反例和暂停条件，不执行交易。`);
-  if(!asset||asset==='ETH')prompt('制定 ETH 测试计划','先选预算，再准备测试资金','我想制定 ETH 测试网买入计划。请先简述流程，让我选择本次测试预算，不执行交易。');
-  else prompt(`整理 ${ticker} 观察计划`,'当前交易执行仅支持 ETH 测试网',`把 ${ticker} 的分析整理为观察计划，列出需要确认的指标；只研究，不转成 ETH 交易。`);
+  if(!asset||asset==='ETH')prompt('制定 ETH 买入计划','10 USDC 起，准备真实现货交易','我想制定 ETH 主网现货买入计划。请简述主要风险，让我选择 10 USDC 小额体验、50 USDC 或自定义金额，不代表我已授权下单。');
+  else prompt(`整理 ${ticker} 观察计划`,'保留当前标的，不替换成 ETH',`把 ${ticker} 的分析整理为观察计划，列出需要确认的指标；只研究，不转成 ETH 交易。`);
  }
- return {stage,asset,budget,wantsPlan,choices,title:stage==='funds'?'计划明确了，下一步准备资金':stage==='plan'&&asset==='ETH'?'这次想用多少测试资金？':'接下来，你想了解什么？'};
+ return {stage,asset,budget,wantsPlan,choices,title:stage==='funds'?'计划已整理，下一步准备真实资金':stage==='plan'&&asset==='ETH'?'这次准备买入多少 ETH？':'接下来，你想了解什么？'};
 }
-export function fundingState(wallet,budget=20){
- if(wallet?.network==='hyperliquid-mainnet')return {kind:'mainnet',title:'正式网资产与测试计划分开',body:'当前钱包面板读取正式网资产。本对话仍为测试订单流程，不会把正式余额用于测试网订单。',action:'查看正式网资产'};
- if(!wallet?.connected)return {kind:'connect',title:'准备交易钱包',body:'连接钱包后核对测试网现货余额。当前尚未读取你的余额。',action:'连接钱包，检查资金'};
- if(wallet.status!=='ready')return {kind:'check',title:'检查可用测试资金',body:wallet.status==='error'?'余额读取失败，请重试；这不代表余额为零。':'先读取 Hyperliquid 测试网 Spot 余额，再判断是否需要补充资金。',action:'检查钱包余额'};
- if(wallet.available<budget)return {kind:'fund',title:'补充测试资金',body:`现货可用 ${wallet.available} 测试 USDC，当前预算 ${budget}；还需至少 ${Math.max(0,budget-wallet.available).toFixed(2)} 测试 USDC，费用另计。`,action:'领取或划转测试资金'};
- return {kind:'ready',title:'测试资金已就绪',body:`现货可用 ${wallet.available} 测试 USDC，可继续预览 ${budget} 测试 USDC 的订单；费用和最终数量以预览为准。`,action:'预览测试订单'};
+export function fundingState(wallet,budget=10){
+ if(!wallet?.connected)return {kind:'connect',title:'连接交易钱包',body:'连接 Rabby、MetaMask 或 OKX Wallet，读取同一地址的主网现货账户。',action:'选择交易钱包'};
+ if(wallet.kind==='embedded')return {kind:'external',title:'选择可在官网使用的交易钱包',body:'当前 Oasis 账号钱包可接收资产，尚不能直接连接 Hyperliquid 官网。此交易流程请使用 Rabby、MetaMask 或 OKX Wallet，并在官网连接同一地址。',action:'连接外部交易钱包'};
+ if(wallet.network!=='hyperliquid-mainnet'||wallet.status!=='ready'||!Number.isFinite(wallet.available))return {kind:'check',title:'检查主网交易资金',body:wallet.status==='error'?'余额读取失败，请刷新；这不代表余额为零。':'先读取 Hyperliquid 主网现货可用 USDC，再判断是否需要入金。',action:'检查钱包与余额'};
+ if(wallet.available<budget)return {kind:'fund',title:'准备主网交易资金',body:`Hyperliquid 现货可用 ${wallet.available} USDC，本次预算 ${budget} USDC，费用另计。钱包余额与交易账户不同，请到官网核对入金网络及金额。`,action:'到官网充值交易账户'};
+ return {kind:'ready',title:'已读取主网现货资金',body:`Hyperliquid 现货可用 ${wallet.available} USDC，本次预算 ${budget} USDC。最终数量、最低金额、手续费及成交结果由官网复核。`,action:'确认 ETH 买入计划'};
 }

@@ -1,4 +1,4 @@
-import {RECEIVE_NETWORKS,verifiedReceiveDetails} from './deposit-address.js?v=deposit-v13-20261116';
+import {RECEIVE_NETWORKS,verifiedReceiveDetails} from './deposit-address.js?v=mainnet-guide-v14-20261116';
 const $=id=>document.getElementById(id);
 export function initDeposit({getWallet,openWalletChooser,onRefresh}){
  const dialog=$('deposit-dialog'),network=$('deposit-network'),asset=$('deposit-asset');let generation=0,recipient=null;

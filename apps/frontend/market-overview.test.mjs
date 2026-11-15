@@ -12,9 +12,9 @@ test('live prices ignore unrelated and invalid payloads, preserving per-asset fr
  const rows=[{id:'ETH',ticker:'ETH',price:2000,previous:2500,observedAt:1},{id:'BTC',price:80000,previous:79000,observedAt:2}];
  const next=priceUpdate(rows,{ETH:'2100',BTC:'invalid',OTHER:'99'});assert.equal(next[0].price,2100);assert.ok(next[0].observedAt>1);assert.equal(next[1],rows[1]);assert.equal(rows[0].price,2000);
 });
-test('guided prompts label the mainnet/testnet distinction and reject stale market snapshots',()=>{
+test('guided prompts distinguish perpetual references from spot execution and reject stale snapshots',()=>{
  const quote={id:'ETH',ticker:'ETH',price:2000,change:-2,volume:1000,observedAt:Date.now()};
- assert.match(marketPrompt('plan',quote,Date.now()),/不是测试网现货报价/);
+ assert.match(marketPrompt('plan',quote,Date.now()),/不是现货成交报价/);
  assert.match(marketPrompt('risk',{...quote,observedAt:Date.now()-120000},Date.now()),/没有有效的实时行情/);
 });
 test('overview handles one unavailable venue without erasing the available market',async()=>{
