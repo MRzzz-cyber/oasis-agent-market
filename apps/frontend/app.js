@@ -1,16 +1,16 @@
-import {renderAccountButton} from "./account-avatar.js?v=mainnet-wallet-v10-20261116";
-import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=mainnet-wallet-v10-20261116";
-import {conversationGuide,fundingState} from "./conversation-guide.js?v=mainnet-wallet-v10-20261116";
-import {setMarkdown} from "./markdown.js?v=mainnet-wallet-v10-20261116";
-import {initEyeMotion} from "./eye-logo.js?v=mainnet-wallet-v10-20261116";
-import {initWorkbench} from "./workbench.js?v=mainnet-wallet-v10-20261116";
-import {testnetPanel} from "./testnet.js?v=mainnet-wallet-v10-20261116";
+import {renderAccountButton} from "./account-avatar.js?v=wallet-simple-v11-20261116";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=wallet-simple-v11-20261116";
+import {conversationGuide,fundingState} from "./conversation-guide.js?v=wallet-simple-v11-20261116";
+import {setMarkdown} from "./markdown.js?v=wallet-simple-v11-20261116";
+import {initEyeMotion} from "./eye-logo.js?v=wallet-simple-v11-20261116";
+import {initWorkbench} from "./workbench.js?v=wallet-simple-v11-20261116";
+import {testnetPanel} from "./testnet.js?v=wallet-simple-v11-20261116";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="mainnet-wallet-v10-20261116";
+const UI_RELEASE="wallet-simple-v11-20261116";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;

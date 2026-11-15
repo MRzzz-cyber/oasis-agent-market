@@ -60,7 +60,7 @@ export function createAppServer() {
         res.writeHead(result.status, Object.fromEntries(result.headers));
         res.end(await result.text()); return;
       }
-      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"mainnet-wallet-v10-20261116",defaultTestBudget:"20"});return;}
+      if(req.method === "GET" && url.pathname === "/api/release"){send(res,200,{version:"wallet-simple-v11-20261116",defaultTestBudget:"20"});return;}
       if(req.method === "GET" && url.pathname === "/api/wallet/config"){send(res,200,{enabled:false,appId:null,mode:"user-controlled",network:"hyperliquid-mainnet",executionEnabled:false});return;}
       if(req.method === "GET" && /^\/vendor\/privy\/[a-zA-Z0-9_.-]+\.(js|css)$/.test(url.pathname)){const body=await readFile(path.join(webDir,url.pathname));res.writeHead(200,{"content-type":url.pathname.endsWith(".css")?"text/css":"text/javascript","cache-control":"no-store"});res.end(body);return;}
       const parts = url.pathname.split("/").filter(Boolean);
