@@ -921,5 +921,8 @@ if(new URLSearchParams(location.search).get("trade")==="testnet")showTab("testne
 
 const workbench=initWorkbench({
   prompt:value=>{if(chatBusy)return toast("请等待当前回复完成");resetStarter();$("goal").value=value;beginConversation();},
-  trade:()=>showTab("testnet"),account:openAccount
+  trade:()=>{
+    if(!state.goal)state.goal="准备一笔用户手动确认的 ETH 测试网买入交易";
+    makeDraftSummary();showTab("create");showChatTradePlan();
+  },account:openAccount
 });
