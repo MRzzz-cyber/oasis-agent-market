@@ -8,3 +8,6 @@ coverage/
 data/local/
 *.sqlite
 *.sqlite-*
+
+apps/frontend/vendor/privy/
+.privy-setup/

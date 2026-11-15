@@ -11,14 +11,23 @@
     "start": "node apps/api/server.mjs",
     "test": "node --test",
     "smoke:x402": "node scripts/base-sepolia-x402-smoke.mjs",
-    "seller:x402": "node scripts/base-sepolia-market-server.mjs"
+    "seller:x402": "node scripts/base-sepolia-market-server.mjs",
+    "build:wallet": "node scripts/build-privy-wallet.mjs",
+    "setup:privy": "node scripts/setup-privy-identity.mjs"
   },
   "dependencies": {
+    "@privy-io/react-auth": "3.51.4",
+    "@solana-program/system": "0.10.0",
     "@x402/core": "2.30.0",
     "@x402/evm": "2.30.0",
-    "@x402/fetch": "2.30.0",
     "@x402/express": "2.30.0",
-    "viem": "^2.38.0",
-    "express": "^5.1.0"
+    "@x402/fetch": "2.30.0",
+    "express": "^5.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "viem": "^2.38.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }

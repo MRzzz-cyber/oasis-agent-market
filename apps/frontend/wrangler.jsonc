@@ -25,5 +25,9 @@
         "AccountStore"
       ]
     }
-  ]
+  ],
+  "build": {
+    "command": "npm ci --include=dev --no-audit --no-fund && npm run build:wallet",
+    "cwd": "../.."
+  }
 }

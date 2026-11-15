@@ -1,3 +1,4 @@
+import {accountWallet} from "./account-wallet.js";
 import {createL1ActionHash} from "./vendor/hl-hash.js";
 
 const API="https://api.hyperliquid-testnet.xyz";
@@ -105,6 +106,7 @@ export function isActiveAgent(agents,address,now=Date.now()) {
 }
 // Keep keys in page memory across panel redraws; never serialize session signers.
 const testnetSessions=new Map();
+if(typeof window!=="undefined")window.addEventListener("oasis:account-wallet-cleared",()=>testnetSessions.clear());
 export function splitSignature(sig) {
   if(!/^0x[0-9a-f]{130}$/i.test(sig))throw Error("钱包返回的签名格式无效");
   let v=parseInt(sig.slice(-2),16);if(v<2)v+=27;
@@ -142,7 +144,8 @@ export function walletChoices(announced,ethereum) {
 }
 export function availableWallets() {
   window.dispatchEvent(new Event("eip6963:requestProvider"));
-  return walletChoices(announcedWallets.values(),window.ethereum);
+  const embedded=accountWallet();
+  return [...(embedded?[embedded]:[]),...walletChoices(announcedWallets.values(),window.ethereum)];
 }
 export function walletError(error) {
   if(/chainid.*(?:same|match)/i.test(error?.message || ""))return "钱包拒绝了 Hyperliquid 订单签名域。请使用测试网交易助手授权，再单独确认订单。";
@@ -154,6 +157,9 @@ export function walletError(error) {
 }
 export function testnetPanel(run,review) {
   const root=document.createElement("section");
+  let selectedProvider=null;
+  const onCleared=event=>{if(!root.isConnected){window.removeEventListener("oasis:account-wallet-cleared",onCleared);return;}if(selectedProvider===event.detail?.provider){root.dataset.walletRevoked="true";root.querySelectorAll("button,input").forEach(b=>{b.disabled=true;b.dataset.blocked="true";});root.prepend(element("p","账号钱包会话已结束，请重新登录后打开交易。"));}};
+  window.addEventListener("oasis:account-wallet-cleared",onCleared);
   root.className="ten-trade";
   let budget=run.testBudget || "20";
   try{budget=localStorage.getItem("oasis-hl-test-budget:"+run.id) || budget;}catch{}
@@ -206,7 +212,7 @@ export function testnetPanel(run,review) {
   root.append(note,result,form);
   function button(text,handler) {
     const b=element("button",text);b.type="button";b.className="ghost";
-    b.onclick=async()=>{b.disabled=true;b.dataset.busy="true";const label=b.textContent;b.textContent="处理中…";result.textContent="正在处理，请留意所选钱包扩展的连接或签名请求。";try{await handler();}catch(e){result.textContent=walletError(e);detail.textContent=result.textContent;}finally{delete b.dataset.busy;b.disabled=b.dataset.blocked==="true";b.textContent=label;}};
+    b.onclick=async()=>{if(root.dataset.walletRevoked==="true")return;b.disabled=true;b.dataset.busy="true";const label=b.textContent;b.textContent="处理中…";result.textContent="正在处理，请留意所选钱包扩展的连接或签名请求。";try{await handler();}catch(e){result.textContent=walletError(e);detail.textContent=result.textContent;}finally{delete b.dataset.busy;b.disabled=b.dataset.blocked==="true"||root.dataset.walletRevoked==="true";b.textContent=label;}};
     form.append(b);return b;
   }
   function showRecord(rec) {
@@ -318,7 +324,7 @@ export function testnetPanel(run,review) {
         const img=document.createElement("img");img.src=choice.icon;img.alt="";
         img.onerror=()=>icon.replaceChildren(document.createTextNode(choice.name.slice(0,1).toUpperCase()));icon.replaceChildren(img);
       }
-      const copy=element("span","");copy.className="wallet-option-copy";copy.append(element("strong",choice.name),element("small","已检测到 · 浏览器钱包"));
+      const copy=element("span","");copy.className="wallet-option-copy";copy.append(element("strong",choice.name),element("small",choice.kind==="embedded"?"独立账号钱包 · Privy":"已检测到 · 浏览器钱包"));
       const arrow=element("span","↗");arrow.className="wallet-option-arrow";arrow.setAttribute("aria-hidden","true");row.append(icon,copy,arrow);
       row.onclick=async()=>{
         if(connecting)return;
@@ -340,14 +346,14 @@ export function testnetPanel(run,review) {
   walletTrigger.onclick=()=>{discoverWallets();dialog.showModal();};
   async function connectWallet(choice) {
     if(amountInput.value.trim()!==budget)throw Error("金额已修改，请先点击应用金额，再连接钱包预览。");
-    const wallet=choice.provider;
+    const wallet=choice.provider;selectedProvider=wallet;
     walletStatus.textContent="正在请求 "+choice.name+" 连接，请打开该钱包扩展查看待处理请求。";
     const accounts=await wallet.request({method:"eth_requestAccounts"});
     const address=accounts?.[0];
     if(!/^0x[0-9a-f]{40}$/i.test(address || ""))throw Error("未获得有效钱包地址，请解锁钱包并允许网站连接。");
     if(!root.isConnected)return;
     walletName.textContent=choice.name;walletBadge.textContent="✓";
-    window.dispatchEvent(new CustomEvent("oasis:wallet-connected",{detail:{address,name:choice.name,provider:wallet}}));
+    window.dispatchEvent(new CustomEvent("oasis:wallet-connected",{detail:{address,name:choice.name,provider:wallet,kind:choice.kind}}));
     walletStatus.textContent=address.slice(0,6)+"…"+address.slice(-4)+" · 已连接";walletStatus.title=address;
     note.textContent="当前读取 Hyperliquid 测试网现货账户。钱包已授权时可能直接返回地址；订单预览后再请求测试网助手授权。";
     advance(1,"钱包已连接："+address+"。正在检查测试网现货余额和盘口。余额不足时，请先在 Hyperliquid 测试网准备测试资金，再重新预览。");
@@ -414,7 +420,7 @@ export function testnetPanel(run,review) {
           if(!root.isConnected)return;
           await checkAccount();
           if(!signer) {
-            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=guided-v7-20261115");
+            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=privy-v8-20261115");
             signer=createTestnetSigner(budget);session.signer=signer;
           }
           // Reconcile an uncertain earlier request before sending another approval.

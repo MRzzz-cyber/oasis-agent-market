@@ -1,14 +1,15 @@
-import {conversationGuide,fundingState} from "./conversation-guide.js?v=guided-v7-20261115";
-import {setMarkdown} from "./markdown.js?v=guided-v7-20261115";
-import {initEyeMotion} from "./eye-logo.js?v=guided-v7-20261115";
-import {initWorkbench} from "./workbench.js?v=guided-v7-20261115";
-import {testnetPanel} from "./testnet.js?v=guided-v7-20261115";
+import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=privy-v8-20261115";
+import {conversationGuide,fundingState} from "./conversation-guide.js?v=privy-v8-20261115";
+import {setMarkdown} from "./markdown.js?v=privy-v8-20261115";
+import {initEyeMotion} from "./eye-logo.js?v=privy-v8-20261115";
+import {initWorkbench} from "./workbench.js?v=privy-v8-20261115";
+import {testnetPanel} from "./testnet.js?v=privy-v8-20261115";
 import { replay } from "./replay.js";
 import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
 const tabs = ["overview", "market", "create", "strategies", "testnet"];
-const UI_RELEASE="guided-v7-20261115";
+const UI_RELEASE="privy-v8-20261115";
 let availableModels = [];
 function toast(message) {
   $("toast").textContent = message;
@@ -340,6 +341,7 @@ $("logout").onclick = async () => {
   try {
     const r = await fetch("/api/auth/logout", {method:"POST"});
     if (!r.ok) throw Error("退出失败，请重试");
+    stopAccountWallet();
     location.replace("/");
   } catch (error) { $("account-note").textContent = error.message; }
 };
@@ -351,6 +353,7 @@ $("account-form").onsubmit = async event => {
     const result = await r.json();
     if (!r.ok) throw Error(result.error || "激活失败");
     currentUser = result;
+    syncAccountWallet(currentUser);
     $("account-invite").value = "";
     renderAccount();
     $("account-dialog").close();
@@ -365,6 +368,7 @@ async function initAccount(status) {
   $("account-button").hidden = false;
   const r = await fetch("/api/auth/me", {cache:"no-store"});
   currentUser = r.ok ? await r.json() : null;
+  syncAccountWallet(currentUser);
   demoStorageKey = currentUser ? "oasis-account-" + currentUser.id : "oasis-guest";
   renderAccount();
   const login = new URLSearchParams(location.search).get("login");
@@ -939,4 +943,5 @@ const workbench=initWorkbench({
   },account:openAccount
 });
 
+configureAccountWallet({openAccount});
 initEyeMotion();
