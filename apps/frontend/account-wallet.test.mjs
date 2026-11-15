@@ -18,3 +18,13 @@ test('account provider blocks transfers/mainnet and requires current server sess
  session={id:'other',active:true};await assert.rejects(provider.request(packet));assert.equal(signed,1);
  active=false;await assert.rejects(provider.request({method:'eth_accounts'}));await assert.rejects(provider.request(packet));
 });
+test('account provider allows own read-only native balance without expanding signing access',async()=>{
+ const provider=guardWalletProvider({request:async()=> '0x1'},{address,subject:'oasis:google:u',isCurrent:()=>true,getSession:async()=>({id:'u',active:true}),signTypedData:async()=>assert.fail('must not sign')});
+ assert.equal(await provider.request({method:'eth_getBalance',params:[address,'latest']}),'0x1');
+ await assert.rejects(provider.request({method:'eth_getBalance',params:[agent,'latest']}));await assert.rejects(provider.request({method:'eth_sendTransaction',params:[]}));
+});
+test('account provider permits only official mainnet USDC balanceOf for its owner',async()=>{
+ const provider=guardWalletProvider({request:async p=>p.method==='eth_chainId'?'0x1':'0x'+'0'.repeat(64)},{address,subject:'oasis:google:u',isCurrent:()=>true,getSession:async()=>({id:'u',active:true}),signTypedData:async()=>assert.fail()});
+ const call={method:'eth_call',params:[{to:'0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',data:'0x70a08231'+address.slice(2).padStart(64,'0')},'latest']};assert.equal(await provider.request(call),'0x'+'0'.repeat(64));
+ await assert.rejects(provider.request({...call,params:[{...call.params[0],data:'0x095ea7b3'},'latest']}));await assert.rejects(provider.request({...call,params:[{...call.params[0],to:agent},'latest']}));
+});

@@ -38,7 +38,7 @@ export function mountPrivyWallet(host,{config,getToken,onStatus,onReady}){
     const provider=guardWalletProvider(raw,{address:embedded.address,subject,isCurrent:()=>currentIdentity?.active&&currentIdentity.id===identity.id,
      getSession:async()=>{const r=await fetch('/api/auth/me',{cache:'no-store'});return r.ok?r.json():null;},
      signTypedData:async typed=>{const {signature}=await signTypedData(typed,{address:embedded.address,uiOptions:{title:'授权 Oasis 测试网助手',description:'仅 Hyperliquid Testnet。协议授权范围请核对，订单仍需单独确认。'}});return signature;}});
-    completed=true;onReady({name:'Oasis 账号钱包 · Privy',kind:'embedded',address:embedded.address,provider});onStatus('ready','独立账号钱包已就绪；测试资金和订单仍需单独确认。');
+    completed=true;onReady({name:'Oasis 账号钱包 · Privy',kind:'embedded',address:embedded.address,provider});onStatus('ready','独立账号钱包已就绪，可以读取正式网资产。');
    }).catch(()=>{if(!cancelled)onStatus('error','账号钱包恢复失败，请重试。');});
    return()=>{cancelled=true;if(!completed&&reported.current===key)reported.current=null;};
   },[linked,walletsReady,wallets,user,subject,attempt,creation,identity?.active,signTypedData]);

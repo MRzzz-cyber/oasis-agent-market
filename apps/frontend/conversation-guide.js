@@ -33,6 +33,7 @@ export function conversationGuide(conversation) {
  return {stage,asset,budget,wantsPlan,choices,title:stage==='funds'?'计划明确了，下一步准备资金':stage==='plan'&&asset==='ETH'?'这次想用多少测试资金？':'接下来，你想了解什么？'};
 }
 export function fundingState(wallet,budget=20){
+ if(wallet?.network==='hyperliquid-mainnet')return {kind:'mainnet',title:'正式网资产与测试计划分开',body:'当前钱包面板读取正式网资产。本对话仍为测试订单流程，不会把正式余额用于测试网订单。',action:'查看正式网资产'};
  if(!wallet?.connected)return {kind:'connect',title:'准备交易钱包',body:'连接钱包后核对测试网现货余额。当前尚未读取你的余额。',action:'连接钱包，检查资金'};
  if(wallet.status!=='ready')return {kind:'check',title:'检查可用测试资金',body:wallet.status==='error'?'余额读取失败，请重试；这不代表余额为零。':'先读取 Hyperliquid 测试网 Spot 余额，再判断是否需要补充资金。',action:'检查钱包余额'};
  if(wallet.available<budget)return {kind:'fund',title:'补充测试资金',body:`现货可用 ${wallet.available} 测试 USDC，当前预算 ${budget}；还需至少 ${Math.max(0,budget-wallet.available).toFixed(2)} 测试 USDC，费用另计。`,action:'领取或划转测试资金'};

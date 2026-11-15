@@ -4,10 +4,10 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
-  <link rel="icon" href="/brand/favicon.svg?v=header-v9-20261116" type="image/svg+xml"/>
+  <link rel="icon" href="/brand/favicon.svg?v=mainnet-wallet-v10-20261116" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=header-v9-20261116"/>
-  <link rel="stylesheet" href="/workbench.css?v=header-v9-20261116"/>
+  <link rel="stylesheet" href="/styles.css?v=mainnet-wallet-v10-20261116"/>
+  <link rel="stylesheet" href="/workbench.css?v=mainnet-wallet-v10-20261116"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
@@ -78,17 +78,16 @@
         <footer class="release-footer"><span id="release-label">工作台 v4</span><span id="release-status" role="status"></span><button type="button" id="reload-release" class="ghost" hidden>加载最新版本</button></footer>
       </main>
       <dialog id="funding-drawer" class="funding-drawer" aria-labelledby="funds-title"><div class="drawer-heading"><div><span class="eyebrow">WALLET & FUNDS</span><h2 id="funds-title">钱包与资金</h2></div><button type="button" id="wallet-close" class="icon-button" aria-label="关闭资金面板">×</button></div>
-      <p class="funds-network">Hyperliquid Testnet · 仅测试资产</p>
-      <section class="funds-total"><small>现货可用余额 · 测试 USDC</small><strong id="funds-balance">—</strong><div>UETH 持有量 <b id="funds-eth">—</b></div></section>
-      <div class="funds-actions"><button type="button" class="primary" id="funds-connect">连接交易钱包</button><a class="ghost" href="https://app.hyperliquid-testnet.xyz/drip" target="_blank" rel="noopener noreferrer">领取测试币 ↗</a></div><div id="funds-wallet-list" class="wallet-list"></div>
-      <div class="funds-account"><strong id="funds-wallet-name">尚未连接交易钱包</strong><code id="funds-address">连接钱包后显示地址</code><div><button type="button" id="funds-copy" class="ghost" disabled>复制地址</button><button type="button" id="funds-refresh" class="ghost" disabled>刷新余额</button></div></div>
-      <p id="funds-status" class="note" role="status">请连接钱包查看测试资金。</p>
-      <div class="funds-help"><h3>准备测试资金</h3><ol><li>连接已领取测试币的钱包。</li><li>资金需要位于测试网 Spot 账户。</li><li>预览数量与限价，再授权并确认订单。</li></ol><a href="https://app.hyperliquid-testnet.xyz/" target="_blank" rel="noopener noreferrer">打开官方测试网，检查资金或划转 ↗</a></div>
-      <div class="account-wallet-note"><strong>Oasis 账号钱包</strong><span id="account-wallet-state">登录后创建</span><p id="account-wallet-note">使用 Google 登录并激活后，创建或恢复独立账号钱包；已有钱包仍可连接。</p><button type="button" class="ghost" id="account-wallet-action">登录并创建钱包</button><button type="button" class="ghost" id="account-wallet-login">查看登录账户</button></div>
-      <button type="button" class="primary funds-trade" id="funds-trade">准备 ETH 测试交易 →</button></dialog><button id="funding-backdrop" class="funding-backdrop" type="button" hidden aria-label="关闭钱包与资金"></button>
+      <p class="funds-network">正式网资产 · Hyperliquid Mainnet</p>
+      <details class="wallet-onboarding" id="funds-wallet-chooser" open><summary><span id="funds-wallet-summary">选择钱包</span><small>账号钱包 / 已有钱包</small></summary><div class="account-wallet-note account-wallet-primary"><div class="account-wallet-brand"><span class="wallet-brand-mark">O</span><strong>Oasis 账号钱包</strong><span id="account-wallet-state">登录后创建</span></div><p id="account-wallet-note">登录后创建或恢复你的独立钱包，也可在下方连接已有钱包。</p><button type="button" class="primary" id="account-wallet-action">登录并创建钱包</button><button type="button" class="ghost" id="account-wallet-login">账号设置</button></div><div class="wallet-choice-divider">或连接已有钱包</div><div id="funds-wallet-list" class="wallet-list" aria-label="已有钱包"></div><button type="button" class="ghost wallet-detect" id="funds-connect">重新检测钱包</button></details>
+      <div class="funds-account"><strong id="funds-wallet-name">尚未选择钱包</strong><code id="funds-address">连接后显示你的钱包地址</code><div><button type="button" id="funds-copy" class="ghost" disabled>复制地址</button><button type="button" id="funds-refresh" class="ghost" disabled>刷新资产</button></div></div>
+      <section class="mainnet-assets"><div class="assets-section-head"><h3>链上钱包</h3><small id="funds-chain">连接后识别当前网络</small></div><div class="native-balance"><strong id="funds-native">—</strong><span id="funds-native-symbol"></span></div><div class="native-usdc"><span>原生 USDC</span><strong id="funds-chain-usdc">—</strong></div><p id="funds-native-status" class="note">仅显示当前支持主网的原生币和 Circle 原生 USDC，不含 USDC.e 或其他代币。</p></section>
+      <section class="mainnet-assets"><div class="assets-section-head"><h3>Hyperliquid 交易账户</h3><small>Mainnet</small></div><section class="funds-total"><small>现货可用 USDC</small><strong id="funds-balance">—</strong><div>默认永续账户可提 USDC <b id="funds-perp">—</b></div></section><div id="funds-spot-assets" class="spot-assets"></div><p class="note account-scope">不含子账户、金库及其他永续 DEX 账户。</p><p id="funds-status" class="note" role="status">连接钱包后读取正式网资产。</p></section>
+      <div class="funds-help"><h3>钱包与交易账户是两处余额</h3><p>连接钱包不等于已向 Hyperliquid 入金。这里只读取正式网资产，不会转账、授权或下单。Hyperliquid 的现货与永续账户也分别显示。</p><a href="https://app.hyperliquid.xyz/portfolio" target="_blank" rel="noopener noreferrer">在 Hyperliquid 官方查看账户 ↗</a><p class="mainnet-execution-note">Oasis 正式网下单尚未开放；测试订单与测试网授权仍为独立流程。</p></div>
+      <button type="button" class="ghost funds-trade" id="funds-trade">返回研究 →</button></dialog><button id="funding-backdrop" class="funding-backdrop" type="button" hidden aria-label="关闭钱包与资金"></button>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=header-v9-20261116" type="module"></script>
+  <script src="/app.js?v=mainnet-wallet-v10-20261116" type="module"></script>
 </body>
 </html>
