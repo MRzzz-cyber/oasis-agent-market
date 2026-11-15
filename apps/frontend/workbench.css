@@ -52,3 +52,12 @@ main{max-width:1100px;margin:auto;padding:28px clamp(24px,4vw,76px) 24px}#page-o
 .guided-funding strong{display:block;font-size:17px;margin-bottom:8px}.guided-funding .funding-cta-icon{float:left;margin:3px 14px 12px 0;font-size:21px;color:var(--green)}
 .guided-funding .primary{width:100%;margin-top:12px;border-radius:24px;padding:12px}.guided-funding .note{line-height:1.7}
 @media(max-width:600px){.reply-options{grid-template-columns:1fr}.guide-progress{gap:18px}.guided-funding{padding:18px}}
+
+/* Discoverable wallet entry and a stable, locally generated account avatar. */
+.header-actions{display:flex;align-items:center;gap:12px;margin-left:auto;flex-shrink:0}.header-actions [hidden]{display:none!important}
+.header-inner .ticker-strip{min-width:0}.header-wallet{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;padding:10px 15px;border:1px solid #3b513d;border-radius:24px;background:#1b281e;color:#d5e8ca;font-size:12px;font-weight:600;line-height:1.4}
+.header-wallet:hover{background:#2a3b2a;border-color:#7b9d68}.header-wallet svg{width:18px;height:18px;color:#b6ee86;flex-shrink:0}.wallet-label-narrow{display:none}
+.app-header #account-button.account-chip{display:inline-flex;align-items:center;gap:9px;max-width:190px;margin:0;padding:3px 10px 3px 3px;border:1px solid #303d32;border-radius:24px;background:#161f19;color:var(--ink);font-size:12px;line-height:1.4;overflow:visible}
+.app-header #account-button.account-chip:hover{background:#233027;border-color:#506b49}.account-avatar{display:block;width:32px;height:32px;flex:0 0 32px;border-radius:50%;border:1px solid #ffffff12}.account-name{max-width:115px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-chevron{font-size:13px;color:var(--muted);margin-left:1px}
+@media(max-width:1000px){.header-inner .ticker-strip{gap:16px}.header-actions{gap:8px}.header-inner{gap:16px}.account-name{max-width:85px}}
+@media(max-width:700px){.header-inner .ticker-strip{display:none}.header-actions{gap:8px}.app-header #account-button.account-chip{width:38px;height:38px;justify-content:center;padding:2px;border-radius:50%}.account-name,.account-chevron{display:none}.header-wallet{padding:9px 12px;font-size:12px}.header-inner{gap:12px}.wallet-label-wide{display:none}.wallet-label-narrow{display:inline}}

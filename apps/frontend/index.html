@@ -4,10 +4,10 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
-  <link rel="icon" href="/brand/favicon.svg?v=privy-v8-20261115" type="image/svg+xml"/>
+  <link rel="icon" href="/brand/favicon.svg?v=header-v9-20261116" type="image/svg+xml"/>
   <title>Oasis AI · 让 AI 帮你做投资</title>
-  <link rel="stylesheet" href="/styles.css?v=privy-v8-20261115"/>
-  <link rel="stylesheet" href="/workbench.css?v=privy-v8-20261115"/>
+  <link rel="stylesheet" href="/styles.css?v=header-v9-20261116"/>
+  <link rel="stylesheet" href="/workbench.css?v=header-v9-20261116"/>
 </head>
 <body>
   <div id="workspace" class="workspace workbench-shell">
@@ -15,7 +15,7 @@
     <header class="app-header"><div class="header-inner">
       <a class="wordmark" href="/" aria-label="Oasis 首页"><span data-oasis-eye></span>Oasis</a>
       <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">策略工作台</button><button data-tab="market">行情</button><button data-tab="strategies">我的策略</button><button data-tab="testnet">测试交易</button></nav>
-      <button class="ghost" id="account-button" hidden>登录</button>
+      <div class="header-actions"><button type="button" class="header-wallet" id="header-wallet-open" aria-label="钱包与资金" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M19 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 11h-5a2 2 0 0 0 0 4h5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.5" cy="13" r=".6" fill="currentColor" stroke="none"/></svg><span class="wallet-label-wide">钱包与资金</span><span class="wallet-label-narrow">钱包</span></button><button class="ghost account-chip" id="account-button" hidden>登录</button></div>
     </div></header>
     <aside class="market-sidebar" aria-label="实时市场行情">
       <div class="watch-head"><h2>市场行情</h2><span class="live-dot">实时</span></div>
@@ -89,6 +89,6 @@
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
     </div>
   </div>
-  <script src="/app.js?v=privy-v8-20261115" type="module"></script>
+  <script src="/app.js?v=header-v9-20261116" type="module"></script>
 </body>
 </html>

@@ -420,7 +420,7 @@ export function testnetPanel(run,review) {
           if(!root.isConnected)return;
           await checkAccount();
           if(!signer) {
-            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=privy-v8-20261115");
+            const {createTestnetSigner}=await import("./vendor/hl-agent.js?v=header-v9-20261116");
             signer=createTestnetSigner(budget);session.signer=signer;
           }
           // Reconcile an uncertain earlier request before sending another approval.
