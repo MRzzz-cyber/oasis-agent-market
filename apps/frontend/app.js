@@ -460,7 +460,7 @@ async function refreshStrategies() {
       details.append(node("summary", "", "原始目标"), node("p", "", item.goal));
       info.appendChild(details);
     }
-    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "运行测试网策略" : "运行模拟策略") : "补全旧策略");
+    const btn = node("button", "primary", item.terms ? (item.asset === "ETH" ? "准备 10U 测试交易" : "运行模拟策略") : "补全旧策略");
     btn.addEventListener("click", async () => {
       if (!item.terms) {
         if (chatBusy) { toast("请等待模型回复完成"); return; }
@@ -493,6 +493,9 @@ async function refreshStrategies() {
     }
     article.append(info, actions); root.appendChild(article);
   }
+  if (!state.run) {
+    try { state.run = runs.find(run => run.id === localStorage.getItem(demoStorageKey+":active-run")) || null; } catch {}
+  }
   if (state.run) renderRunContent();
 }
 async function reviewTestnet(run, quote, output) {
@@ -520,13 +523,14 @@ async function reviewTestnet(run, quote, output) {
 }
 function renderRunContent() {
   const run = state.run; if (!run) return;
+  try { localStorage.setItem(demoStorageKey+":active-run",run.id); } catch {}
   $("run-panel").classList.remove("hidden");
   const flow = $("flowchart"); flow.replaceChildren();
   const testnet = run.mode === "testnet";
   const head = $("run-panel").querySelector(".activity-head");
   head.querySelector("h3").textContent = testnet ? "测试网执行台 · ETH 现货" : "模拟策略回放";
   head.querySelector(".status-pill").textContent = testnet ? "Hyperliquid Testnet" : "模拟运行";
-  head.querySelector("p").textContent = testnet ? "手动测试订单。请核对触发与暂停条件后再签名。" : "预置场景，仅用于模拟。";
+  head.querySelector("p").textContent = testnet ? "确认计划、检查资金、预览订单，再由钱包签名。当前由你手动发起测试交易。" : "预置场景，仅用于模拟。";
   if (testnet) {
     flow.append(node("p","note","策略创建模型："+(run.model || "未记录")+" · 本次下单由用户决定"));
     $("order-followup").replaceChildren();
@@ -770,13 +774,25 @@ $("chat-form").addEventListener("submit", event => {
   sendToRealModel();
 });
 $("create-strategy").addEventListener("click", async () => {
+  const button = $("create-strategy");
+  if (chatBusy || button.disabled) return;
+  button.disabled = true;
   try {
-    if (chatBusy) return;
     updateModelLabels();
     const terms = confirmedDraft();
     const result = await request("/api/strategies", { method: "POST", body: JSON.stringify({ goal: state.goal, budget: $("budget").value, model: state.modelName, modelId: state.model, committee: state.committee, terms, conversation: state.conversation }) });
-    state.strategy = result; toast("策略已保存"); showTab("strategies");
-  } catch (error) { toast(error.message); }
+    state.strategy = result;
+    try {
+      state.run = await request("/api/runs", {method:"POST",body:JSON.stringify({strategyId:result.id,mode:result.asset === "ETH" ? "testnet" : "simulation"})});
+      showTab("strategies");
+      await refreshStrategies();
+      $("run-panel").scrollIntoView({behavior:"smooth",block:"start"});
+      toast("策略已保存，请查看执行流程");
+    } catch (error) {
+      showTab("strategies");
+      toast("策略已保存，准备流程失败："+error.message+"。请从策略列表重试。");
+    }
+  } catch (error) { toast(error.message); } finally { button.disabled = false; }
 });
 
 checkAiStatus();

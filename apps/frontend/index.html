@@ -52,12 +52,12 @@
               <label>投资预算（可选）<input id="draft-capital" type="number" min="0.000001" step="any" placeholder="例如月度预算 500"/></label>
               <label>暂停回撤 %（可选）<input id="draft-stop" type="number" min="0.01" max="100" step="any" placeholder="例如 5"/></label>
             </div>
-            <p class="note">模拟运行使用预置行情样本，每笔订单需要你确认。</p>
-            <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 真实付款及交易已关闭</small></details>
-            <button class="primary" id="create-strategy">保存策略</button>
+            <p class="note">ETH 可进入 10 测试 USDC 手动交易流程，其他标的使用模拟样本。保存后展示下一步。</p>
+            <details class="advanced-budget"><summary>服务预算与权限</summary><p>这是 Agent 购买行情或数据服务的费用上限，不是你的投资金额。当前仅用于演示，不会真实扣款。</p><label for="budget">本策略数据与模型服务预算（USDC）</label><input id="budget" type="number" min="0.1" max="100" step="0.1" value="5"/><small>模型 <span id="policy-model">加载中</span> · 服务采购付款关闭 · ETH 支持用户签名测试网交易</small></details>
+            <button class="primary" id="create-strategy">保存并查看执行流程</button>
           </div>
         </section>
-        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看已保存的策略和模拟运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
+        <section id="page-strategies" class="app-page hidden"><div class="page-heading"><div><h2>我的策略</h2><p>查看交易计划、准备测试交易和核对运行记录。</p></div></div><div id="strategy-list" class="stack"></div><div id="run-panel" class="panel hidden"><div class="activity-head"><div><h3>Agent 执行流程</h3><p class="note">选择一个行情场景，查看你的约束如何影响模拟订单。</p></div><span class="status-pill">模拟运行</span></div><div id="flowchart" class="run-ledger"></div><div id="decision" class="panel inset"></div><div id="order-followup" class="panel inset hidden"></div></div></section>
 
       </main>
       <dialog id="account-dialog"><form id="account-form"><h3 id="account-title">登录 Oasis</h3><p id="account-note"></p><a id="google-login" href="/api/auth/google" class="primary">使用 Google 登录</a><label id="invite-label" hidden>私人体验码<input id="account-invite" type="password" maxlength="1024" autocomplete="off"/></label><button id="activate" type="submit" class="primary" hidden>激活账号</button><button id="logout" type="button" class="ghost" hidden>退出登录</button><button id="account-close" type="button" class="ghost">关闭</button></form></dialog><div id="toast" aria-live="polite"></div>
