@@ -92,7 +92,7 @@ export async function purchaseSession(wallet,{getWallet,fetchImpl=fetch,onPrepar
    if(order.id.toLowerCase()!==record.orderId||address(order.makerAddress)!==address(record.identity.wallet)||String(order.assetId)!==record.quote.assetId||order.side!=='BUY')throw Error('原订单资产或账户不匹配');
    const status=String(order.status).toUpperCase(),matched=atomic(String(order.sizeMatched));if(record.signedAmounts&&(atomic(String(order.originalSize))!==BigInt(record.signedAmounts.takerAmount)||matched>BigInt(record.signedAmounts.takerAmount)))throw Error('原订单份额与钱包签名不匹配');
    if(['CANCELED','CANCELLED','EXPIRED'].includes(status)&&matched===0n)return {...record,status:'unfilled',terminal:true,message:'原订单未成交，平台已确认结束'};
-   const ids=order.associateTrades||record.tradeIds||[];
+   const ids=order.associateTrades?.length?order.associateTrades:(record.tradeIds||[]);
    if(matched>0n&&matched<BigInt(record.quote.minimumSharesAtomic))throw Error('平台报告的份额低于本次下限，请核对原订单');
    if(matched>0n&&ids.length){const hashes=await client.waitForOrderFillSettlement({ok:true,orderId:record.orderId,status:'matched',tradeIds:ids,transactionsHashes:[]},{timeoutMs:12000});if(!hashes.length)return record;
     const receipts=await Promise.all(hashes.map(h=>rpc('eth_getTransactionReceipt',[h])));if(receipts.some(r=>r?.status!=='0x1'))return record;

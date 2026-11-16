@@ -3,7 +3,7 @@ import {assertFundingClear} from './funding-core.js';
 import {swapJournal} from './arbitrum-swap-core.js';
 const rejected=e=>e?.code===4001||e?.name==='CancelledSigningError'||e?.cause?.code===4001;
 export function assertPurchaseClear(storage,owner){assertFundingClear(storage,owner);if(swapJournal(storage,owner).load()?.terminal===false)throw Error('有 ETH 兑换待核对，请先核对原交易');}
-export async function executePurchase({quote:q,session,wallet,getWallet,storage,locks,now=Date.now,onStage=()=>{},waitMs=15000}){
+export async function executePurchase({quote:q,session,wallet,getWallet,storage,locks,now=Date.now,onStage=()=>{},waitMs=15000,pollIntervalMs=1500}){
  if(!locks?.request)throw Error('请使用支持跨页面交易锁的浏览器');
  return locks.request('oasis-mainnet-order:'+address(wallet.address),{ifAvailable:true},async lock=>{
   if(!lock)throw Error('另一个页面正在处理该钱包');assertPurchaseClear(storage,wallet.address);checkQuote(q,now());
@@ -37,7 +37,7 @@ export async function executePurchase({quote:q,session,wallet,getWallet,storage,
    if(reply.ok===false)return save({...record,terminal:true,status:'rejected',message:'平台未接受本次订单，请刷新报价后核对'});
    if(reply.ok!==true||reply.orderId?.toLowerCase()!==record.orderId)throw Error('返回的订单标识与签名不匹配，请核对原订单');
    save({...record,status:'pending',tradeIds:Array.isArray(reply.tradeIds)?reply.tradeIds.slice(0,100):[],message:reply.status==='matched'?'平台已匹配，正在核对结算':'订单已接受，正在等待平台回执'});
-   try{return save(await session.reconcile(record));}catch{return save({...record,status:'pending',message:'原订单结算仍待核对，不会重复买入'});}
+   const until=Date.now()+Math.min(Math.max(waitMs,0),30000);do{try{save(await session.reconcile(record));}catch{return save({...record,status:'pending',message:'原订单结算仍待核对，不会重复买入'});}if(record.terminal||Date.now()>=until)return record;await new Promise(resolve=>setTimeout(resolve,Math.min(Math.max(pollIntervalMs,100),3000)));}while(true);
   }finally{session.observe?.(()=>{});}
  });
 }

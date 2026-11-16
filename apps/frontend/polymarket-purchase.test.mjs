@@ -77,7 +77,7 @@ const locks={request:async(name,options,fn)=>{assert.equal(name,'oasis-mainnet-o
 function harness({unknown=false,settle=true}={}){
  const storage=memory(),wallet={address:owner},q=quote();let observer=()=>{},submits=0;
  const session={identity,observe:fn=>observer=fn,preview:async()=>q,wasSubmitted:()=>unknown,async submit(){submits++;assert.equal(predictionJournal(storage,owner).load().terminal,false);observer({orderId:hash,signedAmounts:{makerAmount:q.netAtomic,takerAmount:q.minimumSharesAtomic}});if(unknown)throw Error('timeout');return {ok:true,orderId:hash,status:'matched',tradeIds:['fixture-trade']};},reconcile:async r=>settle?{...r,status:'settled',terminal:true,hashes:[hash],message:'Fixture settlement'}:{...r,status:'pending',terminal:false,message:'Fixture pending'}};
- return {storage,wallet,q,session,args:{quote:q,session,wallet,getWallet:()=>wallet,storage,locks},count:()=>submits};
+ return {storage,wallet,q,session,args:{quote:q,session,wallet,getWallet:()=>wallet,storage,locks,waitMs:0},count:()=>submits};
 }
 test('buy journals before wallet signing and persists the order hash before submission',async()=>{
  const h=harness(),r=await executePurchase(h.args);assert.equal(r.status,'settled');assert.equal(r.orderId,hash);assert.equal(h.count(),1);assert.equal(predictionJournal(h.storage,owner).load().terminal,true);
@@ -115,4 +115,15 @@ test('pinned SDK gasless batch is accepted by the restricted relay policy withou
  let step=await flow.next();assert.equal(step.value.kind,'requestAddress');step=await flow.next(who);assert.equal(step.value.kind,'signGaslessTypedData');
  const typed=JSON.parse(canonical(step.value.payload));checkBatch(typed,q,wallet);const sig=await acct.signTypedData(step.value.payload);const done=await flow.next(sig);assert.equal(done.done,true);
  const payload=auth(who),proof={payload,signature:await acct.signTypedData(payload)};await validateRelay({body:canonical(body),proof,quote:q,batch:typed});assert.equal(body.type,'WALLET');
+});
+
+test('accepted orders are polled read-only until settlement without a second post',async()=>{
+ const h=harness();let reads=0;h.session.reconcile=async record=>{reads++;return reads<3?{...record,status:'matched',terminal:false,message:'Fixture settling'}:{...record,status:'settled',terminal:true,hashes:[hash],message:'Fixture settled'};};
+ const result=await executePurchase({...h.args,waitMs:1000,pollIntervalMs:100});assert.equal(result.status,'settled');assert.equal(reads,3);assert.equal(h.count(),1);
+});
+
+test('definitive Relayer credential rejection is not treated as an unknown broadcast',async()=>{
+ const f=await relayFixture(),env={POLYMARKET_BUILDER_API_KEY:'fake-key',POLYMARKET_BUILDER_SECRET:'dGVzdC1zZWNyZXQ=',POLYMARKET_BUILDER_PASSPHRASE:'fake-pass'};
+ const result=await purchaseService(new Request('https://oasis.test/api/predictions/relay',{method:'POST',headers:{origin:'https://oasis.test'},body:canonical(f)}),env,{getAccount:async()=>Response.json({id:'fixture-auth-rejection',active:true}),fetchImpl:async()=>Response.json({error:'invalid credentials'},{status:401})});
+ assert.equal(result.status,502);assert.equal((await result.json()).submitted,false);
 });

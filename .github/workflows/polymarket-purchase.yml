@@ -26,6 +26,11 @@ jobs:
       - name: Verify live public purchase metadata without wallet operations
         if: always()
         run: node scripts/check-polymarket-purchase-readonly.mjs
+      - name: Verify secure relay in the actual Workers runtime
+        if: always()
+        run: |
+          npm install --prefix "$RUNNER_TEMP/purchase-worker" --no-audit --no-fund miniflare@4
+          node scripts/check-polymarket-purchase-worker.mjs
       - name: Real Chrome purchase and QR acceptance
         if: always()
         run: node scripts/check-polymarket-purchase-ui.mjs

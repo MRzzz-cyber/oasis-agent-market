@@ -38,7 +38,7 @@ export async function purchaseService(request,env,{fetchImpl=fetch,getAccount=ac
   const {buildHmacSignature}=await import('@polymarket/client'),timestamp=Math.floor(now()/1000);
   const signature=await buildHmacSignature(env.POLYMARKET_BUILDER_SECRET,timestamp,'POST','/submit',body);
   const r=await fetchImpl('https://relayer-v2.polymarket.com/submit',{method:'POST',body,redirect:'manual',headers:{'content-type':'application/json','POLY_BUILDER_API_KEY':env.POLYMARKET_BUILDER_API_KEY,'POLY_BUILDER_PASSPHRASE':env.POLYMARKET_BUILDER_PASSPHRASE,'POLY_BUILDER_TIMESTAMP':String(timestamp),'POLY_BUILDER_SIGNATURE':signature},signal:AbortSignal.timeout(12000)});
-  if(!r.ok)return send({error:'平台交易账户请求未完成（HTTP '+r.status+'），请核对原请求',submitted:'unknown'},502);
+  if(!r.ok)return send({error:[401,403].includes(r.status)?'平台拒绝 Relayer 凭据或权限，请管理员核对配置；本次未提交':'平台交易账户请求未完成（HTTP '+r.status+'），请核对原请求',submitted:[401,403].includes(r.status)?false:'unknown'},502);
   const result=await r.json();if(typeof result.transactionID!=='string')return send({error:'平台未返回有效请求标识，请核对原请求',submitted:'unknown'},502);
   return send(result);
  }catch{return send({error:'平台请求结果尚未确认，请核对原请求',submitted:'unknown'},502);}
