@@ -1,0 +1,35 @@
+name: Polymarket purchase acceptance
+on:
+  push:
+    branches: [feat/polymarket-wallet-purchase]
+permissions:
+  contents: read
+concurrency:
+  group: polymarket-purchase
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Inspect installed SDK contracts
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile,readdir} from 'node:fs/promises';
+          const root='node_modules/@polymarket/client/';
+          const pkg=JSON.parse(await readFile(root+'package.json','utf8'));
+          console.log('SDK EXPORTS',JSON.stringify(pkg.exports));console.log('SDK REPO',JSON.stringify(pkg.repository));
+          const files=await readdir(root,{recursive:true});
+          console.log('SDK FILES',files.filter(f=>/\.d\.ts$/.test(f)).join('\n').slice(0,16000));
+          let budget=80000;
+          for(const f of files.filter(f=>/\.d\.ts$/.test(f)&&/secure|order|signer|wallet|balance|allowance|fee|client|transaction/i.test(f))){if(budget<=0)break;const s=await readFile(root+f,'utf8');console.log('SDK TYPE',f,s.slice(0,Math.min(budget,12000)));budget-=Math.min(s.length,12000);}
+          JS
+      - run: npm test
+      - run: npm run build:wallet
+      - name: Build Worker
+        run: node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
