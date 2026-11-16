@@ -127,3 +127,10 @@ test('definitive Relayer credential rejection is not treated as an unknown broad
  const result=await purchaseService(new Request('https://oasis.test/api/predictions/relay',{method:'POST',headers:{origin:'https://oasis.test'},body:canonical(f)}),env,{getAccount:async()=>Response.json({id:'fixture-auth-rejection',active:true}),fetchImpl:async()=>Response.json({error:'invalid credentials'},{status:401})});
  assert.equal(result.status,502);assert.equal((await result.json()).submitted,false);
 });
+
+test('oversized chunked relay requests are canceled before buffering or forwarding the body',async()=>{
+ let chunks=0,cancelled=false;const stream=new ReadableStream({pull(controller){chunks++;controller.enqueue(new Uint8Array(8192));if(chunks===20)controller.close();},cancel(){cancelled=true;}});
+ const request=new Request('https://oasis.test/api/predictions/relay',{method:'POST',headers:{origin:'https://oasis.test'},body:stream,duplex:'half'});
+ const result=await purchaseService(request,{POLYMARKET_BUILDER_API_KEY:'fake',POLYMARKET_BUILDER_SECRET:'dGVzdA==',POLYMARKET_BUILDER_PASSPHRASE:'fake'},{getAccount:async()=>Response.json({id:'fixture-stream-bound',active:true}),fetchImpl:()=>assert.fail('must not forward oversized input')});
+ assert.equal(result.status,413);assert.equal(cancelled,true);assert.ok(chunks<20);assert.equal((await result.json()).submitted,false);
+});

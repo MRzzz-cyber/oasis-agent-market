@@ -23,6 +23,14 @@ export async function validateRelay(input,{now=Date.now(),recover=recoverTypedDa
  }else throw Error('仅开放平台账户创建及本次金额的 pUSD 授权');
  return {body:input.body,owner};
 }
+async function boundedBody(request){
+ const reader=request.body?.getReader();if(!reader)return '';
+ const chunks=[];let size=0;
+ try{while(true){const part=await reader.read();if(part.done)break;size+=part.value.byteLength;if(size>16384){await reader.cancel();throw Object.assign(Error('请求过大'),{code:'BODY_TOO_LARGE'});}chunks.push(part.value);}}
+ finally{reader.releaseLock();}
+ const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.byteLength;}
+ return new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+}
 export async function purchaseService(request,env,{fetchImpl=fetch,getAccount=account,now=Date.now,recover}={}){
  const url=new URL(request.url);
  if(url.pathname==='/api/predictions/trading-status'&&request.method==='GET')return send({provider:'polymarket',enabled:purchaseConfigured(env),chainId:137,asset:'pUSD',version:'polymarket-purchase-v1',reason:purchaseConfigured(env)?null:'平台交易服务正在准备，暂不发起钱包签名'});
@@ -33,7 +41,7 @@ export async function purchaseService(request,env,{fetchImpl=fetch,getAccount=ac
  if(!purchaseConfigured(env))return send({error:'平台交易服务尚未配置',submitted:false},503);
  if(!allow(String(current.id),now()))return send({error:'请求过于频繁，请稍后再试',submitted:false},429);
  if(Number(request.headers.get('content-length')||0)>16384)return send({error:'请求过大',submitted:false},413);
- let body;try{const raw=await request.text();if(new TextEncoder().encode(raw).length>16384)return send({error:'请求过大',submitted:false},413);const parsed=await validateRelay(JSON.parse(raw),{now:now(),recover});body=parsed.body;}catch{return send({error:'平台请求未通过账户、金额或时效核对，请刷新报价',submitted:false},403);}
+ let body;try{const raw=await boundedBody(request);const parsed=await validateRelay(JSON.parse(raw),{now:now(),recover});body=parsed.body;}catch(error){return send({error:error.code==='BODY_TOO_LARGE'?'请求过大':'平台请求未通过账户、金额或时效核对，请刷新报价',submitted:false},error.code==='BODY_TOO_LARGE'?413:403);}
  try{
   const {buildHmacSignature}=await import('@polymarket/client'),timestamp=Math.floor(now()/1000);
   const signature=await buildHmacSignature(env.POLYMARKET_BUILDER_SECRET,timestamp,'POST','/submit',body);
