@@ -2,21 +2,14 @@
 
 Oasis is a Chinese-first AI investment assistant MVP. Keep architecture small and auditable.
 
-- Runtime: Node.js 22, ESM, built-in HTTP server, vanilla HTML/CSS/JS.
-- Run: `npm run dev`, tests: `npm test`.
-- Service payments: Base Sepolia only, Circle test USDC, x402 v2.
-- Remove all Hedera/HBAR/tinybar runtime dependencies. Never reintroduce them.
-- Service-purchase demos remain simulation-only and MUST label fixture data, mock committee votes and non-payments.
-- Mainnet ETH spot trading is explicitly user-authorized: browser-only signing and exchange submission after an exact user-reviewed preview. Never let a model approve, sign, submit, choose an account, or increase a trade budget.
-- Mainnet API-agent permissions cover account trading beyond the displayed per-order budget. Disclose that scope before approval; keep its one-use key in page memory only and provide revocation guidance.
-- On November 16, 2026 the user explicitly requested in-site wallet-confirmed funding. Limit this to native USDC deposits from Arbitrum One to the pinned Hyperliquid Bridge2, same-wallet spot/perp class transfers, withdraw3 to the current wallet on Arbitrum, and an explicitly reviewed switch to independent account mode. Each step needs a separate preview and principal-wallet confirmation. Never use a trading agent key for funding, permit arbitrary recipients, request unlimited token approval, or chain a funding action into a trade automatically.
-- Account-mode changes affect the entire account. Require no positions across all perp DEXes, no open orders, and no borrowing or lending supply; never silently change modes.
-- Persist pending orders and funding requests before submission. Hold uncertain results for reconciliation, with no automatic retry. A withdrawal acceptance is not proof of bridge completion or receipt.
-- Do not add a web endpoint to spend funds. Funding and trading stay in the browser; the x402 wallet is accessible only from explicit local CLI.
-- Agent input never controls signer, service destination, payment policy or payout address.
-- Policy Engine is deterministic and fail closed. Use canonical USDC atomic-unit integer strings for budget/purchases.
-- Quote selection requires exact amount, network, token and recipient matching.
-- Payment uncertainty holds budget for reconciliation. Never retry a potentially submitted payment without checking chain state.
-- Avoid exposing secrets via browser, logs, tests or Git commits.
-- Unit tests must not spend tokens. Live testnet smoke requires explicit user opt-in and isolated funded test wallet. Mainnet signatures, deposits, transfers, withdrawals and order submissions are performed only by the user in their wallet.
-- A good MVP is a complete, explainable user journey, not a promise of real profitable trading.
+- Runtime: Node.js 22, ESM, built-in HTTP server, vanilla HTML/CSS/JS. Run `npm run dev`; tests `npm test`.
+- Service payments remain Base Sepolia, Circle test USDC and x402 v2. Demos must identify simulations and non-payments. Never restore Hedera runtime dependencies.
+- On November 16, 2026 the user explicitly replaced the default Hyperliquid purchase route with wallet-native Arbitrum USDC-to-ETH exchange. `mainnet-trade.js` must point to `arbitrum-swap.js`. Default purchases read wallet-held native Circle USDC, quote pinned Uniswap V3 pools and return native ETH to the same wallet. Never use a Hyperliquid balance or quote to enable this route.
+- Arbitrum swaps pin chain 42161, Circle USDC, WETH, Uniswap V3 factory/router/quoter, supported pool fees and the current wallet recipient. Quote, approve and swap transactions must match an exact user-reviewed amount, minimum output and deadline. Verify router factory/WETH identities. Never allow an arbitrary destination, calldata route, unlimited approval or model-generated transaction.
+- Principal-wallet confirmation is mandatory. First use may require exact-amount USDC approval followed by swap confirmation; never promise one wallet popup when ERC20 approval is needed. Only continue the same reviewed purchase intent if approval is confirmed and the original quote remains valid. Stop for price, account, network, balance or expiry changes. Never silently replace reviewed minimum output or increase amount.
+- Simulate the swap and estimate network gas before requesting its transaction. No server endpoint may sign or spend. Mainnet tests use fixtures. Read-only live smoke may query pinned public contracts, but must never sign, approve or broadcast. Real wallet confirmations are performed only by the user.
+- Persist an Arbitrum pending record before requesting wallet submission and persist a known hash immediately. Uncertain sends and pending receipts block new transactions across page reloads. Never retry automatically or clear a hold based solely on balance changes. Reconcile original hash, calldata, sender, recipient and receipt; validate exact USDC spend and WETH unwrap logs before reporting ETH received. L2 inclusion is not a claim of final settlement.
+- Keep existing Privy App ID, Client ID, JWT audience, identity keys and wallet addresses. Do not recreate wallets. `OASIS_AUTH_ISSUER` remains `https://oasistrade.app`; preserve the old origin for local history.
+- Legacy Hyperliquid modules and records remain for reconciliation and old tests, not the default purchasing UI. API-agent scopes, funding confirmations and whole-account mode conversions remain explicit and separate. Never silently convert an account or chain bridge funding into a trade.
+- All spending routes share the account's cross-tab lock. Existing unresolved order or funding requests must remain visible to their reconciliation code. No signatures, private keys or secrets in journals, logs or Git.
+- Research/model prose never authorizes an action, chooses a signer, sets a payment destination or increases a budget. Policy math uses integer atomic units. An MVP must provide an honest executable journey, not promise profit.
