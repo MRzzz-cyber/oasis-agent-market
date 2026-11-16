@@ -16,6 +16,7 @@
     "setup:privy": "node scripts/setup-privy-identity.mjs"
   },
   "dependencies": {
+    "@polymarket/client": "0.19.0",
     "@privy-io/react-auth": "3.51.4",
     "@solana-program/system": "0.10.0",
     "@x402/core": "2.30.0",

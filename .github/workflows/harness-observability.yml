@@ -1,0 +1,71 @@
+name: Harness observability acceptance
+on:
+  push:
+    branches: [feat/harness-observability]
+    paths:
+      - 'apps/frontend/harness-*'
+      - 'apps/frontend/admin*'
+      - 'scripts/integrate-observability.mjs'
+      - 'scripts/check-admin-ui.mjs'
+      - '.github/workflows/harness-observability.yml'
+permissions:
+  contents: write
+concurrency:
+  group: harness-observability
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/harness-observability
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Integrate known source anchors and preserve wallet identity
+        run: node scripts/integrate-observability.mjs
+      - name: Synchronize the SDK lockfile and verify deployment-style install
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --include=dev --ignore-scripts --no-audit --no-fund
+      - name: Verify syntax and run all regression tests
+        run: |
+          node --check apps/frontend/worker.js
+          node --check apps/frontend/admin-metrics.js
+          if ! npm test > "$RUNNER_TEMP/harness-tests.log" 2>&1; then
+            node --input-type=module -e 'import {readFileSync} from "node:fs"; const text=readFileSync(process.env.RUNNER_TEMP+"/harness-tests.log","utf8"); console.log("::error title=Harness tests::"+text.slice(-10000).replaceAll("%","%25").replaceAll("\n","%0A").replaceAll("\r","%0D"));'
+            cat "$RUNNER_TEMP/harness-tests.log"
+            exit 1
+          fi
+          tail -12 "$RUNNER_TEMP/harness-tests.log"
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Verify desktop, mobile, empty and forbidden dashboard states
+        run: node scripts/check-admin-ui.mjs
+      - name: Verify existing wallet and prediction cards
+        run: |
+          node scripts/check-swap-ui.mjs
+          node scripts/check-prediction-ui.mjs
+      - name: Commit validated integration and lockfile
+        run: |
+          git add apps/frontend/worker.js apps/frontend/arbitrum-swap.js apps/frontend/wrangler.jsonc apps/frontend/harness-metrics.js apps/frontend/harness-telemetry.js package-lock.json
+          if ! git diff --cached --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git commit -m "feat: connect private observability and synchronize deployment lockfile"
+            git push origin HEAD:feat/harness-observability
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harness-observability-acceptance
+          path: |
+            ${{ runner.temp }}/admin-ui/*.png
+            ${{ runner.temp }}/swap-ui/*.png
+            ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/harness-tests.log
+          if-no-files-found: ignore
