@@ -19,7 +19,12 @@ export async function readMainnetAccount(address,fetchImpl=fetch){
  if(perp.status==='fulfilled'){try{perpResult={withdrawable:decimal(perp.value.withdrawable)};}catch{}}
  return {network:'hyperliquid-mainnet',spot:spotResult,perp:perpResult,observedAt:Date.now()};
 }
-export async function readNativeBalance(provider,address){
+// A wallet RPC may never settle. This read-only deadline must not block the order UI indefinitely.
+export async function readNativeBalance(provider,address,{timeoutMs=6000}={}){
+ if(!Number.isSafeInteger(timeoutMs)||timeoutMs<1||timeoutMs>30000)throw Error('余额读取超时参数无效');
+ let timer;try{return await Promise.race([nativeBalance(provider,address),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('钱包链上余额读取超时，请刷新')),timeoutMs);})]);}finally{clearTimeout(timer);}
+}
+async function nativeBalance(provider,address){
  const chain=await provider.request({method:'eth_chainId'});if(!/^0x[0-9a-f]+$/i.test(chain))throw Error('无法识别钱包网络');const info=MAINNET_CHAINS[Number(BigInt(chain))];if(!info)return {status:'unsupported'};
  const contract=USDC_CONTRACTS[Number(BigInt(chain))];
  const [nativeResult,usdcResult]=await Promise.allSettled([provider.request({method:'eth_getBalance',params:[address,'latest']}),provider.request({method:'eth_call',params:[{to:contract,data:'0x70a08231'+address.slice(2).toLowerCase().padStart(64,'0')},'latest']})]);
