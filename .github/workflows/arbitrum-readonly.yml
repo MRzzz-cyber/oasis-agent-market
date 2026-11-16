@@ -1,0 +1,22 @@
+name: Arbitrum read-only quote
+on:
+  workflow_dispatch:
+  push:
+    branches: [refactor/simple-base-mvp]
+    paths:
+      - apps/frontend/arbitrum-swap-core.js
+      - scripts/check-arbitrum-swap.mjs
+      - .github/workflows/arbitrum-readonly.yml
+permissions:
+  contents: read
+jobs:
+  quote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read pinned contracts and quote 1 USDC, never broadcast
+        run: node scripts/check-arbitrum-swap.mjs
