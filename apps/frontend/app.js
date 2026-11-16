@@ -1,4 +1,5 @@
 import {nativeTrade} from './mainnet-trade.js?v=native-mainnet-v15-20261116';
+import {predictionCards,predictionIntent} from './prediction-cards.js?v=prediction-v1';
 import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=native-mainnet-v15-20261116';
 import {renderAccountButton} from "./account-avatar.js?v=native-mainnet-v15-20261116";
 import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=native-mainnet-v15-20261116";
@@ -303,7 +304,7 @@ function restoreConversation(record){
   persistConversation();restoringConversation=true;
   conversationId=record.id;conversationCreatedAt=record.createdAt||new Date().toISOString();
   state.goal=record.goal||record.messages?.find(m=>m.role==='user')?.content||'';state.conversation=[];
-  $('goal').value=state.goal;$('chat-messages').replaceChildren();$('chat-next-actions').replaceChildren();$('chat-funding-card').replaceChildren();$('chat-trade-plan').replaceChildren();$('chat-input').value='';$('ai-usage').textContent='已恢复历史对话；发送新消息后继续研究。';
+  $('goal').value=state.goal;$('chat-messages').replaceChildren();$('chat-next-actions').replaceChildren();$('chat-funding-card').replaceChildren();clearChatTradePlan();$('chat-input').value='';$('ai-usage').textContent='已恢复历史对话；发送新消息后继续研究。';
   for(const message of cleanMessages(record.messages))addChat(message.role,message.content);
   const model=availableModels.find(m=>m.id===record.modelId);if(model){$('model-primary').value=model.id;$('model-primary').dispatchEvent(new Event('change'));}
   makeDraftSummary();$('draft-panel').open=false;renderChatChoices();renderFundingCard();restoringConversation=false;showTab('create');
@@ -513,6 +514,7 @@ async function sendToRealModel() {
 function renderChatChoices() {
   const actions=$("chat-next-actions");actions.replaceChildren();
   if(chatBusy || !state.conversation.length)return;
+  if(predictionIntent(state.conversation)){const b=node('button','reply-option','查看预测市场盘口与成本');b.type='button';b.onclick=showPredictionMarkets;actions.append(b);showPredictionMarkets();return;}
   const guide=conversationGuide(state.conversation);
   const progress=node("div","guide-progress");
   for(const [step,label] of [["research","行情研究"],["plan","确认计划"],["funds","准备资金"]]){const item=node("span",step===guide.stage?"active":"",label);if(step===guide.stage)item.setAttribute("aria-current","step");progress.append(item);}
@@ -525,7 +527,7 @@ function renderChatChoices() {
   actions.append(grid,node("p","note guide-freeform","也可以在下面直接输入，或调整你的想法。选择选项不会自动授权或提交交易。"));
 }
 function renderFundingCard(){
- const host=$('chat-funding-card');host.replaceChildren();const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds'||$('chat-trade-plan').children.length)return;
+ const host=$('chat-funding-card');host.replaceChildren();if(predictionIntent(state.conversation))return;const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds'||$('chat-trade-plan').children.length)return;
  const info=fundingState(workbench.funds(),guide.budget),card=node('section','funding-cta guided-funding'),copy=node('div');copy.append(node('span','funding-network-label','Hyperliquid Mainnet · 真实资金'),node('strong','',info.title),node('p','note',info.body));
  const button=node('button','primary','站内预览买入');button.type='button';button.onclick=()=>showChatTradePlan();card.append(copy,button);host.append(card);
 }
@@ -546,8 +548,11 @@ async function startChatSimulation() {
     addChat("user","我选择先模拟买入 ETH，金额 10 USDC，不发起测试网或主网交易。");
   }catch(e){toast(e.message);}
 }
+function clearChatTradePlan(){const host=$('chat-trade-plan');host.firstElementChild?.dispose?.();host.replaceChildren();}
+function showPredictionMarkets(){const host=$('chat-trade-plan');if(host.querySelector('.prediction-cards'))return;clearChatTradePlan();host.append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds}));$('chat-funding-card').replaceChildren();}
 function showChatTradePlan(amount=conversationGuide(state.conversation).budget||10){
- const host=$('chat-trade-plan');host.replaceChildren(nativeTrade({budget:amount,getWallet:workbench.wallet,pickWallet:workbench.openFunds,openDeposit:workbench.openDeposit,
+ if(predictionIntent(state.conversation))return showPredictionMarkets();
+ clearChatTradePlan();const host=$('chat-trade-plan');host.replaceChildren(nativeTrade({budget:amount,getWallet:workbench.wallet,pickWallet:workbench.openFunds,openDeposit:workbench.openDeposit,
  onBudget:value=>{const guide=conversationGuide(state.conversation);if(guide.budget!==Number(value)){addChat('user','ETH 主网现货，本次买入预算 '+value+' USDC，费用另计；请预览，不自动下单。');persistConversation();renderChatChoices();}},
  onReceipt:record=>{const db=readDemoState(),id='mainnet:'+record.cloid,prior=db.runs.find(r=>r.id===id);const run={...prior,id,mode:'mainnet',asset:'ETH',createdAt:new Date(record.nonce).toISOString(),goal:'站内 ETH 现货买入',status:record.status,receipt:record};if(prior)Object.assign(prior,run);else db.runs.push(run);writeDemoState(db);}
  }));renderFundingCard();host.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -561,7 +566,7 @@ function beginConversation() {
   if (!state.model) { toast("请先在策略工作台中选择一个 OpenRouter 模型"); showTab("overview"); return; }
   persistConversation();state.goal=nextGoal;conversationId=crypto.randomUUID();conversationCreatedAt=new Date().toISOString();
   state.conversation = [];
-  $("chat-next-actions").replaceChildren();$("chat-trade-plan").replaceChildren();$("chat-funding-card").replaceChildren();
+  $("chat-next-actions").replaceChildren();clearChatTradePlan();$("chat-funding-card").replaceChildren();
   $("draft-panel").open=false;
   $("chat-messages").replaceChildren();
   addChat("user", state.goal);
@@ -877,7 +882,7 @@ $("change-model").addEventListener("change", event => {
 });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
-  $("chat-trade-plan").replaceChildren();
+  clearChatTradePlan();
   try { appendUserMessage(value); } catch (error) { toast(error.message); return; }
   const guide=conversationGuide(state.conversation);if(guide.stage==='funds')showChatTradePlan(guide.budget);
   state.goal = (state.goal + "；补充要求：" + value).slice(-2000); $("chat-input").value = "";
