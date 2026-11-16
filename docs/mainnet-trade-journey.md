@@ -1,33 +1,25 @@
 # Mainnet ETH purchase journey
 
-The conversation opens a UETH/USDC spot quote automatically for the selected wallet. The card displays the Hyperliquid execution network, current wallet signing network, ask, maximum execution price, quantity, maximum cost, fee reserve and available trading cash. The user reviews these and clicks `购买 ETH` once. There is no separate consent checkbox or authorize-session button. The visible notice beside the purchase button discloses that the initial wallet signature authorizes an API agent whose protocol permissions cover account trading beyond this order's budget.
+The purchase card shows an explicit `购买 ETH` action in every state. Loading disables it temporarily. A failed quote leaves `购买 ETH · 获取报价`, which only retries the quote and never signs or submits. Insufficient funds, an unsupported network, a budget below the venue minimum or a pending original order leaves a visible disabled action and a specific reason. A valid reviewed quote enables `购买 ETH · 上限 … USDC`.
 
-That click acquires the account's cross-tab lock, validates the reviewed order and checks fresh funds and prices before requesting wallet approval. After the user confirms, the browser verifies authorization and rechecks the same reviewed order. It submits one IOC order with unchanged quantity, cap and limit. It never refreshes and trades a replacement quote silently. A quote that expires while the wallet is open, a worse ask than the limit, a changed wallet/network/account mode or missing funds stops submission. Refreshing an expired quote requires another explicit purchase click. The one-use signer remains only in page memory; protocol authorization can be revoked at Hyperliquid's API management page.
+On November 16, 2026 the user asked to defer complex funding and permission-management content. The purchase card therefore contains no funding form or expandable rules section. A short notice beside an enabled purchase button still discloses that initial API-agent authorization covers account trading beyond the displayed order budget, and provides revocation guidance.
 
-Pending orders are journaled before submission, uncertain outcomes block further orders and are reconciled without resubmission. Tests never spend real funds. Amounts are exact decimal strings; a 10 USDC choice is not a guarantee of meeting venue minimums, and budgets are never increased automatically.
+## Two balances, two ledgers
 
-## Cash-funded unified accounts
+The card reads both chain-wallet native USDC and Hyperliquid trading cash, and labels the source explicitly. The chain-wallet read has a six-second total deadline and is informational: failure to read it does not block an independently funded Hyperliquid order. Wallet and network checks reject stale reads.
 
-Independent spot accounts use USDC total minus hold. `unifiedAccount` uses the smaller of unheld USDC and the API's token-0 `tokenToAvailableAfterMaintenance` allowance. Missing, duplicate, negative or malformed allowance data stops the quote. Portfolio-margin flags and borrowing or lending supply also stop unified cash quotes. Collateral value is not treated as cash and no borrowing is requested. A fresh quote must preserve the reviewed account mode. Oasis never automatically converts an account, moves perp funds or bridges funds as part of a purchase.
+For example, the same wallet can hold 12.159122 USDC on Arbitrum while its Hyperliquid trading account holds 4.8 USDC. These values are not interchangeable and are never added or substituted to enable an order. This implementation trades Hyperliquid UETH/USDC; it does not execute an Arbitrum USDC-to-ETH DEX swap or debit chain-wallet USDC directly. Bridge funding or a separately implemented wallet-native swap route would be needed to spend chain-wallet assets. Changing display labels cannot remove this requirement.
 
-A displayed balance of 4.8 USDC does not meet a roughly 10+ USDC order's minimum and fee reserve. The purchase card shows a short insufficiency message and does not automatically mount a funding form. Hyperliquid trading cash and chain-wallet assets remain distinct.
+Independent spot accounts use USDC total minus hold. Unified cash availability is the smaller of unheld USDC and token-0 `tokenToAvailableAfterMaintenance`. Missing or malformed maintenance data, portfolio-margin flags, borrowing or lending supply fail closed. A fresh order preflight must preserve the reviewed account mode. No automatic account conversion, bridging or class transfer occurs.
 
-## Optional funding in Oasis
+## Purchase execution
 
-`充值 / 提款（按需打开）` is collapsed by default. The funding form is created only after the user opens this optional entry and requests it. It is not part of the normal purchase path.
+After review, one click obtains the account's cross-tab lock and validates the displayed order. It checks fresh funds and prices before requesting wallet authorization. After the user confirms, the browser verifies the authorization and rechecks the same reviewed order, then signs and submits one IOC buy with unchanged quantity, cap and limit. A changed wallet, network, account mode, insufficient balance, expired quote or ask above the reviewed limit stops submission. Refreshing a quote requires another purchase click; it never trades a replacement quote silently.
 
-- Read the selected wallet's spot balance, perp withdrawable balance and account mode.
-- Deposit native Circle USDC on Arbitrum One to pinned Bridge2 `0x2df1c51e09aecf9cacb7bc98cb1742757f163df7`. The Oasis product floor is 10 USDC. Validate wallet, network, balance, bridge code and estimated gas, then send an exact ERC20 transfer without token approval. A deposit does not automatically buy ETH.
-- Transfer an exact USDC amount between the same wallet's independent perp and spot accounts with `usdClassTransfer`.
-- Request `withdraw3` from perp withdrawable USDC to the selected wallet on Arbitrum. Spot-to-perp transfer, when needed, is reviewed separately. Protocol acceptance and ledger evidence do not prove destination-chain arrival.
-- Explicit conversion to independent mode remains an optional whole-account operation, with its own preview and confirmation. Require no positions across perp DEXes, no open orders and no borrowing or lending supply; never switch automatically.
+Temporary one-use signing keys remain only in page memory. Orders are journaled before submission and uncertain outcomes block further orders until reconciliation, without resubmission. Existing funding modules and their durable pending records are retained; their safety checks continue to block trading if an unresolved funding operation exists. Funding is not automatically chained into a purchase.
 
-Each funding operation needs its own 60-second preview and principal-wallet confirmation. Temporary trading keys cannot fund or withdraw. Funding and trading share a cross-tab lock. Persist pending requests before submission, hold uncertain results, do not retry automatically and do not persist signatures or secrets. Check known deposits against exact Arbitrum receipts and USDC Transfer logs; separately refresh Hyperliquid credit. Match withdrawals by original nonce. Uncertain class transfers require reconciliation, never a balance-difference guess.
+Amounts are exact decimal strings. A 10 USDC budget is not a guarantee of meeting market precision and minimum notional. Budgets never increase automatically. Existing Privy IDs, JWT audience, identity keys and wallet addresses are unchanged; issuer remains `https://oasistrade.app`.
 
-Existing Privy App ID, Client ID, JWT audience, identity keys and wallet addresses remain unchanged. The configured issuer stays `https://oasistrade.app`; the old origin remains available for local history.
+## Verification
 
-## Validation boundaries
-
-Run `npm test`, `npm run build:wallet` and the Worker bundle check in CI. Fixtures cover one-click purchase, wallet rejection, double clicks, cross-tab contention, storage failure, changes during signature, unified cash bounds and pending-order reconciliation. A passing CI run is not evidence of an actual wallet interaction or mainnet fill. Deployment and real wallet UX require separate browser verification.
-
-References: Hyperliquid official Python SDK signing and exchange implementations; `@nktkas/hyperliquid` spot state schema for `tokenToAvailableAfterMaintenance`; pinned bridge address cross-check against MetaMask constants.
+Run `npm test`, `npm run build:wallet` and the Worker bundle check. Fixtures cover visible loading/error/blocked/ready actions, separate 12.159122 wallet and 4.8 exchange balances, retry without signing, wallet rejection, double clicks, cross-tab contention, storage failure, changes during confirmation, unified cash bounds and pending-order reconciliation. A passing CI run is not evidence of live wallet interaction, deployment or a mainnet fill. Those require separate verification.
