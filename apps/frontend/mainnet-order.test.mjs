@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {UETH_ID,U,atoms,text,address,mainnetMarket,makeQuote,validateQuote,validateFresh,orderPacket,approvalPacket,exchangeResult,journal,spotFree,activeAgent} from './mainnet-order-core.js';
-import {mainnetQuote} from './mainnet-quote.js';
+import {info,mainnetQuote} from './mainnet-quote.js';
 import {createMainnetSigner} from '../wallet-ui/mainnet-signer.js';
 import {recoverTypedDataAddress} from 'viem';
 import {guardWalletProvider} from './account-wallet.js';
@@ -22,6 +22,23 @@ test('active agent requires exact address and nonexpired permission',()=>{assert
 test('submission response distinguishes partial fill, rejection and uncertainty, checking limit',()=>{const q=quote();const filled=(sz,px='1801')=>({status:'ok',response:{type:'order',data:{statuses:[{filled:{totalSz:sz,avgPx:px,oid:5}}]}}});assert.equal(exchangeResult(filled(q.s),q).status,'filled');assert.equal(exchangeResult(filled('0.0001'),q).status,'partial');assert.equal(exchangeResult(filled('100'),q).terminal,false);assert.equal(exchangeResult(filled(q.s,'9999'),q).terminal,false);assert.equal(exchangeResult({status:'err',response:'no funds'},q).status,'rejected');assert.equal(exchangeResult({status:'ok',response:{type:'order',data:{statuses:[{resting:{oid:9}}]}}},q).terminal,false);assert.equal(exchangeResult({},q).terminal,false);});
 test('durable journal holds pending order across reload, keeps history, rejects replacement and strips credentials',()=>{const storage=memory(),j=journal(storage,master),r=receipt();j.save({...r,signature:'secret',privateKey:'secret'});assert.equal(journal(storage,master).load().cloid,cloid);assert.ok(!JSON.stringify([...storage.data.values()]).includes('secret'));assert.throws(()=>j.save({...r,cloid:'0x'+'b'.repeat(32)}));assert.throws(()=>j.save({...r,p:'1'}));j.save({...r,terminal:true,status:'canceled'});j.save({...r,cloid:'0x'+'b'.repeat(32),nonce:t+100,expiresAfter:t+30100});assert.equal(j.list().length,2);assert.equal(journal(storage,agent).load(),null);storage.setItem([...storage.data.keys()][0],'broken');assert.throws(()=>j.load());});
 test('storage failure is an exception, never silently accepting a pending reservation',()=>{const j=journal({getItem:()=>null,setItem:()=>{throw Error('quota');}},master);assert.throws(()=>j.save(receipt()),/quota/);assert.throws(()=>spotFree({balances:[{coin:'USDC',token:0,total:'1',hold:'2'}]}));});
-test('readonly quote proxy finds context by coin, pins URLs and rejects POST or malformed user before network',async()=>{let calls=0;const mock=async(url,options)=>{calls++;assert.equal(url,'https://api.hyperliquid.xyz/info');assert.equal(options.redirect,'error');const b=JSON.parse(options.body);switch(b.type){case 'spotMetaAndAssetCtxs':return Response.json([meta,[{coin:'@0',markPx:'1'},{coin:'@151',markPx:'1801'}]]);case 'spotClearinghouseState':return Response.json({balances:[{coin:'USDC',token:0,total:'100',hold:'1'}]});case 'userAbstraction':return Response.json('default');case 'l2Book':assert.equal(b.coin,'@151');return Response.json({coin:b.coin,time:Date.now(),levels:[[{px:'1800'}],[{px:'1801'}]]});default:assert.fail('unexpected request');}};const response=await mainnetQuote(new Request('https://oasis.test/api/mainnet/quote?user='+master+'&budget=20'),mock);assert.equal(response.status,200);const q=await response.json();assert.equal(q.available,'99');validateQuote(q,q.checkedAt);assert.equal(calls,4);assert.equal((await mainnetQuote(new Request('https://oasis.test/api/mainnet/quote',{method:'POST'}),mock)).status,405);assert.equal((await mainnetQuote(new Request('https://oasis.test/api/mainnet/quote?user=bad&budget=20'),mock)).status,400);assert.equal(calls,4);});
+test('readonly quote proxy finds context by coin, pins URLs and rejects POST or malformed user before network',async()=>{let calls=0;const mock=async(url,options)=>{calls++;assert.equal(url,'https://api.hyperliquid.xyz/info');assert.equal(options.redirect,'manual');const b=JSON.parse(options.body);switch(b.type){case 'spotMetaAndAssetCtxs':return Response.json([meta,[{coin:'@0',markPx:'1'},{coin:'@151',markPx:'1801'}]]);case 'spotClearinghouseState':return Response.json({balances:[{coin:'USDC',token:0,total:'100',hold:'1'}]});case 'userAbstraction':return Response.json('default');case 'l2Book':assert.equal(b.coin,'@151');return Response.json({coin:b.coin,time:Date.now(),levels:[[{px:'1800'}],[{px:'1801'}]]});default:assert.fail('unexpected request');}};const response=await mainnetQuote(new Request('https://oasis.test/api/mainnet/quote?user='+master+'&budget=20'),mock);assert.equal(response.status,200);const q=await response.json();assert.equal(q.available,'99');validateQuote(q,q.checkedAt);assert.equal(calls,4);assert.equal((await mainnetQuote(new Request('https://oasis.test/api/mainnet/quote',{method:'POST'}),mock)).status,405);assert.equal((await mainnetQuote(new Request('https://oasis.test/api/mainnet/quote?user=bad&budget=20'),mock)).status,400);assert.equal(calls,4);});
 
 test('L1 action hash matches independent Python msgpack wire fixture with mainnet expiry',()=>{const packet=orderPacket(quote(),cloid,t);assert.equal(packet.typed.message.connectionId,'0xb80581fe921a7242d012acd9c17e0e1efd33831bc26d17bf0dcd11e9163a987c');});
+
+test('quote transport rejects redirects before reading their bodies and never follows them',async()=>{
+ for(const status of [300,301,302,303,304,307,308]){
+  let calls=0,parsed=false;
+  await assert.rejects(info({type:'spotMetaAndAssetCtxs'},async(url,options)=>{
+   calls++;assert.equal(url,'https://api.hyperliquid.xyz/info');assert.equal(options.redirect,'manual');
+   return {status,ok:false,json:async()=>{parsed=true;throw Error('redirect body must not be parsed');}};
+  }),/重定向/);
+  assert.equal(calls,1);assert.equal(parsed,false);
+ }
+});
+test('quote transport keeps upstream errors closed and parses only successful responses',async()=>{
+ for(const status of [400,403,429,500,503]){
+  await assert.rejects(info({type:'userAbstraction'},async()=>({status,ok:false,json:()=>assert.fail('error body must not be parsed')})),/主网数据暂不可用/);
+ }
+ assert.equal(await info({type:'userAbstraction'},async()=>Response.json('default')),'default');
+});
