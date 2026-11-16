@@ -17,25 +17,9 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Inspect installed SDK contracts
-        run: |
-          node --input-type=module <<'JS'
-          import {readFile,readdir} from 'node:fs/promises';
-          const root='node_modules/@polymarket/client/';
-          const pkg=JSON.parse(await readFile(root+'package.json','utf8'));
-          console.log('SDK EXPORTS',JSON.stringify(pkg.exports));console.log('SDK REPO',JSON.stringify(pkg.repository));
-          console.log('SDK ROOT',await readdir(root));
-          for(const f of ['dist/index.d.ts','dist/actions/index.d.ts']){const s=await readFile(root+f,'utf8');console.log('SDK EXACT',f,s.slice(0,20000));}
-          const sdk=await import('@polymarket/client'),actions=await import('@polymarket/client/actions');
-          console.log('SDK ROOT KEYS',Object.keys(sdk).join(','));
-          console.log('SDK ACTION KEYS',Object.keys(actions).join(','));
-          const client=sdk.createPublicClient();console.log('PUBLIC METHODS',Object.keys(client).filter(x=>/Market|Fee|Book|Wallet|Order|Balance/.test(x)));
-          const page=await client.search({q:'Bitcoin',pageSize:1,eventsStatus:'active',keepClosedMarkets:0}).firstPage();
-          const market=page.items.events.flatMap(e=>e.markets||[]).find(m=>m.state.acceptingOrders);
-          console.log('SDK LIVE MARKET',JSON.stringify(market).slice(0,14000));
-          if(market){const assetId=market.version==='v2'?market.outcomes.yes.positionId:market.outcomes.yes.tokenId;console.log('SDK LIVE BOOK',JSON.stringify(await client.fetchOrderBook({assetId})).slice(0,5000));console.log('SDK LIVE INFO',JSON.stringify(await client.fetchMarketInfo({conditionId:market.conditionId})).slice(0,5000));}
-          JS
       - run: npm test
       - run: npm run build:wallet
       - name: Build Worker
         run: node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Verify live public purchase metadata without wallet operations
+        run: node scripts/check-polymarket-purchase-readonly.mjs

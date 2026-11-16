@@ -4,3 +4,5 @@ await build({entryPoints:['apps/wallet-ui/privy-island.jsx'],outdir:'apps/fronte
 await build({entryPoints:['apps/wallet-ui/deposit-qr.js'],outfile:'apps/frontend/vendor/privy/deposit-qr.js',bundle:true,format:'esm',platform:'browser',target:['es2022'],minify:true,sourcemap:false,legalComments:'linked'});
 
 await build({entryPoints:['apps/wallet-ui/mainnet-signer.js'],outfile:'apps/frontend/vendor/privy/mainnet-signer.js',bundle:true,format:'esm',platform:'browser',target:['es2022'],minify:true,sourcemap:false,legalComments:'linked'});
+
+await build({entryPoints:['apps/wallet-ui/polymarket-purchase-sdk.js'],outfile:'apps/frontend/vendor/privy/polymarket-purchase-sdk.js',bundle:true,format:'esm',platform:'browser',target:['es2022'],minify:true,sourcemap:false,legalComments:'linked'});
