@@ -16,15 +16,28 @@ export function mainnetMarket(meta){
  if(!usd||pairs.length!==1||!Number.isInteger(pair.index)||pair.index<0||pair.name!=='@'+pair.index||!Number.isInteger(token.szDecimals)||token.szDecimals<0||token.szDecimals>8)throw Error('主网 ETH/USDC 交易对不匹配');
  return {coin:pair.name,asset:10000+pair.index,decimals:token.szDecimals,tokenId:UETH_ID};
 }
-export function spotFree(state){if(!Array.isArray(state?.balances))throw Error('现货余额读取失败');const rows=state.balances.filter(x=>x.coin==='USDC'&&x.token===0);if(rows.length>1)throw Error('重复的 USDC 余额');if(!rows.length)return '0';const free=atoms(rows[0].total)-atoms(rows[0].hold);return text(free);}
+// Unified cash spending is bounded by BOTH unheld USDC and the venue's maintenance allowance.
+// No collateral valuation, borrowing, account conversion or perp transfer is inferred here.
+export function spotFree(state,accountMode='default'){
+ if(!Array.isArray(state?.balances))throw Error('现货余额读取失败');
+ const rows=state.balances.filter(x=>x.coin==='USDC'&&x.token===0);if(rows.length>1)throw Error('重复的 USDC 余额');
+ const free=rows.length?atoms(rows[0].total)-atoms(rows[0].hold):0n;if(free<0n)throw Error('USDC 可用余额无效');
+ if(accountMode!=='unifiedAccount')return text(free);
+ if(state.portfolioMarginEnabled===true)throw Error('暂不支持组合保证金账户');
+ if(state.balances.some(x=>atoms(x.borrowed??'0')>0n||atoms(x.supplied??'0')>0n))throw Error('当前账户存在借贷，无法确认纯现金买入额度');
+ const entries=state.tokenToAvailableAfterMaintenance;
+ if(!Array.isArray(entries)||entries.some(x=>!Array.isArray(x)||x.length!==2))throw Error('统一账户可交易额度暂不可用，请刷新报价');
+ const allowed=entries.filter(x=>x[0]===0);if(allowed.length!==1)throw Error('统一账户 USDC 可交易额度暂不可用，请刷新报价');
+ const maintenance=atoms(allowed[0][1]);return text(free<maintenance?free:maintenance);
+}
 export function makeQuote({market,book,markPx,available,budget,checkedAt,accountMode='default'}){
  const cap=budgetAtoms(budget);if(!Number.isSafeInteger(checkedAt)||book?.coin!==market.coin||!Number.isSafeInteger(book.time)||checkedAt-book.time>10000||book.time-checkedAt>5000)throw Error('主网盘口已过期，请刷新报价');
  const ask=atoms(book.levels?.[1]?.[0]?.px),bid=atoms(book.levels?.[0]?.[0]?.px),mark=atoms(markPx),free=atoms(available);if(!ask||!bid||!mark||bid>ask||ask*100n>mark*102n||mark*100n>ask*102n)throw Error('现货盘口或参考价异常，请稍后重试');
  const raw=ceil(ask*10050n,10000n);const exponent=raw.toString().length-1-8;const decimals=Math.min(8-market.decimals,Math.max(0,4-exponent));const tick=10n**BigInt(8-decimals),limit=ceil(raw,tick)*tick,step=10n**BigInt(8-market.decimals);
  const floor=ask<mark?ask:mark,minSize=ceil(10n*U*U,floor*step)*step;
  const minimumBudget=ceil(ceil(minSize*limit,U),1000000n)*1000000n;
- const size=(cap*U/limit)/step*step,cost=ceil(size*limit,U),reserve=ceil(cost,100n); // Conservative 1% balance reserve, not a fee quote.
- const reason=accountMode!=='default'&&accountMode!=='disabled'?'当前仅支持标准独立现货账户，暂不支持统一或组合保证金账户':size<minSize?'当前精度和限价下，至少需 '+text(minimumBudget)+' USDC（费用另计）；金额不会自动提高':cost+reserve>free?'主网现货 USDC 不足，需预留成交额及手续费缓冲':'';
+ const size=(cap*U/limit)/step*step,cost=ceil(size*limit,U),reserve=ceil(cost,100n);
+ const reason=!['default','disabled','unifiedAccount'].includes(accountMode)?'暂不支持当前组合保证金账户':size<minSize?'当前精度和限价下，至少需 '+text(minimumBudget)+' USDC（费用另计）；金额不会自动提高':cost+reserve>free?'可交易 USDC 不足：可用 '+text(free)+'，本单含费用预留需 '+text(cost+reserve)+' USDC':'';
  return {network:'hyperliquid-mainnet',address:null,market,budget:text(cap),available:text(free),p:text(limit),s:text(size),cost:text(cost),feeReserve:text(reserve),minimumBudget:text(minimumBudget),ask:text(ask),bid:text(bid),markPx:text(mark),checkedAt,bookTime:book.time,expiresAt:checkedAt+15000,ready:!reason,reason,accountMode};
 }
 export function validateQuote(q,now){
@@ -35,7 +48,7 @@ export function validateQuote(q,now){
 }
 export function validateFresh(old,fresh,now){
  validateQuote(old,now);
- if(address(old.address)!==address(fresh.address)||old.market.asset!==fresh.market.asset||old.market.decimals!==fresh.market.decimals||fresh.market.tokenId!==UETH_ID||fresh.market.coin!==old.market.coin||fresh.network!=='hyperliquid-mainnet'||!['default','disabled'].includes(fresh.accountMode)||!Number.isSafeInteger(fresh.checkedAt)||now-fresh.checkedAt>10000||fresh.checkedAt>now+5000||now-fresh.bookTime>10000||atoms(fresh.bid)>atoms(fresh.ask)||atoms(fresh.ask)>atoms(old.p)||atoms(old.s)*(atoms(fresh.ask)<atoms(fresh.markPx)?atoms(fresh.ask):atoms(fresh.markPx))<10n*U*U||atoms(old.cost)+atoms(old.feeReserve)>atoms(fresh.available))throw Error('行情或余额已变化，请重新预览并确认');
+ if(address(old.address)!==address(fresh.address)||old.market.asset!==fresh.market.asset||old.market.decimals!==fresh.market.decimals||fresh.market.tokenId!==UETH_ID||fresh.market.coin!==old.market.coin||fresh.network!=='hyperliquid-mainnet'||!['default','disabled','unifiedAccount'].includes(fresh.accountMode)||fresh.accountMode!==old.accountMode||!Number.isSafeInteger(fresh.checkedAt)||now-fresh.checkedAt>10000||fresh.checkedAt>now+5000||now-fresh.bookTime>10000||atoms(fresh.bid)>atoms(fresh.ask)||atoms(fresh.ask)>atoms(old.p)||atoms(old.s)*(atoms(fresh.ask)<atoms(fresh.markPx)?atoms(fresh.ask):atoms(fresh.markPx))<10n*U*U||atoms(old.cost)+atoms(old.feeReserve)>atoms(fresh.available))throw Error('行情或余额已变化，请重新预览并确认');
 }
 export function orderPacket(q,cloid,nonce){validateQuote(q,nonce);if(!/^0x[0-9a-f]{32}$/.test(cloid)||!Number.isSafeInteger(nonce))throw Error('订单标识无效');const action={type:'order',orders:[{a:q.market.asset,b:true,p:q.p,s:q.s,r:false,t:{limit:{tif:'Ioc'}},c:cloid}],grouping:'na'},expiresAfter=nonce+30000;
  const typed={domain:{name:'Exchange',version:'1',chainId:1337,verifyingContract:zero},types:{Agent:[{name:'source',type:'string'},{name:'connectionId',type:'bytes32'}]},primaryType:'Agent',message:{source:'a',connectionId:createL1ActionHash({action,nonce,expiresAfter})}};return {action,nonce,expiresAfter,typed};}
