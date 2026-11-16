@@ -15,6 +15,10 @@
       {
         "name": "ACCOUNTS",
         "class_name": "AccountStore"
+      },
+      {
+        "name": "HARNESS_METRICS",
+        "class_name": "HarnessMetricsStore"
       }
     ]
   },
@@ -23,6 +27,12 @@
       "tag": "v1-accounts",
       "new_sqlite_classes": [
         "AccountStore"
+      ]
+    },
+    {
+      "tag": "v2-harness-metrics",
+      "new_sqlite_classes": [
+        "HarnessMetricsStore"
       ]
     }
   ],

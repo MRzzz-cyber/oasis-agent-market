@@ -1,4 +1,6 @@
 import {mainnetQuote} from './mainnet-quote.js';
+import {harnessMetricsRoute,observeHarnessRequest} from './harness-metrics.js';
+export {HarnessMetricsStore} from './harness-metrics.js';
 import {predictionRoute} from './prediction-markets.js';
 import {privyRoute} from './privy-auth.js';
 import {overview} from './market-overview.js';
@@ -31,9 +33,11 @@ export async function streamOpenRouterChat({model,messages,env,fetchImpl=fetch})
  if(!upstream.body)return respond({error:'OpenRouter 未返回流式响应'},502);return new Response(normalizeAdvisorStream(upstream),{status:200,headers:{'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache, no-transform',connection:'keep-alive','x-accel-buffering':'no'}});
 }
 async function secureEqual(a,b){const encoder=new TextEncoder(),[x,y]=await Promise.all([a,b].map(v=>crypto.subtle.digest('SHA-256',encoder.encode(v)))),left=new Uint8Array(x),right=new Uint8Array(y);let mismatch=0;for(let i=0;i<left.length;i++)mismatch|=left[i]^right[i];return mismatch===0;}
-export default {async fetch(request,env){const url=new URL(request.url);
- if(url.pathname==='/api/release'&&request.method==='GET')return respond({version:'native-mainnet-v15-20261116',purchaseFlow:'arbitrum-wallet-swap-v17',purchaseUI:'wallet-card-v18',predictionResearch:'prediction-v1',predictionTrading:false,execution:'arbitrum-uniswap-v3',inputBalance:'wallet',defaultTestBudget:'20'});
- if(url.pathname.startsWith('/api/predictions/'))return predictionRoute(request);
+export default {async fetch(request,env,ctx){const url=new URL(request.url);
+ if(['/api/harness/events','/api/admin/metrics','/api/admin/metrics/prometheus'].includes(url.pathname))return harnessMetricsRoute(request,env);
+ if(['/admin','/admin/','/admin.html'].includes(url.pathname)){if(request.method!=='GET')return respond({error:'后台页面只支持 GET'},405);const asset=await env.ASSETS.fetch(new Request(new URL('/admin.html',url),request)),headers=new Headers(asset.headers);headers.set('cache-control','no-store');headers.set('x-frame-options','DENY');headers.set('referrer-policy','no-referrer');headers.set('content-security-policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");return new Response(asset.body,{status:asset.status,headers});}
+ if(url.pathname==='/api/release'&&request.method==='GET')return respond({version:'native-mainnet-v15-20261116',purchaseFlow:'arbitrum-wallet-swap-v17',purchaseUI:'wallet-card-v18',predictionResearch:'prediction-v1',predictionTrading:false,observability:'harness-metrics-v1',execution:'arbitrum-uniswap-v3',inputBalance:'wallet',defaultTestBudget:'20'});
+ if(url.pathname.startsWith('/api/predictions/'))return observeHarnessRequest(request,env,ctx,url.pathname.endsWith('/quote')?'prediction_quote':'prediction_search',()=>predictionRoute(request));
  if(url.pathname==='/api/mainnet/quote')return mainnetQuote(request);
  if(url.pathname==='/api/testnet/book'&&request.method==='GET')return testnetBook(request);
  if(url.pathname==='/api/market/overview'&&request.method==='GET')return overview();
@@ -48,4 +52,4 @@ export default {async fetch(request,env){const url=new URL(request.url);
  if(!env.OASIS_DEMO_ACCESS_CODE)return respond({error:'模型 API 尚未开放：管理员需先配置 OASIS_DEMO_ACCESS_CODE'},503);
  const origin=request.headers.get('origin');if(!origin||origin!==url.origin)return respond({error:'只允许从 Oasis 页面调用'},403);
  if(googleMode(env)){if(!env.ACCOUNTS)return respond({error:'账号服务尚未配置'},503);const current=await account(request,env);if(!current.ok)return current;if(!(await current.json()).active)return respond({error:'请先激活账号'},403);}else if(!(await secureEqual(request.headers.get('x-oasis-access-code')||'',env.OASIS_DEMO_ACCESS_CODE)))return respond({error:'体验码不正确'},401);
- if(Number(request.headers.get('content-length')||0)>25000)return respond({error:'请求内容过大'},413);let payload;try{payload=validateChatInput(await request.json());}catch(error){return respond({error:error.message||'无效请求'},400);}return streamOpenRouterChat({...payload,env});}};
+ if(Number(request.headers.get('content-length')||0)>25000)return respond({error:'请求内容过大'},413);let payload;try{payload=validateChatInput(await request.json());}catch(error){return respond({error:error.message||'无效请求'},400);}return observeHarnessRequest(request,env,ctx,'advisor',()=>streamOpenRouterChat({...payload,env}));}};
