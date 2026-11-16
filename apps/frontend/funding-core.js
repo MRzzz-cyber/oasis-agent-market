@@ -1,5 +1,4 @@
 import {MAINNET_API,address,atoms,text,splitSignature,journal as orderJournal} from './mainnet-order-core.js';
-// Hyperliquid Bridge2 on Arbitrum; native Circle USDC only. No approvals or arbitrary recipients.
 export const ARBITRUM='0xa4b1';
 export const USDC='0xaf88d065e77c8cc2239327c5edb3a432268e5831';
 export const BRIDGE='0x2df1c51e09aecf9cacb7bc98cb1742757f163df7';
@@ -15,7 +14,7 @@ export function fundingPacket(kind,user,amount,chain,nonce){
  else if(kind==='withdraw'){action={type:'withdraw3',destination:user,amount:usd(amount),time:nonce};primary='Withdraw';fields=[['destination','string'],['amount','string'],['time','uint64']];}
  else {action={type:'usdClassTransfer',amount:usd(amount),toPerp:kind==='toPerp',nonce};primary='UsdClassTransfer';fields=[['amount','string'],['toPerp','bool'],['nonce','uint64']];}
  action.signatureChainId=chain;action.hyperliquidChain='Mainnet';const name='HyperliquidTransaction:'+primary;
- return {action,nonce,typed:{domain:{name:'HyperliquidSignTransaction',version:'1',chainId:Number(BigInt(chain)),verifyingContract:'0x'+'0'.repeat(40)},types:{[name]:[['hyperliquidChain','string'],...fields].map(([name,type])=>({name,type}))},primaryType:name,message:action}};
+ return {action,nonce,typed:{domain:{name:'HyperliquidSignTransaction',version:'1',chainId:Number(BigInt(chain)),verifyingContract:'0x'+'0'.repeat(40)},types:{EIP712Domain:[{name:'name',type:'string'},{name:'version',type:'string'},{name:'chainId',type:'uint256'},{name:'verifyingContract',type:'address'}],[name]:[['hyperliquidChain','string'],...fields].map(([name,type])=>({name,type}))},primaryType:name,message:action}};
 }
 export async function fundingRpc(body,fetchImpl=fetch,path='/info'){
  if(!['/info','/exchange'].includes(path))throw Error('接口无效');
@@ -73,9 +72,9 @@ export async function submitFunding({prepared:p,wallet,getWallet,storage,fetchIm
  if(!locks?.request)throw Error('请使用支持跨页面操作锁的新版 Chrome 或 Edge');
  return locks.request('oasis-mainnet-order:'+address(p.user),{ifAvailable:true},async lock=>{
   if(!lock)throw Error('另一个页面正在处理该账户，请先核对');assertFundingClear(storage,p.user);
+  if(fundingJournal(storage,p.user).list().some(r=>r.nonce===p.nonce))throw Error('原请求已处理，不允许重复提交，请重新预览新的操作');
   if(!Number.isSafeInteger(now())||now()>=p.expiresAt||p.expiresAt!==p.nonce+60000||now()<p.nonce-5000||address(wallet.address)!==p.user)throw Error('资金预览已过期，请重新预览');
   await currentWallet(wallet,getWallet,p.chain);
-  // Read balances and account mode again; never change the reviewed amount, direction or recipient.
   const fresh=await prepareFunding({kind:p.kind,amount:p.amount,wallet,getWallet,fetchImpl,now:()=>p.nonce});
   if(fresh.mode!==p.mode||JSON.stringify(fresh.tx)!==JSON.stringify(p.tx)||JSON.stringify(fresh.packet)!==JSON.stringify(p.packet))throw Error('资金预览发生变化，请重新确认');
   let signature;
@@ -83,10 +82,11 @@ export async function submitFunding({prepared:p,wallet,getWallet,storage,fetchIm
    wallet.provider.armMainnetFunding?.(p.packet);
    signature=splitSignature(await wallet.provider.request({method:'eth_signTypedData_v4',params:[p.user,JSON.stringify(p.packet.typed)]}));
    await currentWallet(wallet,getWallet,p.chain);
+   if(p.kind==='standardize')await assertSafeModeChange(await readFunding(p.user,fetchImpl),fetchImpl);
    if(now()>=p.expiresAt)throw Error('签名等待过久，未提交；请重新预览');
   }
-  const j=fundingJournal(storage,p.user),record={user:p.user,kind:p.kind,amount:p.amount,nonce:p.nonce,chain:p.chain,status:'submitting',terminal:false,message:'钱包已确认，提交结果待核对'};
-  j.save(record); // No signature, private key or token is stored. Storage must succeed before submission.
+  const j=fundingJournal(storage,p.user),record={user:p.user,kind:p.kind,amount:p.amount,nonce:p.nonce,chain:p.chain,status:'submitting',terminal:false,message:'提交结果待核对'};
+  j.save(record);
   try{
    if(p.kind==='deposit'){
     wallet.provider.armMainnetDeposit?.(p.tx);
@@ -107,7 +107,18 @@ export async function submitFunding({prepared:p,wallet,getWallet,storage,fetchIm
 export async function reconcileFunding({record:r,wallet,getWallet,storage,fetchImpl=fetch}){
  await currentWallet(wallet,getWallet);if(address(wallet.address)!==r.user)throw Error('钱包不匹配');const j=fundingJournal(storage,r.user);
  if(r.kind==='standardize'){const mode=await fundingRpc({type:'userAbstraction',user:r.user},fetchImpl);if(standard(mode))return j.save({...r,status:'confirmed',terminal:true,message:'已核对为独立现货模式，请刷新订单'});}
- if(r.kind==='deposit'&&r.hash){await currentWallet(wallet,getWallet,ARBITRUM);const receipt=await wallet.provider.request({method:'eth_getTransactionReceipt',params:[r.hash]});if(receipt){if(receipt.transactionHash?.toLowerCase()!==r.hash.toLowerCase()||receipt.to?.toLowerCase()!==USDC||receipt.from?.toLowerCase()!==r.user)throw Error('链上回执与入金不匹配');if(receipt.status==='0x0')return j.save({...r,status:'reverted',terminal:true,message:'入金交易链上失败，没有入账'});if(receipt.status==='0x1')return j.save({...r,status:'chain-confirmed',terminal:true,message:'Arbitrum 转账已确认；请刷新 Hyperliquid 余额核对入账，尚未自动划转或买入'});}}
+ if(r.kind==='deposit'&&r.hash){
+  await currentWallet(wallet,getWallet,ARBITRUM);const receipt=await wallet.provider.request({method:'eth_getTransactionReceipt',params:[r.hash]});
+  if(receipt){
+   if(receipt.transactionHash?.toLowerCase()!==r.hash.toLowerCase()||receipt.to?.toLowerCase()!==USDC||receipt.from?.toLowerCase()!==r.user)throw Error('链上回执与入金不匹配');
+   if(receipt.status==='0x0')return j.save({...r,status:'reverted',terminal:true,message:'入金交易链上失败，没有入账'});
+   if(receipt.status==='0x1'){
+    const transfer='0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',from='0x'+r.user.slice(2).padStart(64,'0'),to='0x'+BRIDGE.slice(2).padStart(64,'0');
+    if(!Array.isArray(receipt.logs)||!receipt.logs.some(l=>l.address?.toLowerCase()===USDC&&l.topics?.length===3&&l.topics[0]?.toLowerCase()===transfer&&l.topics[1]?.toLowerCase()===from&&l.topics[2]?.toLowerCase()===to&&/^0x[0-9a-f]{64}$/i.test(l.data)&&BigInt(l.data)===atoms(r.amount)/100n))throw Error('未找到与金额、收款桥完全匹配的 USDC 转账事件');
+    return j.save({...r,status:'chain-confirmed',terminal:true,message:'Arbitrum 转账已确认；请刷新 Hyperliquid 余额核对入账，尚未自动划转或买入'});
+   }
+  }
+ }
  if(r.kind==='withdraw'){
   const rows=await fundingRpc({type:'userNonFundingLedgerUpdates',user:r.user,startTime:r.nonce-60000},fetchImpl);if(!Array.isArray(rows))throw Error('提款账本暂不可用');
   const row=rows.find(x=>x.delta?.type==='withdraw'&&x.delta.nonce===r.nonce);
