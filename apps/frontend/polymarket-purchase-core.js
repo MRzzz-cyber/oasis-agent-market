@@ -5,7 +5,7 @@ export const EXCHANGES={standard:'0xe111180000d2663c0091e4f400237545b87b996b',ne
 export const ZERO32='0x'+'0'.repeat(64);
 export const address=v=>{if(!/^0x[0-9a-f]{40}$/i.test(v||''))throw Error('钱包地址无效');return v.toLowerCase();};
 export const uint=v=>{if(!/^\d{1,78}$/.test(String(v)))throw Error('数量格式无效');return BigInt(v);};
-export const canonical=v=>JSON.stringify(v,(_,x)=>typeof x==='bigint'?x.toString():x);
+export const canonical=v=>JSON.stringify(v,(_,x)=>typeof x==='bigint'?x.toString():x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const exactKeys=(obj,keys)=>obj&&Object.keys(obj).length===keys.length&&keys.every(k=>Object.hasOwn(obj,k));
 const assert=(ok,message)=>{if(!ok)throw Error(message);};
 const fields=s=>s.split(',').map(v=>{const [name,type]=v.split(':');return {name,type};});

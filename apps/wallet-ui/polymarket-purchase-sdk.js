@@ -4,7 +4,7 @@ import {hashTypedData,keccak256,toHex} from 'viem';
 import {POLYGON,PUSD,address,atomic,canonical,checkAuth,checkOrder,checkBatch,purchasePreview,checkQuote,approvalCalls,EXCHANGES} from '../frontend/polymarket-purchase-core.js';
 import {depositWallets} from '../frontend/polymarket-identity.js';
 export {depositWallets};
-const json=(x)=>JSON.parse(canonical(x)),hosts=new Set(['gamma-api.polymarket.com','clob.polymarket.com','relayer-v2.polymarket.com','polygon.drpc.org']);
+const json=(x)=>JSON.parse(canonical(x)),hosts=new Set(['gamma-api.polymarket.com','clob.polymarket.com','relayer-v2.polymarket.com',new URL(production.rpc).hostname]);
 const TIMEOUT=15000;
 export async function purchaseSession(wallet,{getWallet,fetchImpl=fetch,onPrepared=()=>{},onAcknowledged=()=>{},accountWallet}={}){
  let proof=null,context=null,authenticating=true,closed=false,deploySent=false,client;
@@ -13,7 +13,7 @@ export async function purchaseSession(wallet,{getWallet,fetchImpl=fetch,onPrepar
   const req=new Request(input,init),url=new URL(req.url);if(!hosts.has(url.hostname)||url.protocol!=='https:')throw Error('平台请求地址未获准');
   if(req.method!=='GET'){
    const text=await req.clone().text();
-   if(url.hostname==='polygon.drpc.org'){
+   if(url.hostname===new URL(production.rpc).hostname){
     const rpc=JSON.parse(text);if(!['eth_call','eth_getCode','eth_chainId','eth_getTransactionReceipt'].includes(rpc.method))throw Error('仅允许 Polygon 合约只读查询');
    }else if(url.hostname==='relayer-v2.polymarket.com'&&url.pathname==='/submit'&&req.method==='POST'){
     const payload=JSON.parse(text);await ensure();

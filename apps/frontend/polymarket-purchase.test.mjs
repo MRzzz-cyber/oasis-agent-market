@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPublicClient,createSecureClient,production} from '@polymarket/client';
-import {prepareMarketOrder,postOrder} from '@polymarket/client/actions';
+import {prepareMarketOrder,postOrder,prepareGaslessTransaction} from '@polymarket/client/actions';
 import {generatePrivateKey,privateKeyToAccount} from 'viem/accounts';
 import {atomic,display,PUSD,FACTORY,address,canonical,purchasePreview,checkQuote,checkOrder,checkAuth,checkBatch,approvalCalls,predictionJournal} from './polymarket-purchase-core.js';
 import {depositWallets} from './polymarket-identity.js';
@@ -106,4 +106,13 @@ test('protocol V2 SDK signatures select Exchange V3 and retain position and cond
  const q={...purchasePreview({market:m,book:{...book(),assetId:position,conditionId:v2condition},feeInfo:{rate:'0.07',exponent:1},budget:'10',outcome:'yes'}),maker};
  const sdk={account:identity,environment:production,clob:{get:async path=>path.startsWith('/markets-by-token/')?v2condition:{feeInfo:{rate:0.07,exponent:1},negRisk:false,tickSize:0.01,tokens:[{assetId:position}]}}};
  const flow=await prepareMarketOrder(sdk,{assetId:position,side:'BUY',amount:display(q.netAtomic),maxSpend:'10',maxPrice:display(q.limitAtomic),orderType:'FOK'}),step=await flow.next();checkOrder(JSON.parse(canonical(step.value.payload)),q,identity);assert.equal(step.value.payload.domain.version,'3');
+});
+
+test('pinned SDK gasless batch is accepted by the restricted relay policy without forwarding',async()=>{
+ const acct=privateKeyToAccount(generatePrivateKey()),who=address(acct.address),wallet=depositWallets(who)[0],q={...quote(),maker:wallet},own={signer:who,wallet,walletType:3,signerType:'OWNER'};let body;
+ const sdk={supportsGasless:true,account:own,environment:production,relayer:{get:async path=>({nonce:'2'}),post:async(path,options)=>{assert.equal(path,'/submit');body=options.json;return {transactionId:'fixture-relay',state:'STATE_NEW'};}}};
+ const flow=await prepareGaslessTransaction(sdk,{calls:approvalCalls(q).map(c=>({to:c.target,data:c.data,value:0n})),metadata:'Oasis exact purchase approval'});
+ let step=await flow.next();assert.equal(step.value.kind,'requestAddress');step=await flow.next(who);assert.equal(step.value.kind,'signGaslessTypedData');
+ const typed=JSON.parse(canonical(step.value.payload));checkBatch(typed,q,wallet);const sig=await acct.signTypedData(step.value.payload);const done=await flow.next(sig);assert.equal(done.done,true);
+ const payload=auth(who),proof={payload,signature:await acct.signTypedData(payload)};await validateRelay({body:canonical(body),proof,quote:q,batch:typed});assert.equal(body.type,'WALLET');
 });
