@@ -19,5 +19,5 @@ export function fundingNeed({requiredAtomic,balanceAtomic,asset,chainId,address}
  if(typeof balanceAtomic!=='string'||!/^\d{1,78}$/.test(balanceAtomic))throw Error('钱包余额无效');const difference=BigInt(requiredAtomic)-BigInt(balanceAtomic);
  return {status:difference>0n?'insufficient':'sufficient',asset,chainId,address,shortfallAtomic:difference>0n?difference.toString():'0'};
 }
-export function predictionIntent(messages){const last=[...(messages||[])].reverse().find(row=>row.role==='user');return typeof last?.content==='string'&&/预测市场|预测盘口|polymarket|kalshi/i.test(last.content);}
+export function predictionIntent(messages){for(const row of [...(messages||[])].reverse()){if(row.role!=='user'||typeof row.content!=='string')continue;const value=row.content;if(/(?:取消|停止|不看|不买|退出|暂不).{0,10}(?:预测市场|预测盘口|polymarket|kalshi)/i.test(value))return false;if(/预测市场|预测盘口|polymarket|kalshi/i.test(value))return true;if(/(?:买入|购买|兑换|买).{0,24}(?:ETH|以太坊)|(?:ETH|以太坊).{0,24}(?:现货|买入|兑换)/i.test(value))return false;}return false;}
 export function comparable(a,b){return !!a?.verifiedEventKey&&a.verifiedEventKey===b?.verifiedEventKey&&!!a?.verifiedOutcomeKey&&a.verifiedOutcomeKey===b?.verifiedOutcomeKey&&!!a?.rulesDigest&&a.rulesDigest===b?.rulesDigest&&!!a?.endDate&&a.endDate===b?.endDate&&!!a?.currency&&a.currency===b?.currency;}
