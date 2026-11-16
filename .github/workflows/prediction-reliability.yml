@@ -27,6 +27,17 @@ jobs:
           console.log('SEARCH',JSON.stringify(await searchPredictions('Bitcoin',{fetchImpl:monitored})).slice(0,2200));
           for(const path of ['/api/release','/api/predictions/search?q=Bitcoin','/api/admin/metrics']){try{const r=await monitored('https://oasistrade.app'+path,{signal:AbortSignal.timeout(35000)});console.log('PRODUCTION',path,(await r.text()).slice(0,2600));}catch(e){console.log('PRODUCTION ERROR',path,e.message);}}
           JS
+      - name: Reproduce public reads in the Workers runtime
+        run: |
+          npm install --prefix "$RUNNER_TEMP/prediction-worker-probe" --no-audit --no-fund miniflare@4
+          node --input-type=module <<'JS'
+          import {build} from 'esbuild';
+          import {pathToFileURL} from 'node:url';
+          const {Miniflare}=await import(pathToFileURL(process.env.RUNNER_TEMP+'/prediction-worker-probe/node_modules/miniflare/dist/src/index.js'));
+          const result=await build({stdin:{contents:`import {searchPredictions} from './apps/frontend/prediction-markets.js'; export default {async fetch(){const monitored=async (url,init)=>{try{const r=await fetch(url,init);console.log('WORKER UPSTREAM',String(url),r.status);return r;}catch(e){console.log('WORKER FETCH ERROR',e.name,e.message);throw e;}}; return Response.json(await searchPredictions('Bitcoin',{fetchImpl:monitored}));}};`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});
+          const mf=new Miniflare({modules:true,script:result.outputFiles[0].text,compatibilityDate:'2026-11-16'});
+          try {console.log('WORKER RESULT',(await (await mf.dispatchFetch('https://test.invalid/')).text()).slice(0,2000));}finally{await mf.dispose();}
+          JS
       - name: Regression tests and builds
         run: |
           npm test
