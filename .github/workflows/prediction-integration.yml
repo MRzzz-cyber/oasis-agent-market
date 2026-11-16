@@ -1,0 +1,65 @@
+name: Prediction integration acceptance
+on:
+  push:
+    branches: [feat/prediction-market-cards]
+    paths:
+      - 'apps/frontend/prediction*'
+      - 'apps/frontend/funding-card*'
+      - 'scripts/*prediction*'
+      - '.github/workflows/prediction-integration.yml'
+      - 'package.json'
+permissions:
+  contents: write
+concurrency:
+  group: prediction-integration
+  cancel-in-progress: true
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/prediction-market-cards
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply bounded integration changes
+        run: node scripts/integrate-predictions.mjs
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Verify source syntax and run all tests
+        run: |
+          node --check apps/frontend/app.js
+          node --check apps/frontend/worker.js
+          node --check apps/frontend/prediction-cards.js
+          npm test
+      - name: Build wallet and Worker bundles
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Verify responsive cards and funding states in Chrome
+        run: |
+          node scripts/check-swap-ui.mjs
+          node scripts/check-prediction-ui.mjs
+      - name: Check real public provider availability
+        continue-on-error: true
+        run: node scripts/check-predictions-readonly.mjs
+      - name: Commit validated integration changes on the feature branch
+        run: |
+          git add apps/frontend/app.js apps/frontend/worker.js apps/frontend/arbitrum-swap.js scripts/check-swap-ui.mjs
+          if ! git diff --cached --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git commit -m "feat: connect prediction research and inline funding to conversations"
+            git push origin HEAD:feat/prediction-market-cards
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prediction-acceptance
+          path: |
+            ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/swap-ui/*.png
+            ${{ runner.temp }}/prediction-readonly.json
+          if-no-files-found: ignore
