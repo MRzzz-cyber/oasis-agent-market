@@ -1,0 +1,42 @@
+name: Prediction reliability acceptance
+on:
+  push:
+    branches: [fix/prediction-provider-reliability]
+permissions:
+  contents: read
+concurrency:
+  group: prediction-provider-reliability
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Diagnose public upstreams and production
+        run: |
+          node --input-type=module <<'JS'
+          import {createPublicClient} from '@polymarket/client';
+          import {searchPredictions} from './apps/frontend/prediction-markets.js';
+          const monitored=async(input,init)=>{const u=new URL(typeof input==='string'?input:input.url||String(input));try{const r=await fetch(input,init);console.log(JSON.stringify({host:u.host,path:u.pathname,status:r.status,type:r.headers.get('content-type')}));if(!r.ok)console.log((await r.clone().text()).slice(0,600));return r;}catch(e){console.log(JSON.stringify({host:u.host,path:u.pathname,error:e.name,message:e.message}));throw e;}};
+          try{const client=createPublicClient({fetch:monitored});const page=await client.search({q:'Bitcoin',pageSize:6,eventsStatus:'active',keepClosedMarkets:0,searchProfiles:false,searchTags:false},{retries:0,timeout:10000,signal:AbortSignal.timeout(12000)}).firstPage();console.log('SDK PAGE',JSON.stringify(page).slice(0,1200));}catch(e){console.log('SDK ERROR',e.name,e.message,JSON.stringify(e.cause));}
+          console.log('SEARCH',JSON.stringify(await searchPredictions('Bitcoin',{fetchImpl:monitored})).slice(0,2200));
+          for(const path of ['/api/release','/api/predictions/search?q=Bitcoin','/api/admin/metrics']){try{const r=await monitored('https://oasistrade.app'+path,{signal:AbortSignal.timeout(35000)});console.log('PRODUCTION',path,(await r.text()).slice(0,2600));}catch(e){console.log('PRODUCTION ERROR',path,e.message);}}
+          JS
+      - name: Regression tests and builds
+        run: |
+          npm test
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Desktop and mobile fixture acceptance
+        run: node scripts/check-prediction-ui.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prediction-reliability
+          path: ${{ runner.temp }}/prediction-ui/*.png
+          if-no-files-found: ignore
