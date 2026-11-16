@@ -2,6 +2,13 @@ import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {PrivyProvider,usePrivy,useWallets,useCreateWallet,useSubscribeToJwtAuthWithFlag,useSignTypedData,useUser} from '@privy-io/react-auth';
 import {matchesWalletIdentity,guardWalletProvider} from '../frontend/account-wallet.js';
+export function signingCopy(typed){
+ const m=typed?.message||{};
+ if(typed?.primaryType==='HyperliquidTransaction:Withdraw')return {title:'确认提款至我的 Arbitrum 钱包',description:m.amount+' USDC · 收款地址 '+m.destination+' · 协议扣费影响净到账。此签名申请提款，不代表已到账。'};
+ if(typed?.primaryType==='HyperliquidTransaction:UsdClassTransfer')return {title:m.toPerp?'确认现货划转至资金账户':'确认资金账户划转至现货',description:m.amount+' USDC · 仅当前钱包自己的 Hyperliquid 账户。此操作不是买入订单。'};
+ if(typed?.primaryType==='HyperliquidTransaction:UserSetAbstraction')return {title:'确认切换整个账户为独立现货模式',description:'钱包 '+m.user+' · 将 Hyperliquid 账户模式改为 disabled。不创建新钱包，不提交订单，不自动恢复原模式。'};
+ return {title:m.hyperliquidChain==='Mainnet'?'授权 Oasis 主网交易会话':'授权 Oasis 测试网助手',description:m.hyperliquidChain==='Mainnet'?'Hyperliquid 主网 API 交易权限。仅本页面保存会话密钥；订单金额由你单独确认，协议权限本身不限本次金额。':'仅 Hyperliquid Testnet。协议授权范围请核对，订单仍需单独确认。'};
+}
 export function mountPrivyWallet(host,{config,getToken,onStatus,onReady}){
  const root=createRoot(host);let identity=null,retry=0,currentIdentity=null;
  function Bridge({identity,attempt}){
@@ -16,7 +23,6 @@ export function mountPrivyWallet(host,{config,getToken,onStatus,onReady}){
   useEffect(()=>{
    if(!identity?.active||!ready)return;
    if(!linked){onStatus('creating','正在同步账号钱包身份…');return;}
-   // SDK auto-create does not cover custom JWT login. Create exactly once after identity sync.
    if(!walletsReady)return;
    const embedded=user.linkedAccounts.find(a=>a.type==='wallet'&&a.chainType==='ethereum'&&['privy','privy-v2'].includes(a.walletClientType));
    if(embedded)return;
@@ -37,7 +43,7 @@ export function mountPrivyWallet(host,{config,getToken,onStatus,onReady}){
     if(cancelled||currentIdentity?.id!==identity.id)return;
     const provider=guardWalletProvider(raw,{address:embedded.address,subject,isCurrent:()=>currentIdentity?.active&&currentIdentity.id===identity.id,
      getSession:async()=>{const r=await fetch('/api/auth/me',{cache:'no-store'});return r.ok?r.json():null;},
-     signTypedData:async typed=>{const {signature}=await signTypedData(typed,{address:embedded.address,uiOptions:{title:typed.message?.hyperliquidChain==='Mainnet'?'授权 Oasis 主网交易会话':'授权 Oasis 测试网助手',description:typed.message?.hyperliquidChain==='Mainnet'?'Hyperliquid 主网 API 交易权限。仅本页面保存会话密钥；订单金额由你单独确认，协议权限本身不限本次金额。':'仅 Hyperliquid Testnet。协议授权范围请核对，订单仍需单独确认。'}});return signature;}});
+     signTypedData:async typed=>{const {signature}=await signTypedData(typed,{address:embedded.address,uiOptions:signingCopy(typed)});return signature;}});
     completed=true;onReady({name:'Oasis 账号钱包 · Privy',kind:'embedded',address:embedded.address,provider});onStatus('ready','独立账号钱包已就绪，可以读取正式网资产。');
    }).catch(()=>{if(!cancelled)onStatus('error','账号钱包恢复失败，请重试。');});
    return()=>{cancelled=true;if(!completed&&reported.current===key)reported.current=null;};
