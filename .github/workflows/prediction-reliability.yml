@@ -35,8 +35,8 @@ jobs:
           import {pathToFileURL} from 'node:url';
           const {Miniflare}=await import(pathToFileURL(process.env.RUNNER_TEMP+'/prediction-worker-probe/node_modules/miniflare/dist/src/index.js'));
           const result=await build({stdin:{contents:`import {searchPredictions} from './apps/frontend/prediction-markets.js'; export default {async fetch(){const monitored=async (url,init)=>{try{const r=await fetch(url,init);console.log('WORKER UPSTREAM',String(url),r.status);return r;}catch(e){console.log('WORKER FETCH ERROR',e.name,e.message);throw e;}}; return Response.json(await searchPredictions('Bitcoin',{fetchImpl:monitored}));}};`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});
-          const mf=new Miniflare({modules:true,script:result.outputFiles[0].text,compatibilityDate:'2026-11-16'});
-          try {console.log('WORKER RESULT',(await (await mf.dispatchFetch('https://test.invalid/')).text()).slice(0,2000));}finally{await mf.dispose();}
+          const mf=new Miniflare({modules:true,script:result.outputFiles[0].text,compatibilityDate:'2026-08-06'});
+          try {const payload=await (await mf.dispatchFetch('https://test.invalid/')).json();console.log('WORKER RESULT',JSON.stringify(payload.providers.map(p=>({provider:p.provider,count:p.markets.length,error:p.error,errorCode:p.errorCode}))));if(!payload.providers.find(p=>p.provider==='polymarket'&&p.markets.length))throw Error('No live Polymarket results in Workers runtime');}finally{await mf.dispose();}
           JS
       - name: Regression tests and builds
         run: |
