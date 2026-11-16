@@ -9,10 +9,11 @@ import {validateRelay,purchaseService} from './polymarket-purchase-service.js';
 import {executePurchase,assertPurchaseClear} from './polymarket-purchase-engine.js';
 import {assertFundingClear} from './funding-core.js';
 import {guardWalletProvider} from './account-wallet.js';
+const yesAsset=(1n<<64n).toString(),noAsset=((1n<<64n)+1n).toString();
 const owner='0x'+'1'.repeat(40),condition='0x'+'2'.repeat(64),maker=depositWallets(owner)[0],hash='0x'+'3'.repeat(64),signature='0x'+'1'.repeat(128)+'1b';
 const identity={signer:owner,wallet:maker,walletType:3,signerType:'OWNER'};
-const market={id:'123',version:'v1',question:'Fixture event',conditionId:condition,state:{active:true,acceptingOrders:true},outcomes:{yes:{tokenId:'1'},no:{tokenId:'2'}}};
-const book=()=>({assetId:'1',conditionId:condition,timestamp:Date.now(),tickSize:0.01,minOrderSize:'5',negRisk:false,asks:[{price:'0.4',size:'1000'}]});
+const market={id:'123',version:'v1',question:'Fixture event',conditionId:condition,state:{active:true,acceptingOrders:true},outcomes:{yes:{tokenId:yesAsset},no:{tokenId:noAsset}}};
+const book=()=>({assetId:yesAsset,conditionId:condition,timestamp:Date.now(),tickSize:0.01,minOrderSize:'5',negRisk:false,asks:[{price:'0.4',size:'1000'}]});
 const quote=()=>({...purchasePreview({market,book:book(),feeInfo:{rate:'0.07',exponent:1},budget:'10',outcome:'yes'}),maker,balanceAtomic:'12000000',approvalNeeded:false});
 const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,v)};};
 const auth=(who=owner)=>({domain:{name:'ClobAuthDomain',version:'1',chainId:137},types:{ClobAuth:[{name:'address',type:'address'},{name:'timestamp',type:'string'},{name:'nonce',type:'uint256'},{name:'message',type:'string'}]},primaryType:'ClobAuth',message:{address:who,timestamp:String(Math.floor(Date.now()/1000)),nonce:'0',message:'This message attests that I control the given wallet'}});
@@ -21,15 +22,15 @@ test('buy preview caps all-in spend, validates timestamps and uses pUSD on Polyg
  const q=quote();assert.equal(q.collateral,PUSD);assert.equal(q.chainId,137);assert.equal(q.orderType,'FOK');assert.equal(BigInt(q.netAtomic)+BigInt(q.feeReserveAtomic),10000000n);assert.equal(q.netAtomic,'9340000');checkQuote(q);
  assert.throws(()=>purchasePreview({market,book:{...book(),timestamp:1},feeInfo:{rate:'0',exponent:1},budget:'10',outcome:'yes'}),/过期/);
  for(const budget of ['0','0.1','1001','10.001','1e3'])assert.throws(()=>purchasePreview({market,book:book(),feeInfo:{rate:'0',exponent:1},budget,outcome:'yes'}));
- assert.throws(()=>purchasePreview({market,book:{...book(),assetId:'2'},feeInfo:{rate:'0',exponent:1},budget:'10',outcome:'yes'}),/不匹配/);
+ assert.throws(()=>purchasePreview({market,book:{...book(),assetId:noAsset},feeInfo:{rate:'0',exponent:1},budget:'10',outcome:'yes'}),/不匹配/);
  assert.throws(()=>checkQuote({...q,netAtomic:'10000000',feeReserveAtomic:'0'}),/模型/);
 });
 test('pinned SDK order generation passes exact sign policy and posts only FOK without automatic allowance recovery',async()=>{
  const q=quote();let posts=0;
- const sdk={account:identity,environment:production,clob:{get:async path=>path.startsWith('/markets-by-token/')?condition:{feeInfo:{rate:0.07,exponent:1},negRisk:false,tickSize:0.01,tokens:[{assetId:'1'},{assetId:'2'}]}},credentials:{key:'fixture-key'},secureClob:{post:async(path,options)=>{posts++;assert.equal(path,'/order');assert.equal(options.json.orderType,'FOK');assert.equal(options.json.order.maker,maker);return {ok:true,orderId:hash,status:'matched',tradeIds:[],transactionsHashes:[]};}}};
- const flow=await prepareMarketOrder(sdk,{assetId:'1',side:'BUY',amount:display(q.netAtomic),maxSpend:'10',maxPrice:display(q.limitAtomic),orderType:'FOK'});
+ const sdk={account:identity,environment:production,clob:{get:async path=>path.startsWith('/markets-by-token/')?condition:{feeInfo:{rate:0.07,exponent:1},negRisk:false,tickSize:0.01,tokens:[{assetId:yesAsset},{assetId:noAsset}]}},credentials:{key:'fixture-key'},secureClob:{post:async(path,options)=>{posts++;assert.equal(path,'/order');assert.equal(options.json.orderType,'FOK');assert.equal(options.json.order.maker,maker);return {ok:true,orderId:hash,status:'matched',tradeIds:[],transactionsHashes:[]};}}};
+ const flow=await prepareMarketOrder(sdk,{assetId:yesAsset,side:'BUY',amount:display(q.netAtomic),maxSpend:'10',maxPrice:display(q.limitAtomic),orderType:'FOK'});
  const step=await flow.next();assert.equal(step.value.kind,'signOrder');const typed=JSON.parse(canonical(step.value.payload));checkOrder(typed,q,identity);
- for(const change of [t=>t.domain.chainId=1,t=>t.message.contents.tokenId='2',t=>t.message.contents.makerAmount='999999999',t=>t.message.contents.side=1,t=>t.message.contents.maker=owner,t=>t.types.Order.push({name:'extra',type:'uint256'})]){const t=structuredClone(typed);change(t);assert.throws(()=>checkOrder(t,q,identity));}
+ for(const change of [t=>t.domain.chainId=1,t=>t.message.contents.tokenId=noAsset,t=>t.message.contents.makerAmount='999999999',t=>t.message.contents.side=1,t=>t.message.contents.maker=owner,t=>t.types.Order.push({name:'extra',type:'uint256'})]){const t=structuredClone(typed);change(t);assert.throws(()=>checkOrder(t,q,identity));}
  const done=await flow.next(signature);assert.equal(done.done,true);await postOrder(sdk)(done.value);assert.equal(posts,1);
 });
 test('SDK recognizes deterministic existing deposit wallet as owned without deploying or using a private key',async()=>{
@@ -98,4 +99,11 @@ test('price movement, expired preview, changed wallet, failed storage and lock c
 test('journal rejects nested credentials and refuses overwriting original trade intent',()=>{
  const h=harness(),j=predictionJournal(h.storage,owner),record={owner,network:'polygon-polymarket',id:'fixture',kind:'order',at:Date.now(),quote:h.q,identity,status:'pending',terminal:false,message:'fixture'};j.save(record);
  assert.throws(()=>j.save({...record,quote:{...h.q,secret:'do-not-store'}}));assert.throws(()=>j.save({...record,identity:{...identity,wallet:owner}}),/参数/);
+});
+
+test('protocol V2 SDK signatures select Exchange V3 and retain position and condition identifiers',async()=>{
+ const position=(1n<<248n).toString(),v2condition='0x01'+'0'.repeat(60),m={...market,version:'v2',conditionId:v2condition,outcomes:{yes:{positionId:position},no:{positionId:(BigInt(position)+1n).toString()}}};
+ const q={...purchasePreview({market:m,book:{...book(),assetId:position,conditionId:v2condition},feeInfo:{rate:'0.07',exponent:1},budget:'10',outcome:'yes'}),maker};
+ const sdk={account:identity,environment:production,clob:{get:async path=>path.startsWith('/markets-by-token/')?v2condition:{feeInfo:{rate:0.07,exponent:1},negRisk:false,tickSize:0.01,tokens:[{assetId:position}]}}};
+ const flow=await prepareMarketOrder(sdk,{assetId:position,side:'BUY',amount:display(q.netAtomic),maxSpend:'10',maxPrice:display(q.limitAtomic),orderType:'FOK'}),step=await flow.next();checkOrder(JSON.parse(canonical(step.value.payload)),q,identity);assert.equal(step.value.payload.domain.version,'3');
 });
