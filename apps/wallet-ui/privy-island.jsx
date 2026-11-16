@@ -1,9 +1,13 @@
+import {display} from '../frontend/polymarket-purchase-core.js';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {PrivyProvider,usePrivy,useWallets,useCreateWallet,useSubscribeToJwtAuthWithFlag,useSignTypedData,useUser} from '@privy-io/react-auth';
 import {matchesWalletIdentity,guardWalletProvider} from '../frontend/account-wallet.js';
 export function signingCopy(typed){
  const m=typed?.message||{};
+ if(typed?.primaryType==='ClobAuth')return {title:'连接 Polymarket 交易账户',description:'Polygon · 钱包 '+m.address+' · 确认此钱包的持有权，用于平台登录。'};
+ if(typed?.primaryType==='Batch'&&typed?.domain?.name==='DepositWallet')return {title:'确认本次 pUSD 授权',description:'Polygon · 平台交易账户 '+m.wallet+' · 仅授权本次已核对金额给固定平台合约。请核对钱包显示的金额与合约。'};
+ if(['Order','TypedDataSign'].includes(typed?.primaryType)&&typed?.domain?.name==='Polymarket CTF Exchange'){const order=m.contents||m;return {title:'确认 Polymarket 买入',description:'Polygon · 订单金额 '+display(BigInt(order.makerAmount))+' pUSD · 购买 '+display(BigInt(order.takerAmount))+' 份。平台费用已在站内支付上限内预留。'};}
  if(typed?.primaryType==='HyperliquidTransaction:Withdraw')return {title:'确认提款至我的 Arbitrum 钱包',description:m.amount+' USDC · 收款地址 '+m.destination+' · 协议扣费影响净到账。此签名申请提款，不代表已到账。'};
  if(typed?.primaryType==='HyperliquidTransaction:UsdClassTransfer')return {title:m.toPerp?'确认现货划转至资金账户':'确认资金账户划转至现货',description:m.amount+' USDC · 仅当前钱包自己的 Hyperliquid 账户。此操作不是买入订单。'};
  if(typed?.primaryType==='HyperliquidTransaction:UserSetAbstraction')return {title:'确认切换整个账户为独立现货模式',description:'钱包 '+m.user+' · 将 Hyperliquid 账户模式改为 disabled。不创建新钱包，不提交订单，不自动恢复原模式。'};

@@ -1,3 +1,4 @@
+import {POLYGON,canonical,checkAuth,checkBatch,checkOrder} from './polymarket-purchase-core.js';
 import {approvalPacket,address as mainnetAddress,text} from './mainnet-order-core.js';
 import {USDC_CONTRACTS} from './mainnet-wallet.js';
 import {ARBITRUM,BRIDGE,USDC,fundingPacket,depositTransaction} from './funding-core.js';
@@ -8,7 +9,7 @@ export function publishAccountWallet(choice){active=choice;if(typeof window!=='u
 export function clearAccountWallet(){const previous=active;active=null;if(previous&&typeof window!=='undefined')window.dispatchEvent(new CustomEvent('oasis:account-wallet-cleared',{detail:previous}));}
 export function matchesWalletIdentity(user,subject){return user?.linkedAccounts?.some(a=>a.type==='custom_auth'&&a.customUserId===subject)===true;}
 export function guardWalletProvider(raw,{address,subject,isCurrent,getSession,signTypedData}){
- let armedAgent=null,armedFunding=null,armedDeposit=null,armedSwap=null;
+ let armedAgent=null,armedFunding=null,armedDeposit=null,armedSwap=null,armedPrediction=null;
  const reads=new Set(['eth_accounts','eth_requestAccounts','eth_chainId','net_version','eth_getBalance','eth_call','eth_getCode','eth_estimateGas','eth_gasPrice','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber']);
  function checkedDeposit(tx){if(typeof tx?.data!=='string'||!/^0xa9059cbb[0-9a-f]{128}$/i.test(tx.data))throw Error('入金交易无效');const amount=text(BigInt('0x'+tx.data.slice(-64))*100n),expected=depositTransaction(address,amount);if(JSON.stringify(tx)!==JSON.stringify(expected))throw Error('只允许当前钱包向固定 Arbitrum 桥转入已预览的 USDC');return expected;}
  function routerRead(tx){return tx?.to?.toLowerCase()===ROUTER&&tx.from?.toLowerCase()===address.toLowerCase()&&tx.value==='0x0'&&/^0xac9650d8[0-9a-f]+$/i.test(tx.data)&&Object.keys(tx).every(k=>['from','to','value','data'].includes(k));}
@@ -23,6 +24,7 @@ export function guardWalletProvider(raw,{address,subject,isCurrent,getSession,si
  }
  async function session(){const user=await getSession();if(!isCurrent()||!user?.active||'oasis:google:'+user.id!==subject)throw Error('登录账户已变化，请重新连接账号钱包');}
  return {
+  armPredictionSignature(typed,context){if(!isCurrent())throw Error('账号钱包会话已失效');if(context.kind==='auth')checkAuth(typed,address);else if(context.identity?.signer?.toLowerCase()!==address.toLowerCase())throw Error('平台签名钱包不匹配');else if(context.kind==='approval')checkBatch(typed,context.quote,context.identity.wallet);else if(context.kind==='order')checkOrder(typed,context.quote,context.identity);else throw Error('平台签名类型无效');armedPrediction={typed:canonical(typed),context};},
   armArbitrumSwap(tx,q,kind){if(!isCurrent()||q?.user!==address.toLowerCase())throw Error('账号钱包会话或兑换账户不匹配');armedSwap={tx:JSON.stringify(checkTransaction(tx,q,kind)),quote:structuredClone(q),kind};},
   armMainnetAgent(agent){if(!isCurrent())throw Error('会话已失效');armedAgent=mainnetAddress(agent);},
   armMainnetFunding(packet){
@@ -34,12 +36,17 @@ export function guardWalletProvider(raw,{address,subject,isCurrent,getSession,si
   async request(packet){
    if(!isCurrent())throw Error('账号钱包会话已失效，请重新登录');
    if(packet.method==='wallet_switchEthereumChain'){
-    if(JSON.stringify(packet.params)!==JSON.stringify([{chainId:ARBITRUM}]))throw Error('仅允许切换至 Arbitrum One');await session();return raw.request(packet);
+    if(![ARBITRUM,POLYGON].some(chain=>JSON.stringify(packet.params)===JSON.stringify([{chainId:chain}])))throw Error('仅允许切换至已支持的交易网络');await session();return raw.request(packet);
    }
    if(packet.method==='eth_sendTransaction'){
     if(armedSwap){const intent=armedSwap;armedSwap=null;if(packet.params?.length!==1||JSON.stringify(checkTransaction(packet.params[0],intent.quote,intent.kind))!==intent.tx||await raw.request({method:'eth_chainId'})!==ARBITRUM)throw Error('兑换交易未匹配本次预览或网络已变化');await session();return raw.request(packet);}
     const approved=armedDeposit;armedDeposit=null;
     if(!approved||Date.now()>=approved.until||packet.params?.length!==1||JSON.stringify(checkedDeposit(packet.params[0]))!==approved.tx||await raw.request({method:'eth_chainId'})!==ARBITRUM)throw Error('交易未由本次预览准备或网络已变化');await session();return raw.request(packet);
+   }
+   if(packet.method==='eth_signTypedData_v4'&&armedPrediction){const armed=armedPrediction;armedPrediction=null;const [signer,data]=packet.params||[];let typed;try{typed=typeof data==='string'?JSON.parse(data):data;}catch{throw Error('平台签名内容无效');}
+    if(signer?.toLowerCase()!==address.toLowerCase()||canonical(typed)!==armed.typed||await raw.request({method:'eth_chainId'})!==POLYGON)throw Error('平台签名内容、账户或网络已变化');
+    const {context}=armed;const check=()=>context.kind==='auth'?checkAuth(typed,address):context.kind==='approval'?checkBatch(typed,context.quote,context.identity.wallet):checkOrder(typed,context.quote,context.identity);
+    check();await session();const signature=await signTypedData(typed);if(!isCurrent()||await raw.request({method:'eth_chainId'})!==POLYGON)throw Error('账号钱包会话或网络已变化');check();return signature;
    }
    if(!reads.has(packet.method)&&packet.method!=='eth_signTypedData_v4')throw Error('只允许已预览并确认的交易或资金操作');
    if(packet.method==='eth_accounts'||packet.method==='eth_requestAccounts')return [address];

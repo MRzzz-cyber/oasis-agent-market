@@ -1,3 +1,4 @@
+import {purchaseService,purchaseConfigured} from './polymarket-purchase-service.js';
 import {mainnetQuote} from './mainnet-quote.js';
 import {harnessMetricsRoute,observeHarnessRequest} from './harness-metrics.js';
 export {HarnessMetricsStore} from './harness-metrics.js';
@@ -10,7 +11,7 @@ import {account,authRoute,googleMode} from './auth.js';
 import {advisorRequest,normalizeAdvisorStream} from './advisor-stream.js';
 export {AccountStore} from './auth.js';
 const SYSTEM_PROMPT=[
- '预测市场已接入独立的盘口研究卡片。用户提到预测市场、Polymarket 或 Kalshi 时引导查看该卡片；目前只开放公共盘口搜索和相同份额卖盘成本估计，不支持站内签名买入。没有实时工具结果不能编造盘口或推荐胜率。不能把相似标题认定为相同事件；必须核对结算规则、截止时间和结果定义。手续费和跨链费未知时，不能声称总成本最低。不要把预测盘口购买解释为 ETH 兑换，也不能将 Arbitrum USDC 当成其他平台可用余额。',
+ '预测市场已接入独立的盘口研究卡片。用户提到预测市场、Polymarket 或 Kalshi 时引导查看该卡片；Polymarket 已接入受配置控制的站内买入卡片；Kalshi 仍为研究入口。买入需核对 Polygon、pUSD 平台交易账户余额、费用预留、最高单价和最低份额，用户钱包确认本次金额授权及 FOK 订单。未知回执禁止重试。服务未配置时不发起签名。没有实时工具结果不能编造盘口或推荐胜率。不能把相似标题认定为相同事件；必须核对结算规则、截止时间和结果定义。手续费和跨链费未知时，不能声称总成本最低。不要把预测盘口购买解释为 ETH 兑换，也不能将 Arbitrum USDC 当成其他平台可用余额。',
  '你是 Oasis 中文 AI 交易助手。当前真实购买入口是 Arbitrum One 钱包直接兑换：使用当前 Rabby、MetaMask 或已有 Oasis 钱包中的原生 USDC，通过 Uniswap V3 直连 USDC/WETH 池兑换并解包为 ETH，ETH 回到同一个钱包。',
  '购买流程：选择金额，核对网络与价格，点击购买，在钱包确认，查看回执。只需要钱包余额和用于网络费的少量 ETH，不需要 Hyperliquid 余额、充值、划转、API 会话或交易代理。不把旧 Hyperliquid UETH 报价当作当前兑换报价。',
  '首次如果 USDC 额度不足，需要用户在钱包确认两笔交易：仅授权本次金额，再确认兑换。已有足够额度就只确认兑换。不能承诺首次只有一个钱包弹窗，不申请无限额度。界面固定 0.5% 滑点保护，展示预计 ETH、最低 ETH、网络费和同钱包收款地址。',
@@ -36,7 +37,8 @@ async function secureEqual(a,b){const encoder=new TextEncoder(),[x,y]=await Prom
 export default {async fetch(request,env,ctx){const url=new URL(request.url);
  if(['/api/harness/events','/api/admin/metrics','/api/admin/metrics/prometheus'].includes(url.pathname))return harnessMetricsRoute(request,env);
  if(['/admin','/admin/','/admin.html'].includes(url.pathname)){if(request.method!=='GET')return respond({error:'后台页面只支持 GET'},405);const asset=await env.ASSETS.fetch(new Request(new URL('/admin',url),request)),headers=new Headers(asset.headers);headers.set('cache-control','no-store');headers.set('x-frame-options','DENY');headers.set('referrer-policy','no-referrer');headers.set('content-security-policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");return new Response(asset.body,{status:asset.status,headers});}
- if(url.pathname==='/api/release'&&request.method==='GET')return respond({version:'native-mainnet-v15-20261116',purchaseFlow:'arbitrum-wallet-swap-v17',purchaseUI:'wallet-card-v18',predictionResearch:'prediction-v2',predictionTrading:false,observability:'harness-metrics-v1',execution:'arbitrum-uniswap-v3',inputBalance:'wallet',defaultTestBudget:'20'});
+ if(url.pathname==='/api/release'&&request.method==='GET')return respond({version:'native-mainnet-v15-20261116',purchaseFlow:'arbitrum-wallet-swap-v17',purchaseUI:'wallet-card-v18',predictionResearch:'prediction-v2',predictionTrading:purchaseConfigured(env),predictionPurchase:'polymarket-purchase-v1',observability:'harness-metrics-v1',execution:'arbitrum-uniswap-v3',inputBalance:'wallet',defaultTestBudget:'20'});
+ if(['/api/predictions/trading-status','/api/predictions/relay'].includes(url.pathname))return purchaseService(request,env);
  if(url.pathname.startsWith('/api/predictions/'))return observeHarnessRequest(request,env,ctx,url.pathname.endsWith('/quote')?'prediction_quote':'prediction_search',()=>predictionRoute(request));
  if(url.pathname==='/api/mainnet/quote')return mainnetQuote(request);
  if(url.pathname==='/api/testnet/book'&&request.method==='GET')return testnetBook(request);
