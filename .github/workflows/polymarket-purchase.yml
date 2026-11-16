@@ -24,10 +24,11 @@ jobs:
           const root='node_modules/@polymarket/client/';
           const pkg=JSON.parse(await readFile(root+'package.json','utf8'));
           console.log('SDK EXPORTS',JSON.stringify(pkg.exports));console.log('SDK REPO',JSON.stringify(pkg.repository));
-          const files=await readdir(root,{recursive:true});
-          console.log('SDK FILES',files.filter(f=>/\.d\.ts$/.test(f)).join('\n').slice(0,16000));
-          let budget=80000;
-          for(const f of files.filter(f=>/\.d\.ts$/.test(f)&&/secure|order|signer|wallet|balance|allowance|fee|client|transaction/i.test(f))){if(budget<=0)break;const s=await readFile(root+f,'utf8');console.log('SDK TYPE',f,s.slice(0,Math.min(budget,12000)));budget-=Math.min(s.length,12000);}
+          const files=(await readdir(root,{recursive:true})).filter(f=>f.startsWith('dist/'));
+          console.log('SDK FILES',files.filter(f=>/\\.d\\.ts$/.test(f)).join('\\n').slice(0,5000));
+          let budget=90000;
+          for(const f of files.filter(f=>/\\.d\\.ts$/.test(f))){if(budget<=0)break;const lines=(await readFile(root+f,'utf8')).split('\\n');for(let i=0;i<lines.length;i++)if(/prepareMarketOrder|createMarketOrder|postOrder|estimateMarketPrice|fetchBalanceAllowance|derive.*DepositWallet|SecureClientOptions|remoteBuilderSigning|fetch.*Fee|OrderMarketMetadata/.test(lines[i])){const s=lines.slice(Math.max(0,i-3),i+27).join('\\n');console.log('SDK TYPE',f,s.slice(0,budget));budget-=s.length;if(budget<=0)break;}}
+          for(const f of files.filter(f=>f.endsWith('.js'))){const s=await readFile(root+f,'utf8');for(const term of ['async function createMarketOrder','function prepareMarketOrder(','function postOrder(','function deriveBeaconDepositWalletAddress','async function fetchBalanceAllowance']){const at=s.indexOf(term);if(at>=0)console.log('SDK SOURCE',f,s.slice(at,at+5500));}}
           JS
       - run: npm test
       - run: npm run build:wallet
