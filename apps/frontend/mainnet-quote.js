@@ -1,4 +1,11 @@
 import {MAINNET_API,address,mainnetMarket,spotFree,makeQuote,budgetAtoms} from './mainnet-order-core.js';
-export async function info(body,fetchImpl=fetch){const r=await fetchImpl(MAINNET_API+'/info',{method:'POST',redirect:'error',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error('主网数据暂不可用，请重试');return r.json();}
+export async function info(body,fetchImpl=fetch){
+ // Workers supports manual redirects, but rejects redirect:'error' before fetching.
+ // Never follow upstream redirects or parse their bodies as market/account data.
+ const r=await fetchImpl(MAINNET_API+'/info',{method:'POST',redirect:'manual',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
+ if(r.status>=300&&r.status<400)throw Error('主网数据接口返回重定向，已停止请求');
+ if(!r.ok)throw Error('主网数据暂不可用，请重试');
+ return r.json();
+}
 export async function readQuote(user,budget,fetchImpl=fetch){address(user);budgetAtoms(budget);const [metadata,state,mode]=await Promise.all([info({type:'spotMetaAndAssetCtxs'},fetchImpl),info({type:'spotClearinghouseState',user},fetchImpl),info({type:'userAbstraction',user},fetchImpl)]);if(!Array.isArray(metadata)||!Array.isArray(metadata[1]))throw Error('主网市场数据无效');const market=mainnetMarket(metadata[0]),ctx=metadata[1].find(x=>x.coin===market.coin);if(!ctx)throw Error('主网 ETH 现货参考价不可用');const book=await info({type:'l2Book',coin:market.coin},fetchImpl);return {...makeQuote({market,book,markPx:ctx.markPx,available:spotFree(state),budget,checkedAt:Date.now(),accountMode:mode}),address:user.toLowerCase()};}
 export async function mainnetQuote(request,fetchImpl=fetch){const reply=(d,status=200)=>Response.json(d,{status,headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});if(request.method!=='GET')return reply({error:'仅支持读取报价'},405);const url=new URL(request.url);try{return reply(await readQuote(url.searchParams.get('user'),url.searchParams.get('budget'),fetchImpl));}catch(e){return reply({error:e.message},/格式|至少|地址|两位/.test(e.message)?400:503);}}
