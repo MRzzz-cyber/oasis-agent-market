@@ -25,5 +25,9 @@ jobs:
           node --check scripts/base-sepolia-market-server.mjs
       - name: Run automated tests
         run: npm test
+      - name: Build wallet bundles
+        run: npm run build:wallet
+      - name: Verify Worker bundle
+        run: node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
       - name: Verify x402 SDK entrypoints
         run: node -e "Promise.all([import('@x402/fetch'), import('@x402/core/server'), import('@x402/evm/exact/client'), import('@x402/evm/exact/server'), import('@x402/express'), import('viem')]).then(()=>console.log('x402 SDK imports OK'))"
