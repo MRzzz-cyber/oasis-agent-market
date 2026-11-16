@@ -1,25 +1,35 @@
-# Mainnet ETH purchase journey
+# Wallet-native ETH purchase
 
-The purchase card shows an explicit `购买 ETH` action in every state. Loading disables it temporarily. A failed quote leaves `购买 ETH · 获取报价`, which only retries the quote and never signs or submits. Insufficient funds, an unsupported network, a budget below the venue minimum or a pending original order leaves a visible disabled action and a specific reason. A valid reviewed quote enables `购买 ETH · 上限 … USDC`.
+The production conversation entry `mainnet-trade.js` re-exports `arbitrum-swap.js`. It no longer renders or requests a Hyperliquid order quote. The card reads native Circle USDC from the current Arbitrum wallet, obtains a Uniswap V3 quote and returns native ETH to that same wallet. No Hyperliquid deposit, balance, API agent or account-mode change is required.
 
-On November 16, 2026 the user asked to defer complex funding and permission-management content. The purchase card therefore contains no funding form or expandable rules section. A short notice beside an enabled purchase button still discloses that initial API-agent authorization covers account trading beyond the displayed order budget, and provides revocation guidance.
+## User flow
 
-## Two balances, two ledgers
+1. Connect the existing wallet. Switch to Arbitrum One only after an explicit wallet request.
+2. Select USDC amount, including a 1 USDC option. The card displays wallet USDC, expected ETH, minimum ETH, 0.5% slippage, pool fee already reflected in the quote, recipient and native ETH for gas.
+3. Click purchase. If allowance is insufficient, the wallet confirms an approval limited to exactly this purchase amount. Wait for the original approval receipt and verify allowance.
+4. Recheck the same reviewed quote, simulate the swap, estimate its gas and request wallet confirmation. No replacement minimum output or amount is chosen. A stale quote requires another review.
+5. Display the original transaction hash and reconcile the chain receipt. A pending or unknown result blocks repeated submission, with a read-only original-transaction check.
 
-The card reads both chain-wallet native USDC and Hyperliquid trading cash, and labels the source explicitly. The chain-wallet read has a six-second total deadline and is informational: failure to read it does not block an independently funded Hyperliquid order. Wallet and network checks reject stale reads.
+Approval and swap are two distinct on-chain transactions on first use. They can require two wallet confirmations. The initial gas estimate covers approval when approval is needed; the swap gas is estimated after allowance is confirmed and is shown by the wallet. Existing allowance permits going directly to swap. There is no unlimited approval or Hyperliquid session signature.
 
-For example, the same wallet can hold 12.159122 USDC on Arbitrum while its Hyperliquid trading account holds 4.8 USDC. These values are not interchangeable and are never added or substituted to enable an order. This implementation trades Hyperliquid UETH/USDC; it does not execute an Arbitrum USDC-to-ETH DEX swap or debit chain-wallet USDC directly. Bridge funding or a separately implemented wallet-native swap route would be needed to spend chain-wallet assets. Changing display labels cannot remove this requirement.
+## Pinned route
 
-Independent spot accounts use USDC total minus hold. Unified cash availability is the smaller of unheld USDC and token-0 `tokenToAvailableAfterMaintenance`. Missing or malformed maintenance data, portfolio-margin flags, borrowing or lending supply fail closed. A fresh order preflight must preserve the reviewed account mode. No automatic account conversion, bridging or class transfer occurs.
+- Arbitrum One, chain 42161.
+- Native USDC `0xaf88d065e77c8cc2239327c5edb3a432268e5831`.
+- WETH `0x82af49447d8a07e3bd95bd0d56f35241523fbab1`.
+- Uniswap V3 SwapRouter `0xe592427a0aece92de3edee1f18e0157c05861564`.
+- Quoter `0xb27308f9f90d607463bb33ea1bebb41c27ce5ab6` and factory `0x1f98431c8ad98523631ae4a59f267346ea31f984`.
 
-## Purchase execution
+Read contract code and verify the router's factory and WETH identity. Query direct pools at fees 500 and 3000, selecting the better returned output. This compares these two direct pools only; it is not a claim of globally optimal routing. The swap atomically calls exactInputSingle with router recipient, then unwrapWETH9 with the current wallet recipient. There is no arbitrary calldata, recipient or route. Independent viem ABI fixtures verify the entire wire encoding and event selectors.
 
-After review, one click obtains the account's cross-tab lock and validates the displayed order. It checks fresh funds and prices before requesting wallet authorization. After the user confirms, the browser verifies the authorization and rechecks the same reviewed order, then signs and submits one IOC buy with unchanged quantity, cap and limit. A changed wallet, network, account mode, insufficient balance, expired quote or ask above the reviewed limit stops submission. Refreshing a quote requires another purchase click; it never trades a replacement quote silently.
+A wallet with 12.159122 USDC can fund a 10 USDC input, provided it has sufficient ETH for gas. Its separate Hyperliquid balance does not participate. USDC.e, other chains and tokens are not automatically substituted.
 
-Temporary one-use signing keys remain only in page memory. Orders are journaled before submission and uncertain outcomes block further orders until reconciliation, without resubmission. Existing funding modules and their durable pending records are retained; their safety checks continue to block trading if an unresolved funding operation exists. Funding is not automatically chained into a purchase.
+## Persistence and verification
 
-Amounts are exact decimal strings. A 10 USDC budget is not a guarantee of meeting market precision and minimum notional. Budgets never increase automatically. Existing Privy IDs, JWT audience, identity keys and wallet addresses are unchanged; issuer remains `https://oasistrade.app`.
+Journal namespace: `oasis-arbitrum-swap-v1:<wallet>`. Persist before wallet send, preserve hashes and hold uncertain outcomes. Never resubmit an unknown request. Reconciliation checks original transaction input, pinned destination, account and zero native value; a successful swap also requires the exact USDC spend to the selected pool and sufficient WETH Withdrawal from the router. Receipt-backed execution is Arbitrum L2 inclusion, not a finality guarantee.
 
-## Verification
+All spending uses the account's shared cross-tab lock. Legacy unresolved funding/order records continue to block conflicting work. Existing identity, wallet addresses and issuer configuration are preserved. The inline wallet swap journal is the authoritative new receipt store; old Hyperliquid history remains legacy.
 
-Run `npm test`, `npm run build:wallet` and the Worker bundle check. Fixtures cover visible loading/error/blocked/ready actions, separate 12.159122 wallet and 4.8 exchange balances, retry without signing, wallet rejection, double clicks, cross-tab contention, storage failure, changes during confirmation, unified cash bounds and pending-order reconciliation. A passing CI run is not evidence of live wallet interaction, deployment or a mainnet fill. Those require separate verification.
+`npm test` covers golden ABI, exact approval, already-approved flow, changed price/network/account, expiry, wallet cancellation, storage failure, pending/unknown sends, embedded-wallet intent restrictions and actual production entry routing. CI also builds wallet and Worker bundles. `Arbitrum read-only quote` independently reads real pinned contracts and quotes 1 USDC without any approval, signature or broadcast. Passing these checks does not prove a user-signed mainnet fill or browser UX; the user performs actual wallet confirmation.
+
+Official contract references are Uniswap v3-periphery SwapRouter, Quoter, PeripheryPayments and Multicall, with Circle's native-USDC registry. `/api/release` reports `purchaseFlow: arbitrum-wallet-swap-v17` and `inputBalance: wallet`; assets use no-store.
