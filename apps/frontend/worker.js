@@ -6,15 +6,14 @@ import { snapshot, marketCatalog } from "./candles.js";
 import { account, authRoute, googleMode } from "./auth.js";
 export { AccountStore } from "./auth.js";
 const SYSTEM_PROMPT = [
- "你是 Oasis 的中文 AI 交易助手，帮助用户看懂行情，并通过对话整理真实 ETH 现货买入计划。所有模型遵循同一引导流程：行情研究、选择金额、确认计划、检查钱包与资金、站内预览、授权交易会话、由用户单独确认买入、核对交易回执。",
- "用户只询问行情或概念时先直接回答，写明数据来源、市场类型与时间，区分事实与推测。结尾可提供相关下一步；用户明确只研究、取消交易或暂不买入时尊重其选择。",
- "用户想买 ETH 时减少追问：简述主要风险，提供 10 USDC 小额体验、50 USDC 或自定义金额。使用真实 USDC、主网现货的表述，不再默认测试资金或测试网。不要反复要求长期周期、数据服务预算或先保存策略。",
- "10 USDC 是用户选择的预算，不保证满足交易所最低名义金额、数量精度及费用。费用另计，不自动提高预算。用户改变金额、标的或取消计划时重新确认。",
- "主流程为 Hyperliquid 主网 ETH 现货 UETH/USDC，不是 ETH 永续合约。输入的主网永续价格只作分析参考，不能当作现货成交价。",
- "界面核对主网现货可用 USDC，资金不足时进入站内资金准备卡片；钱包收款余额与 Hyperliquid 交易账户余额是两回事。没有工具数据时，不能声称用户余额为零、已充值、钱包未连接或资金足够。",
- "站内已支持 ETH 现货订单预览、主网 API 会话授权和用户确认后提交 IOC 买单，可用 Oasis 账号钱包及外部钱包。不要求跳转官网下单。用户表达 ETH 买入意图后尽快让其选择金额，有明确金额就直接进入站内订单预览，不反复问已回答的问题。",
- "选择金额不等于授权或成交。主网会话授权覆盖账户交易，并非协议强制的单笔预算；临时签名密钥仅在页面内存。实际订单必须由用户在订单卡片单独点击确认。只根据交易所回执说明成交，纯对话不能宣称已执行订单，不能把旧测试签名、测试资金或测试记录转换为主网交易。旧测试流程仅保留在独立开发入口。",
- "回答简洁，每次最多追问一个必要信息。不要编造报价、模型投票、收益、授权、付款或订单回执，不索要私钥与 API Key，不承诺收益。"
+ "你是 Oasis 的中文 AI 交易助手，帮助用户看懂行情并整理真实 ETH 现货买入计划。购买交互只有：选择金额，核对网络与价格，点击购买，在钱包确认，查看回执。不要要求用户先展开资金管理、勾选复选框、单独授权会话再单独买入。",
+ "用户只询问行情或概念时先直接回答，写明数据来源、市场类型与时间，区分事实与推测。用户明确只研究、取消交易或暂不买入时尊重其选择。",
+ "用户想买 ETH 时减少追问：简述主要风险，提供 10 USDC、50 USDC 或自定义金额。有明确金额就直接进入站内报价，不反复追问周期、数据服务预算或要求先保存策略。",
+ "10 USDC 是预算选择，不保证满足交易所最低名义金额、数量精度及费用。费用另计，不自动提高预算。用户改变金额、标的或取消计划时重新确认。",
+ "主流程为 Hyperliquid 主网 ETH 现货 UETH/USDC，成交资产在 Hyperliquid，不是钱包链上的 ETH，也不是永续合约。永续价格只能作分析参考，不能当作现货成交价。明确区分交易网络与钱包签名网络。",
+ "余额不足只给出简短的可用金额与本单所需金额提示；充值和提款是默认折叠的可选入口，不自动展开或执行。链上钱包余额不等于 Hyperliquid 可交易余额。统一账户按现金与维护保证金后额度的较小值核对，不要求先转换模式。没有工具数据不能编造余额、充值状态或钱包状态。",
+ "购买按钮会在首次交易时发起钱包 API 会话授权，确认后仅提交已展示的那一笔 IOC 买单。协议授权覆盖账户交易，不限本单预算；临时密钥仅存于本页内存。报价过期、网络或钱包变化、余额不足、价格超过限价时停止提交，由用户重新核对。模型不能代点购买或签名。",
+ "仅根据交易所回执说明成交。纯对话不能宣称已执行订单，不能把旧测试资金、签名或记录转换为主网交易。不要求跳转 Hyperliquid 官网购买。回答简洁，每次最多追问一个必要信息，不编造报价、投票、收益、授权、付款或订单回执，不索要私钥或 API Key，不承诺收益。"
 ].join("\n");
 
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -102,7 +101,6 @@ export async function fetchOpenRouterModels({ fetchImpl = fetch, forceRefresh = 
 export async function streamOpenRouterChat({ model, messages, env, fetchImpl = fetch }) {
   const key = env.OPENROUTER_API_KEY;
   if (!key) return respond({ error: "OpenRouter API Key 未配置，请在 Cloudflare Workers 的 Secrets 中添加 OPENROUTER_API_KEY" }, 503);
-
   let upstream;
   try {
     upstream = await fetchImpl(OPENROUTER_CHAT_URL, {
@@ -125,7 +123,6 @@ export async function streamOpenRouterChat({ model, messages, env, fetchImpl = f
   } catch (error) {
     return respond({ error: error?.name === "TimeoutError" ? "OpenRouter 模型响应超时" : "OpenRouter 连接失败，请稍后重试" }, 502);
   }
-
   if (!upstream.ok) {
     let detail = "HTTP " + upstream.status;
     try {
@@ -139,7 +136,6 @@ export async function streamOpenRouterChat({ model, messages, env, fetchImpl = f
       upstream.status >= 500 ? "模型供应商暂时不可用" : detail.slice(0, 180);
     return respond({ error: "OpenRouter 调用失败：" + safeDetail }, upstream.status === 429 ? 429 : 502);
   }
-
   if (!upstream.body) return respond({ error: "OpenRouter 未返回流式响应" }, 502);
   return new Response(upstream.body, {
     status: 200,
@@ -164,7 +160,7 @@ async function secureEqual(a, b) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"native-mainnet-v15-20261116",defaultTestBudget:"20"});
+    if(url.pathname === "/api/release" && request.method === "GET")return respond({version:"native-mainnet-v15-20261116",purchaseFlow:"review-buy-wallet-v16",defaultTestBudget:"20"});
     if(url.pathname === "/api/mainnet/quote")return mainnetQuote(request);
     if(url.pathname === "/api/testnet/book" && request.method === "GET")return testnetBook(request);
     if(url.pathname === "/api/market/overview" && request.method === "GET")return overview();
@@ -178,27 +174,17 @@ export default {
       if(url.pathname.startsWith("/privy-setup")){headers.set("referrer-policy","no-referrer");headers.set("x-frame-options","DENY");headers.set("content-security-policy","default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");}
       return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
     }
-
     if (request.method === "GET" && url.pathname === "/api/ai/status") {
-      return respond({
-        googleLogin: googleMode(env),
-        enabled: Boolean(env.OASIS_DEMO_ACCESS_CODE),
-        openRouterConfigured: Boolean(env.OPENROUTER_API_KEY),
-        provider: "OpenRouter"
-      });
+      return respond({googleLogin:googleMode(env),enabled:Boolean(env.OASIS_DEMO_ACCESS_CODE),openRouterConfigured:Boolean(env.OPENROUTER_API_KEY),provider:"OpenRouter"});
     }
-
     if (request.method === "GET" && url.pathname === "/api/ai/models") {
       try {
         const models = await fetchOpenRouterModels();
-        return respond({ provider: "OpenRouter", count: models.length, models }, 200, {
-          "cache-control": "public, max-age=300"
-        });
+        return respond({ provider: "OpenRouter", count: models.length, models }, 200, {"cache-control":"public, max-age=300"});
       } catch (error) {
         return respond({ error: error.message || "无法获取 OpenRouter 模型目录" }, 502);
       }
     }
-
     if (request.method !== "POST" || url.pathname !== "/api/ai/chat") return respond({ error: "接口不存在" }, 404);
     if (!env.OASIS_DEMO_ACCESS_CODE) return respond({ error: "模型 API 尚未开放：管理员需先配置 OASIS_DEMO_ACCESS_CODE" }, 503);
     const origin = request.headers.get("origin");
@@ -210,11 +196,9 @@ export default {
       if (!(await current.json()).active) return respond({error:"请先激活账号"},403);
     } else if (!(await secureEqual(request.headers.get("x-oasis-access-code") || "", env.OASIS_DEMO_ACCESS_CODE))) return respond({ error: "体验码不正确" }, 401);
     if (Number(request.headers.get("content-length") || 0) > 25000) return respond({ error: "请求内容过大" }, 413);
-
     let payload;
     try { payload = validateChatInput(await request.json()); }
     catch (error) { return respond({ error: error.message || "无效请求" }, 400); }
-
     return streamOpenRouterChat({ ...payload, env });
   }
 };
