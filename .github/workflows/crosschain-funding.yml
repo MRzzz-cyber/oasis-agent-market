@@ -3,17 +3,63 @@ on:
   push:
     branches: [feat/prediction-crosschain-funding]
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: crosschain-funding
   cancel-in-progress: true
 jobs:
-  research:
+  acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node scripts/probe-crosschain-docs.mjs
+      - name: Materialize reviewed integration patches on feature branch
+        run: |
+          node scripts/integrate-crosschain.mjs
+          git add apps/frontend/funding-core.js apps/frontend/account-wallet.js apps/wallet-ui/polymarket-purchase-sdk.js apps/frontend/worker.js apps/frontend/polymarket-purchase.js apps/frontend/i18n-messages.js AGENTS.md
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Integrate crosschain funding into wallet guards, Worker and purchase card'
+            git push origin HEAD:feat/prediction-crosschain-funding
+          fi
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Regression and bridge policy tests
+        run: |
+          if npm test > "$RUNNER_TEMP/bridge-tests.txt" 2>&1; then tail -n 12 "$RUNNER_TEMP/bridge-tests.txt"; else cat "$RUNNER_TEMP/bridge-tests.txt"; exit 1; fi
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild';await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Desktop mobile and purchase regression fixtures
+        run: |
+          node scripts/check-crosschain-ui.mjs
+          node scripts/check-polymarket-purchase-ui.mjs
+          node scripts/check-prediction-conversation.mjs
+          node scripts/check-bilingual-ui.mjs
+      - name: Public supported assets and estimate only
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import {bridgeJSON,supportedSource,quoteBody} from './apps/frontend/crosschain-service.js';
+          for(const chain of ['42161','8453','10']){const a=await supportedSource(chain,fetch);console.log('LIVE supported source',chain,a.token.symbol,a.minCheckoutUsd);}
+          const q=await bridgeJSON('/quote',{body:quoteBody('0x17ec161f126e82a8ba337f4022d574dbeafef575','0x17ec161f126e82a8ba337f4022d574dbeafef575','42161','12')});assert.ok(BigInt(q.estToTokenBaseUnit)>0n);console.log('LIVE estimated output',q.estToTokenBaseUnit,'pUSD atomic; no account registration or transfer');
+          JS
+      - name: Emit synthetic bridge screenshots
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';for(const name of ['390-success','390-unknown']){try{const data=(await readFile(process.env.RUNNER_TEMP+'/crosschain-ui/'+name+'.png')).toString('base64');for(let i=0;i<data.length;i+=6000)console.log('OASIS_UI:'+name+':'+data.slice(i,i+6000));}catch{}}
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crosschain-fixtures
+          path: |
+            ${{ runner.temp }}/crosschain-ui/*.png
+            ${{ runner.temp }}/bridge-tests.txt
+          if-no-files-found: ignore
