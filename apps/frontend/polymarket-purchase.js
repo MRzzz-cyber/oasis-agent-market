@@ -1,9 +1,11 @@
+import {bindMarketTitle} from './market-language.js';
 import {POLYGON,PUSD,address,display,predictionJournal} from './polymarket-purchase-core.js';
 import {executePurchase,reconcilePurchase} from './polymarket-purchase-engine.js';
 const sessions=new WeakMap(),el=(tag,text,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(text==null?{}:{textContent:String(text)})});
 const short=a=>a.slice(0,6)+'…'+a.slice(-4);
 export function polymarketPurchase({market,outcome,getWallet,pickWallet,createSession,storage=localStorage,locks=navigator.locks}){
  const root=el('section',null,'prediction-purchase'),css=el('link');css.rel='stylesheet';css.href='/polymarket-purchase.css?v=1';root.append(css,el('span','Polymarket · Polygon','prediction-eyebrow'),el('h3','买入 '+(market.outcomes.find(o=>o.key===outcome)?.label||outcome)),el('p',market.question,'purchase-question'));
+ bindMarketTitle(root.querySelector('.purchase-question'),{...market,provider:'polymarket'});
  root.append(el('small','首次连接会创建或恢复由当前钱包控制的 Polymarket 交易账户；Oasis 钱包地址保持不变。'));
  const input=el('input');input.type='number';input.inputMode='decimal';input.min='1';input.max='1000';input.step='0.01';input.value='10';input.id='prediction-budget-'+crypto.randomUUID();const label=el('label','最多支付 · pUSD');label.htmlFor=input.id;root.append(label,input);
  const facts=el('dl'),funding=el('div'),status=el('p','正在检查交易服务…','purchase-status'),actions=el('div'),receipt=el('div');status.setAttribute('role','status');status.setAttribute('aria-live','polite');root.append(facts,funding,actions,status,receipt);

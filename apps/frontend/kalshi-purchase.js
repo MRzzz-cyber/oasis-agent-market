@@ -1,8 +1,9 @@
+import {bindMarketTitle} from './market-language.js';
 import {createKalshiSession,executeKalshi,reconcileKalshi} from './kalshi-client.js';
 import {display,kalshiJournal} from './kalshi-core.js';
 const el=(tag,text,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(text==null?{}:{textContent:String(text)})});
 export function kalshiPurchase({market,outcome,getWallet,pickWallet,initialCount='10',createSession=createKalshiSession,storage=localStorage,locks=navigator.locks}){
- const root=el('section',null,'prediction-purchase kalshi-purchase'),css=el('link');css.rel='stylesheet';css.href='/kalshi-purchase.css?v=1';root.append(css,el('span','KALSHI / API','prediction-eyebrow'),el('h3','连接 Kalshi，站内核对并买入'),el('p',market.question));
+ const root=el('section',null,'prediction-purchase kalshi-purchase'),css=el('link');css.rel='stylesheet';css.href='/kalshi-purchase.css?v=1';root.append(css,el('span','KALSHI / API','prediction-eyebrow'),el('h3','连接 Kalshi，站内核对并买入'),bindMarketTitle(el('p',market.question),market));
  const help=el('details'),summary=el('summary','没有 API 密钥？查看申请和配置位置');help.append(summary,el('p','Kalshi → Account & security → API Keys → Create Key。保存 Key ID 和私钥文件，支持 Ed25519 与 RSA。'),el('p','选择 read 和 write::trade 权限即可，本入口不提供提款或转账。'));
  const link=el('a','打开 Kalshi API Key 设置 ↗');link.href='https://kalshi.com/account/profile';link.target='_blank';link.rel='noopener noreferrer';help.append(link);root.append(help);
  const form=el('form',null,'kalshi-connect'),mode=el('select'),id=el('input'),file=el('input');for(const [value,label]of [['production','正式环境 · 真实 USD'],['demo','模拟环境 · 测试 USD']]){const o=el('option',label);o.value=value;mode.append(o);}mode.setAttribute('aria-label','Kalshi 环境');
@@ -14,7 +15,7 @@ export function kalshiPurchase({market,outcome,getWallet,pickWallet,initialCount
  controls.append(countLabel);const actions=el('div',null,'kalshi-actions');root.append(account,controls,facts,actions,status,orders);
  let session=null,quote=null,busy=false,closed=false,token=0,record=null;const button=(parent,text,fn)=>{const b=el('button',text);b.type='button';b.onclick=()=>run(fn);parent.append(b);return b;};
  const held=()=>session&&kalshiJournal(storage,session.accountHash).load()?.terminal===false;
- function receipt(){orders.replaceChildren();if(!session)return;try{record=kalshiJournal(storage,session.accountHash).load();if(record){orders.append(el('strong',record.message),el('p','状态：'+record.status),el('code',record.clientId));if(record.orderId)orders.append(el('code',record.orderId));if(record.filled)orders.append(el('p','平台报告成交 '+record.filled+' 份 · 支付 '+record.spent+' USD'));}}catch(e){status.textContent=e.message;}}
+ function receipt(){orders.replaceChildren();if(!session)return;try{record=kalshiJournal(storage,session.accountHash).load();if(record){orders.append(el('strong',record.message),el('p','状态：'+record.status),el('code',record.clientId));if(record.orderId)orders.append(el('code',record.orderId));if(record.filled)orders.append(el('p','平台报告成交 '+record.filled+' 份 · 合约成本 '+record.spent+' USD'));}}catch(e){status.textContent=e.message;}}
  function paint(){quantity.disabled=busy;connect.disabled=busy;id.disabled=busy;file.disabled=busy;mode.disabled=busy;actions.replaceChildren();if(!session)return;
   if(held()){button(actions,'核对原 Kalshi 订单',async()=>{record=await reconcileKalshi({session,storage});receipt();status.textContent=record.message;});return;}
   if(!getWallet())button(actions,'选择现有 Oasis 钱包',pickWallet);

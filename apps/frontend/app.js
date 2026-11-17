@@ -583,7 +583,7 @@ function historicalStatus(run){return ({manual_testnet:'测试记录',blocked:'�
 function showArchivedRun(run){
   const panel=$('run-panel');panel.classList.remove('hidden');const head=panel.querySelector('.activity-head');head.querySelector('h3').textContent='历史记录';head.querySelector('p').textContent='保存时的快照，不代表当前行情或有效交易计划。';head.querySelector('.status-pill').textContent=run.mode==='testnet'?'旧版测试网':'旧版模拟';
   $('flowchart').replaceChildren();$('order-followup').replaceChildren();$('order-followup').classList.add('hidden');const body=$('decision');body.replaceChildren();
-  body.append(node('h3','',run.asset+' · '+(run.mode==='testnet'?'测试记录':'模拟记录')),node('p','note',historyDate(run.createdAt)),node('p','',run.goal||'未保存原始目标'));
+  body.append(node('h3','',run.asset+' · '+(run.mode==='testnet'?'测试记录':'模拟记录')),node('p','note',historyDate(run.createdAt)),node('p','history-goal',run.goal||'未保存原始目标'));
   let receipt;try{receipt=JSON.parse(localStorage.getItem('oasis-hl-test-order:'+run.id));}catch{}
   body.append(node('p','note',receipt?.message?'本地回执：'+receipt.message:'记录状态：'+historicalStatus(run)+'。没有已保存的成交回执。'));
   if(run.terms)body.append(node('p','note','历史参数：'+Object.entries(run.terms).map(([key,value])=>key+' '+value).join(' · ')));
@@ -596,14 +596,14 @@ async function refreshStrategies(){
   const search=$('history-search').value.trim().toLowerCase(),conversations=conversationStore().list();
   for(const [key,label,count] of [['conversations','历史对话',conversations.length],['strategies','已存策略',items.length],['archive','交易与旧版记录',runs.length]]){const b=document.querySelector('[data-history-filter="'+key+'"]');b.textContent=label+' '+count;b.setAttribute('aria-pressed',String(historyFilter===key));}
   const matches=record=>!search||JSON.stringify(record).toLowerCase().includes(search);
-  function card(title,summary,meta,label,open){const article=node('article','record-card');const info=node('div','record-info');info.append(node('strong','',title),node('p','record-summary',summary),node('small','record-meta',meta));const button=node('button','ghost',label);button.type='button';button.onclick=open;article.append(info,button);root.append(article);return info;}
+  function card(title,summary,meta,label,open){const article=node('article','record-card');const info=node('div','record-info');info.append(node('strong','history-title',title),node('p','record-summary history-goal',summary),node('small','record-meta',meta));const button=node('button','ghost',label);button.type='button';button.onclick=open;article.append(info,button);root.append(article);return info;}
   if(historyFilter==='conversations')for(const record of conversations.filter(matches)){
     const last=[...record.messages].reverse().find(m=>m.role==='assistant')||record.messages.at(-1);
     card(record.title,historyTitle(last?.content).slice(0,100),historyDate(record.updatedAt)+' · '+record.messages.length+' 条消息'+(record.model?' · '+record.model:''),'继续对话',()=>restoreConversation(record));
   }
   if(historyFilter==='strategies')for(const item of [...items].reverse().filter(matches)){
     const info=card(historyTitle(item.goal),item.terms?item.asset+' · '+item.terms.cadence+' · 单次上限 '+item.terms.maxOrder+' '+item.terms.quoteAsset:'早期保存的策略草案',historyDate(item.createdAt)+' · 历史草案'+(item.model?' · '+item.model:''),'继续讨论',()=>restoreConversation({id:'strategy-'+item.id,goal:item.goal,messages:cleanMessages(item.conversation).length?item.conversation:[{role:'user',content:item.goal}],modelId:item.modelId,createdAt:item.createdAt}));
-    const details=node('details','record-terms');details.append(node('summary','','查看策略内容'),node('p','',item.goal||''));if(item.terms){const terms=node('dl','record-parameters');for(const [label,value] of [['标的',item.asset],['执行节奏',item.terms.cadence],['单次上限',item.terms.maxOrder+' '+item.terms.quoteAsset],['投资预算',item.terms.capital],['暂停回撤',item.terms.stopPercent?item.terms.stopPercent+'%':null]])if(value){terms.append(node('dt','',label),node('dd','',String(value)));}details.append(terms);}details.append(node('small','note','保存的参数仅供回顾，继续使用前需重新研究与确认。'));info.append(details);
+    const details=node('details','record-terms');details.append(node('summary','','查看策略内容'),node('p','history-goal',item.goal||''));if(item.terms){const terms=node('dl','record-parameters');for(const [label,value] of [['标的',item.asset],['执行节奏',item.terms.cadence],['单次上限',item.terms.maxOrder+' '+item.terms.quoteAsset],['投资预算',item.terms.capital],['暂停回撤',item.terms.stopPercent?item.terms.stopPercent+'%':null]])if(value){terms.append(node('dt','',label),node('dd','',String(value)));}details.append(terms);}details.append(node('small','note','保存的参数仅供回顾，继续使用前需重新研究与确认。'));info.append(details);
   }
   if(historyFilter==='archive')for(const run of [...runs].reverse().filter(matches))card(run.asset+' · '+(run.mode==='mainnet'?'主网现货订单':run.mode==='testnet'?'旧版测试记录':'旧版模拟记录'),historyTitle(run.goal||'历史运行快照'),historyDate(run.createdAt)+' · '+historicalStatus(run),'查看记录',()=>run.mode==='mainnet'?showMainnetReceipt(run):showArchivedRun(run));
   if(!root.children.length){const empty=node('div','history-empty');empty.append(node('span','',search?'没有找到匹配记录':historyFilter==='conversations'?'还没有保存的对话':historyFilter==='strategies'?'还没有保存的策略':'暂无交易或旧版记录'),node('p','note',search?'试试币种、关键词或模型名称。':historyFilter==='conversations'?'新对话会自动保存在这里。早期未保存的对话无法恢复，可在已存策略里继续讨论。':'与 Oasis 讨论后，可以选择保存策略。'));root.append(empty);}
@@ -759,7 +759,7 @@ function resetStarter() {
 }
 async function chooseStarter(question) {
   resetStarter();
-  $("goal").value = question.label;
+  $("goal").value = translateUI(question.label);
   $("goal").focus();
   if (!question.coin) return;
   const controller = new AbortController();

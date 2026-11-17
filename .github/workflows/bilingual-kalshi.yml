@@ -39,6 +39,9 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/kalshi-worker" --no-audit --no-fund miniflare@4
           node scripts/check-kalshi-worker.mjs
+      - name: Read-only live Kalshi preflight
+        if: always()
+        run: node scripts/check-kalshi-readonly.mjs
       - name: Emit selected fixture images
         if: always()
         run: |

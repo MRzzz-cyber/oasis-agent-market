@@ -185,7 +185,9 @@ export function marketView(analyze) {
     const latest=rows.at(-1), window=rows.slice(-20);
     const high=Math.max(...window.map(r=>r.h)),low=Math.min(...window.map(r=>r.l));
     const tail=window.slice(-6).map(r=>[new Date(r.t).toISOString(),r.o,r.h,r.l,r.c,r.v].join(",")).join("\n");
+    if(getLanguage()==='en'){analyze('Analyze '+coin+' ('+selected().label+' · '+selected().group+') '+interval+' candles. Explain price action, volume and limitations. Hyperliquid data read at '+new Date(refreshed).toISOString()+'. Last close '+latest.c+' '+selected().quote+' (the last candle may still be open). The last '+window.length+' candles span '+low+'–'+high+' '+selected().quote+'. Samples are UTC open time, open, high, low, close, volume:\n'+tail);return;}
     analyze("请分析 "+coin+"（"+selected().label+" · "+selected().group+"）的 "+interval+" K 线，解释走势、成交量和判断局限。Hyperliquid 行情读取于 "+new Date(refreshed).toISOString()+"。最新收盘价 "+latest.c+" "+selected().quote+"（末根可能未收盘）。最近 "+window.length+" 根区间 "+low+"–"+high+" "+selected().quote+"。最近样本按 UTC 开盘时间、开、高、低、收、成交量（"+coin+"）排列：\n"+tail);
   };
+  window.addEventListener("oasis:language-changed",()=>{if(active)draw();});
   return visible=>{active=visible;if(visible){start();directory();}else {stop();clearTimeout(catalogRetry);}};
 }

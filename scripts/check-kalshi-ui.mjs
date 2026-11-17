@@ -10,7 +10,7 @@ document.querySelector('main').append(node);
 const fail=(v,m)=>{if(!v)throw Error(m);};async function wait(fn){for(let i=0;i<250;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('UI did not settle');}
 try{
  fail(submits===0&&connected===0,'page load authenticated or submitted');fail(node.textContent.includes('API Keys'),'setup instructions missing');
- const inputs=node.querySelectorAll('form input');inputs[0].value='00000000-0000-4000-8000-000000000001';const data=new DataTransfer();data.items.add(new File(['FIXTURE PRIVATE KEY FILE'],'fixture.key',{type:'text/plain'}));inputs[1].files=data;node.querySelector('form').requestSubmit();
+ const inputs=node.querySelectorAll('form input');inputs[0].value='00000000-0000-4000-8000-000000000001';const data=new DataTransfer();data.items.add(new File(['FIXTURE PRIVATE KEY FILE'],'fixture.key',{type:'text/plain'}));inputs[1].files=data.files;node.querySelector('form').requestSubmit();
  await wait(()=>connected===1&&!node.querySelector('form button').disabled);fail(inputs[1].value==='','private file input not cleared');fail(submits===0,'connection placed order');
  if(mode==='insufficient'){fail(node.textContent.includes('余额不足'),'insufficient funding missing');fail(node.querySelector('.kalshi-actions button:last-child').disabled,'insufficient funds enabled submission');}
  else{
