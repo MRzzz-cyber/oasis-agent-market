@@ -2,7 +2,7 @@ import {account,reserveKalshiSubmission} from './auth.js';
 import {predictionQuote} from './prediction-markets.js';
 import {KALSHI_HOSTS,KALSHI_PATH,environment,marketId,quantity,kalshiPreview,checkKalshiQuote,checkKalshiOrder} from './kalshi-core.js';
 const send=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});
-const allowed={balance:'/portfolio/balance',positions:'/portfolio/positions',orders:'/portfolio/orders',submit:'/portfolio/events/orders'};
+const allowed={balance:'/portfolio/balance',positions:'/portfolio/positions',orders:'/portfolio/orders',fills:'/portfolio/fills',submit:'/portfolio/events/orders'};
 const fail=(condition,message)=>{if(!condition)throw Error(message);};
 async function boundedBody(request){const reader=request.body?.getReader();fail(reader,'请求内容为空');let size=0,chunks=[];try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>16384){await reader.cancel();throw Error('请求内容过大');}chunks.push(value);}}finally{reader.releaseLock();}const joined=new Uint8Array(size);let offset=0;for(const value of chunks){joined.set(value,offset);offset+=value.length;}return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(joined));}
 function authHeaders(auth,now=Date.now()){
@@ -37,11 +37,11 @@ export async function kalshiService(request,env,{fetchImpl=fetch,getAccount=acco
   let query=new URLSearchParams();
   if(resource!=='submit'){
    fail(!packet.review&&!packet.order&&!packet.balanceAuth,'只读请求不能包含订单');
-   const q=packet.query||{};fail(Object.keys(q).every(k=>['exchange_index','ticker','cursor','limit'].includes(k)),'查询字段未开放');
+   const q=packet.query||{};fail(Object.keys(q).every(k=>['exchange_index','ticker','cursor','limit','order_id'].includes(k)),'查询字段未开放');
    if(q.exchange_index!=null){fail(Number.isInteger(q.exchange_index)&&q.exchange_index>=0&&q.exchange_index<=1024,'交易分区无效');query.set('exchange_index',q.exchange_index);}
-   if(q.ticker)query.set('ticker',marketId(q.ticker));
+   if(q.ticker)query.set('ticker',marketId(q.ticker));if(q.order_id){fail(resource==='fills'&&/^[0-9a-f-]{36}$/i.test(q.order_id),'成交查询订单号无效');query.set('order_id',q.order_id);}
    if(q.cursor){fail(typeof q.cursor==='string'&&q.cursor.length<=500,'游标无效');query.set('cursor',q.cursor);}
-   query.set('subaccount','0');if(resource!=='balance')query.set('limit','100');
+   query.set('subaccount','0');if(resource!=='balance')query.set('limit',resource==='fills'?'1000':'100');
   }else{
    fail(!packet.query,'交易请求不能覆盖查询参数');checkKalshiQuote(packet.review,now());fail(packet.review.environment===mode,'Kalshi 环境已变化');body=checkKalshiOrder(packet.order,packet.review,now());
    const fresh=await prepareKalshi({ticker:packet.review.ticker,outcome:packet.review.outcome,count:packet.review.count,mode},{fetchImpl,now:now()});
@@ -59,6 +59,7 @@ export async function kalshiService(request,env,{fetchImpl=fetch,getAccount=acco
   if(!upstream.ok){const definitive=[400,401,403,404].includes(upstream.status);return send({error:'Kalshi 请求未通过，请核对权限、余额或盘口',code:typeof payload?.code==='string'?payload.code.slice(0,80):'upstream_error',submitted:submitted&&!definitive},upstream.status>=500?502:upstream.status);}
   if(resource==='balance')return send({balance:payload.balance,portfolio_value:payload.portfolio_value,environment:mode,currency:'USD',exchangeIndex:packet.query?.exchange_index??null});
   if(resource==='positions')return send({market_positions:Array.isArray(payload.market_positions)?payload.market_positions.slice(0,100):[],cursor:payload.cursor||null});
+  if(resource==='fills')return send({fills:Array.isArray(payload.fills)?payload.fills.slice(0,1000):[],cursor:payload.cursor||null});
   if(resource==='orders')return send({orders:Array.isArray(payload.orders)?payload.orders.slice(0,100):[],cursor:payload.cursor||null});
   return send({receipt:payload,submitted:true},201);
  }catch(error){return send({error:error.message||'Kalshi 请求未完成',submitted},400);}

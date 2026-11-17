@@ -50,3 +50,19 @@ export function kalshiJournal(storage,accountHash){check(/^[a-f0-9]{64}$/.test(a
  return {load,save(value){const record={version:'kalshi-api-v1',accountHash,owner:value.owner.toLowerCase(),clientId:value.clientId,terminal:value.terminal,status:String(value.status||''),at:value.at,quote:{...value.quote},orderId:value.orderId||null,filled:value.filled||null,spent:value.spent||null,message:String(value.message||'')};check(/^0x[a-f0-9]{40}$/.test(record.owner)&&uuid.test(record.clientId),'Kalshi 订单记录无效');const safe=JSON.stringify(record);check(!/PRIVATE KEY|KALSHI-ACCESS|signature|passphrase|keyId/.test(safe),'订单记录包含认证数据');storage.setItem(key,safe);return load();}};
 }
 export function assertKalshiClear(storage,owner){if(!storage)throw Error('浏览器订单存储不可用');let count=0;for(let i=0;i<storage.length;i++){const key=storage.key(i);if(!key?.startsWith(prefix))continue;if(++count>100)throw Error('请先核对历史 Kalshi 订单');const r=kalshiJournal(storage,key.slice(prefix.length)).load();if(r?.terminal===false&&r.owner===owner.toLowerCase())throw Error('有 Kalshi 原订单待核对，不能重复交易');}}
+
+export function recoverKalshiFills(order,fills,q,clientId){
+ try{
+  if(order.client_order_id!==clientId||!uuid.test(order.order_id||'')||order.ticker!==q.ticker||order.exchange_index!==q.exchangeIndex||(order.subaccount_number!=null&&order.subaccount_number!==0)||order.outcome_side!==q.outcome||order.book_side!==(q.outcome==='yes'?'bid':'ask')||!['executed','canceled'].includes(order.status)||atomic(order.initial_count_fp)!==BigInt(q.count)*SCALE||atomic(order.remaining_count_fp)!==0n)return null;
+  const reported=atomic(order.fill_count_fp);if(reported>BigInt(q.count)*SCALE)return null;
+  if(reported===0n)return order.status==='canceled'&&fills.length===0?{terminal:true,status:'unfilled',message:'平台未成交，本次订单已结束',orderId:order.order_id}:null;
+  let count=0n,cost=0n,fees=0n;const seen=new Set();
+  for(const f of fills){if(typeof f.fill_id!=='string'||!f.fill_id||seen.has(f.fill_id)||f.order_id!==order.order_id||f.ticker!==q.ticker||f.exchange_index!==q.exchangeIndex||(f.subaccount_number!=null&&f.subaccount_number!==0)||f.outcome_side!==q.outcome||f.book_side!==order.book_side||f.is_taker!==true)return null;seen.add(f.fill_id);
+   const n=atomic(f.count_fp),yes=atomic(f.yes_price_dollars),no=atomic(f.no_price_dollars),fee=atomic(f.fee_cost),p=q.outcome==='yes'?yes:no;
+   if(n<=0n||n%10000n!==0n||yes+no!==SCALE||p<=0n||p>=SCALE||p>BigInt(q.limitAtomic))return null;
+   count+=n;cost+=(n*p+SCALE-1n)/SCALE;fees+=fee;
+  }
+  if(count!==reported||fees>BigInt(q.feeReserveAtomic)||cost+fees>BigInt(q.maxSpendAtomic))return null;
+  return {terminal:true,status:count===BigInt(q.count)*SCALE?'filled':'partial',message:'Kalshi 平台报告已成交',orderId:order.order_id,filled:display(count),spent:display(cost+fees)};
+ }catch{return null;}
+}

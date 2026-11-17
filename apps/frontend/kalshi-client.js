@@ -1,4 +1,4 @@
-import {KALSHI_PATH,environment,kalshiOrder,checkKalshiQuote,kalshiJournal,receiptState,assertKalshiClear} from './kalshi-core.js';
+import {KALSHI_PATH,environment,kalshiOrder,checkKalshiQuote,kalshiJournal,receiptState,recoverKalshiFills,assertKalshiClear} from './kalshi-core.js';
 import {assertFundingClear} from './funding-core.js';
 import {swapJournal} from './arbitrum-swap-core.js';
 const bytes=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
@@ -10,7 +10,7 @@ export async function importKalshiKey(pem){
  const match=pem.trim().match(/^-----BEGIN (RSA PRIVATE KEY|PRIVATE KEY)-----\s*([A-Za-z0-9+/=\s]+)\s*-----END \1-----$/);if(!match)throw Error('私钥格式无效，支持 Ed25519 或 RSA');
  let data=bytes(match[2].replace(/\s/g,''));if(match[1]==='RSA PRIVATE KEY'){const oid=Uint8Array.from([0x30,0x0d,0x06,0x09,0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x01,0x05,0x00]);data=der(0x30,concat(Uint8Array.of(2,1,0),oid,der(4,data)));}
  let key,algorithm;try{key=await crypto.subtle.importKey('pkcs8',data,{name:'Ed25519'},false,['sign']);algorithm={name:'Ed25519'};}catch{try{key=await crypto.subtle.importKey('pkcs8',data,{name:'RSA-PSS',hash:'SHA-256'},false,['sign']);if(key.algorithm.modulusLength<2048||key.algorithm.modulusLength>4096)throw Error();algorithm={name:'RSA-PSS',saltLength:32};}catch{throw Error('无法读取私钥，请选择 Ed25519 或 2048–4096 位 RSA 密钥');}}
- return {type:algorithm.name,async sign(timestamp,method,path){if(!key)throw Error('Kalshi 会话已断开');if(!['GET','POST'].includes(method)||!['/portfolio/balance','/portfolio/positions','/portfolio/orders','/portfolio/events/orders'].some(p=>path===KALSHI_PATH+p))throw Error('Kalshi 签名路径未开放');return base64(await crypto.subtle.sign(algorithm,key,new TextEncoder().encode(timestamp+method+path)));},close(){key=null;data.fill(0);}};
+ return {type:algorithm.name,async sign(timestamp,method,path){if(!key)throw Error('Kalshi 会话已断开');if(!['GET','POST'].includes(method)||!['/portfolio/balance','/portfolio/positions','/portfolio/orders','/portfolio/fills','/portfolio/events/orders'].some(p=>path===KALSHI_PATH+p))throw Error('Kalshi 签名路径未开放');return base64(await crypto.subtle.sign(algorithm,key,new TextEncoder().encode(timestamp+method+path)));},close(){key=null;data.fill(0);}};
 }
 export async function createKalshiSession({keyId,pem,mode='production',fetchImpl=fetch}){
  environment(mode);if(!/^[0-9a-f-]{36}$/i.test(keyId||''))throw Error('请输入有效的 Kalshi API Key ID');
@@ -18,7 +18,7 @@ export async function createKalshiSession({keyId,pem,mode='production',fetchImpl
  async function account(){const r=await fetchImpl('/api/auth/me',{cache:'no-store',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('请先使用 Google 登录');const p=await r.json();if(!p.active||!p.id)throw Error('请先激活账号');return p;}
  let owner;try{owner=(await account()).id;}catch(e){signer.close();throw e;}
  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(mode+':'+keyId)),accountHash=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
- async function current(){if(closed)throw Error('Kalshi 会话已断开');const p=await account();if(p.id!==owner){close();throw Error('Oasis 登录账户已变化，请重新连接 Kalshi');}}
+ async function current(){if(closed)throw Error('Kalshi 会话已断开');let p;try{p=await account();}catch(error){close();error.code='KALSHI_SESSION_EXPIRED';throw error;}if(p.id!==owner){close();throw Object.assign(Error('Oasis 登录账户已变化，请重新连接 Kalshi'),{code:'KALSHI_SESSION_EXPIRED'});}}
  async function auth(resource){const timestamp=String(Date.now()),path=KALSHI_PATH+(resource==='submit'?'/portfolio/events/orders':'/portfolio/'+resource);return {keyId,timestamp,signature:await signer.sign(timestamp,resource==='submit'?'POST':'GET',path)};}
  async function call(resource,query={}){
   await current();const packet={environment:mode,resource,auth:await auth(resource),query};const r=await fetchImpl('/api/kalshi/account',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(packet),signal:AbortSignal.timeout(20000)});const p=await r.json();if(!r.ok)throw Error(p.error||'Kalshi 请求失败');await current();return p;
@@ -30,7 +30,7 @@ export async function createKalshiSession({keyId,pem,mode='production',fetchImpl
   const r=await fetchImpl('/api/kalshi/account',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(packet),signal:AbortSignal.timeout(45000)});let p;try{p=await r.json();}catch{throw Error('Kalshi 回执暂未确认，请核对原订单');}await current();return {ok:r.ok,...p};
  }
  function close(){closed=true;signer.close();keyId=null;}
- return {accountHash,environment:mode,keyType:signer.type,balance:exchangeIndex=>call('balance',exchangeIndex==null?{}:{exchange_index:exchangeIndex}),positions:()=>call('positions'),orders:query=>call('orders',query),submit,close,current};
+ return {accountHash,environment:mode,keyType:signer.type,balance:exchangeIndex=>call('balance',exchangeIndex==null?{}:{exchange_index:exchangeIndex}),positions:()=>call('positions'),orders:query=>call('orders',query),fills:query=>call('fills',query),submit,close,current};
 }
 export async function executeKalshi({quote,session,wallet,getWallet,storage=localStorage,locks=navigator.locks,onStage=()=>{}}){
  if(!wallet||!/^0x[a-f0-9]{40}$/i.test(wallet.address||''))throw Error('请先选择现有 Oasis 钱包');
@@ -53,7 +53,7 @@ export async function reconcileKalshi({session,storage=localStorage}){
   if(found){
    if(found.ticker!==r.quote.ticker||found.order_id!==r.orderId&&r.orderId)throw Error('Kalshi 原订单身份未匹配');
    const side=found.book_side||found.side;if(side!==(r.quote.outcome==='yes'?'bid':'ask'))throw Error('Kalshi 原订单方向尚未核实');
-   const result=receiptState({...found,fill_count:found.fill_count??found.fill_count_fp,remaining_count:found.remaining_count??found.remaining_count_fp},r.quote,r.clientId);
+   let result=null;if(session.fills){let fillCursor,rows=[],complete=false;for(let page=0;page<3;page++){const f=await session.fills({ticker:r.quote.ticker,exchange_index:r.quote.exchangeIndex,order_id:found.order_id,...(fillCursor?{cursor:fillCursor}:{})});if(!Array.isArray(f.fills))break;rows.push(...f.fills);fillCursor=f.cursor;if(!fillCursor){complete=true;break;}}if(complete)result=recoverKalshiFills(found,rows,r.quote,r.clientId);}
    if(result)return j.save({...r,...result});return j.save({...r,orderId:found.order_id,message:'已找到原 Kalshi 订单，成交金额仍待核对'});
   }
   cursor=page.cursor;if(!cursor)break;

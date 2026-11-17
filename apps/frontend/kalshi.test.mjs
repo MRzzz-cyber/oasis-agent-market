@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,verify,constants} from 'node:crypto';
-import {kalshiPreview,kalshiOrder,checkKalshiOrder,receiptState,kalshiJournal,assertKalshiClear} from './kalshi-core.js';
+import {kalshiPreview,kalshiOrder,checkKalshiOrder,receiptState,recoverKalshiFills,kalshiJournal,assertKalshiClear} from './kalshi-core.js';
 import {importKalshiKey,executeKalshi,createKalshiSession} from './kalshi-client.js';
 import {kalshiService} from './kalshi-service.js';
 const owner='0x'+'1'.repeat(40),keyId='00000000-0000-4000-8000-000000000001',accountHash='a'.repeat(64),clientId='00000000-0000-4000-8000-000000000002';
@@ -78,4 +78,13 @@ test('private service rejects origin, inactive users, arbitrary routes and wrong
 test('streamed bodies are capped before decode and oversized requests never forward',async()=>{
  let cancelled=false;const stream=new ReadableStream({start(c){c.enqueue(new Uint8Array(17000));},cancel(){cancelled=true;}});const r=await kalshiService(new Request('https://oasis.test/api/kalshi/account',{method:'POST',headers:{origin:'https://oasis.test'},body:stream,duplex:'half'}),{}, {getAccount:user,fetchImpl:()=>assert.fail('unexpected forwarding')});
  assert.equal(r.status,400);assert.equal(cancelled,true);
+});
+
+test('modern order recovery verifies every fill, NO complement, fees and original identity',()=>{
+ const q=quote(),order={order_id:clientId,client_order_id:clientId,ticker:q.ticker,exchange_index:0,subaccount_number:0,outcome_side:'yes',book_side:'bid',initial_count_fp:'10.00',fill_count_fp:'10.00',remaining_count_fp:'0.00',status:'executed'};
+ const fill={fill_id:'fixture-fill',order_id:clientId,ticker:q.ticker,exchange_index:0,subaccount_number:0,outcome_side:'yes',book_side:'bid',count_fp:'10.00',yes_price_dollars:'0.4',no_price_dollars:'0.6',fee_cost:'0.168',is_taker:true};
+ assert.equal(recoverKalshiFills(order,[fill],q,clientId).status,'filled');
+ for(const f of [{...fill,fee_cost:'10'},{...fill,order_id:keyId},{...fill,no_price_dollars:'0.5'},{...fill,count_fp:'9'},{...fill,is_taker:false}])assert.equal(recoverKalshiFills(order,[f],q,clientId),null);
+ assert.equal(recoverKalshiFills(order,[fill,fill],q,clientId),null);assert.equal(recoverKalshiFills({...order,status:'resting'},[fill],q,clientId),null);
+ const no=quote({outcome:'no'});assert.equal(recoverKalshiFills({...order,outcome_side:'no',book_side:'ask'},[{...fill,outcome_side:'no',book_side:'ask',yes_price_dollars:'0.6',no_price_dollars:'0.4'}],no,clientId).spent,'4.168');
 });
