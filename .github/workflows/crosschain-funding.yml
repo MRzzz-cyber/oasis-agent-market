@@ -1,0 +1,28 @@
+name: Prediction crosschain funding acceptance
+on:
+  push:
+    branches: [feat/prediction-crosschain-funding]
+permissions:
+  contents: read
+concurrency:
+  group: crosschain-funding
+  cancel-in-progress: true
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Official bridge and LI.FI documentation, public reads only
+        run: |
+          node --input-type=module <<'JS'
+          const read=async u=>{try{const r=await fetch(u,{redirect:'manual',signal:AbortSignal.timeout(15000)});const text=await r.text();console.log('SOURCE',u,r.status,text.slice(0,18000));return text;}catch(e){console.log('SOURCE FAILED',u,e.name);return '';}};
+          const poly=await read('https://docs.polymarket.com/llms.txt');
+          console.log('POLY LINKS',poly.split('\n').filter(l=>/bridge|deposit|pusd|quote|supported.asset/i.test(l)).join('\n'));
+          const li=await read('https://docs.li.fi/llms.txt');console.log('LIFI LINKS',li.split('\n').filter(l=>/quote|status|receiving|destination|polymarket/i.test(l)).slice(0,60).join('\n'));
+          await read('https://bridge.polymarket.com/supported-assets');
+          await read('https://li.quest/v1/token?chain=137&token=0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb');
+          JS
