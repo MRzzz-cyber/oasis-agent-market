@@ -16,13 +16,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Official bridge and LI.FI documentation, public reads only
+      - name: Read official API contracts, no account creation or financial writes
         run: |
           node --input-type=module <<'JS'
-          const read=async u=>{try{const r=await fetch(u,{redirect:'manual',signal:AbortSignal.timeout(15000)});const text=await r.text();console.log('SOURCE',u,r.status,text.slice(0,18000));return text;}catch(e){console.log('SOURCE FAILED',u,e.name);return '';}};
-          const poly=await read('https://docs.polymarket.com/llms.txt');
-          console.log('POLY LINKS',poly.split('\n').filter(l=>/bridge|deposit|pusd|quote|supported.asset/i.test(l)).join('\n'));
-          const li=await read('https://docs.li.fi/llms.txt');console.log('LIFI LINKS',li.split('\n').filter(l=>/quote|status|receiving|destination|polymarket/i.test(l)).slice(0,60).join('\n'));
-          await read('https://bridge.polymarket.com/supported-assets');
-          await read('https://li.quest/v1/token?chain=137&token=0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb');
+          for(const path of ['deposit','quote','status','supported-assets']){const u='https://docs.polymarket.com/trading/bridge/'+path+'.md';const r=await fetch(u,{signal:AbortSignal.timeout(15000)});console.log('DOCUMENT',u,r.status,await r.text());}
+          const params=new URLSearchParams({fromChain:'42161',toChain:'137',fromToken:'0xaf88d065e77c8cc2239327c5edb3a432268e5831',toToken:'0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb',fromAddress:'0x1111111111111111111111111111111111111111',toAddress:'0x2222222222222222222222222222222222222222',fromAmount:'12000000',integrator:'oasis-trade',slippage:'0.005'});
+          const r=await fetch('https://li.quest/v1/quote?'+params,{signal:AbortSignal.timeout(30000)});console.log('LIFI QUOTE',r.status,(await r.text()).slice(0,18000));
+          const assets=await (await fetch('https://bridge.polymarket.com/supported-assets')).json();console.log('USDC SUPPORT',assets.supportedAssets.filter(x=>['42161','8453','10'].includes(x.chainId)&&x.token.symbol==='USDC'));
           JS
