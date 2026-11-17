@@ -7,7 +7,7 @@ export const getLocale=()=>language==='en'?'en-US':'zh-CN';
 const replacements=Object.entries(messages).sort((a,b)=>b[0].length-a[0].length);
 const escape=s=>s.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&');
 const matcher=new RegExp(replacements.filter(([k])=>k.length>1).map(([k])=>escape(k)).join('|'),'g');
-export function translateUI(value,lang=language){const source=String(value??'');if(lang!=='en')return chromeLabels[source]||source;if(Object.hasOwn(messages,source))return messages[source];return source.replace(matcher,s=>messages[s]);}
+export function translateUI(value,lang=language){const source=String(value??'');if(lang!=='en'){if(/^(?:Yes|YES|No|NO)(?:\s+[\d.]+¢)?$/.test(source))return source.replace(/^(?:Yes|YES)/,'是').replace(/^(?:No|NO)/,'否');return chromeLabels[source]||source;}if(Object.hasOwn(messages,source))return messages[source];return source.replace(matcher,s=>messages[s]);}
 const originals=new WeakMap(),attributes=new WeakMap(),roots=new Set();
 const skip='script,style,textarea,code,pre,svg,[data-i18n-skip],.chat-message>p,.chat-message .markdown-body,.history-title,.history-goal';
 function protectedNode(node){return !!node.parentElement?.closest(skip);}

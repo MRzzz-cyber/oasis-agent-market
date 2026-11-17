@@ -23,10 +23,10 @@ export function kalshiPreview({market,estimate,series,outcome,count,mode='produc
  return {version:'kalshi-api-v1',environment:mode,ticker:market.ticker,question:String(market.title||'').slice(0,400),outcome,count:String(count),limitAtomic:String(price),feeReserveAtomic:String(fee),maxSpendAtomic:String(cap),exchangeIndex:market.exchange_index,at:now,expiresAt:now+30000,currency:'USD'};
 }
 export function checkKalshiQuote(q,now=Date.now()){
- check(q?.version==='kalshi-api-v1','报价版本无效');environment(q.environment);marketId(q.ticker);quantity(q.count);
+ check(exact(q,['version','environment','ticker','question','outcome','count','limitAtomic','feeReserveAtomic','maxSpendAtomic','exchangeIndex','at','expiresAt','currency'])&&q.version==='kalshi-api-v1'&&q.currency==='USD'&&typeof q.question==='string'&&q.question.length<=400,'报价版本无效');environment(q.environment);marketId(q.ticker);quantity(q.count);
  check(['yes','no'].includes(q.outcome)&&Number.isSafeInteger(q.at)&&Number.isSafeInteger(q.expiresAt)&&q.expiresAt===q.at+30000&&q.at<=now+5000&&q.expiresAt>now,'Kalshi 报价已过期，请刷新');
  check(Number.isInteger(q.exchangeIndex)&&q.exchangeIndex>=0&&q.exchangeIndex<=1024,'Kalshi 交易分区无效');
- const p=BigInt(q.limitAtomic),fee=BigInt(q.feeReserveAtomic),cap=BigInt(q.maxSpendAtomic),expected=((BigInt(q.count)*17600n+19999n)/10000n)*10000n;
+ check([q.limitAtomic,q.feeReserveAtomic,q.maxSpendAtomic].every(v=>typeof v==='string'&&/^\d{1,20}$/.test(v)),'Kalshi 金额格式无效');const p=BigInt(q.limitAtomic),fee=BigInt(q.feeReserveAtomic),cap=BigInt(q.maxSpendAtomic),expected=((BigInt(q.count)*17600n+19999n)/10000n)*10000n;
  check(p>0n&&p<SCALE&&p%10000n===0n&&fee===expected&&cap===BigInt(q.count)*p+fee&&cap<=1000n*SCALE,'Kalshi 价格或支付上限无效');return q;
 }
 export function kalshiOrder(q,clientId,now=Date.now()){
@@ -46,7 +46,7 @@ export function receiptState(reply,q,clientId){
 }
 const prefix='oasis-kalshi-order:';
 export function kalshiJournal(storage,accountHash){check(/^[a-f0-9]{64}$/.test(accountHash||''),'Kalshi 账号标识无效');const key=prefix+accountHash;
- function load(){let value;try{value=storage.getItem(key);if(!value)return null;value=JSON.parse(value);}catch{throw Error('Kalshi 订单记录无法读取，请先核对');}check(value?.version==='kalshi-api-v1'&&value.accountHash===accountHash&&/^0x[a-f0-9]{40}$/.test(value.owner||'')&&uuid.test(value.clientId||'')&&typeof value.terminal==='boolean'&&value.quote?.ticker,'Kalshi 订单记录无效，请先核对');return value;}
+ function load(){let value;try{value=storage.getItem(key);if(!value)return null;value=JSON.parse(value);}catch{throw Error('Kalshi 订单记录无法读取，请先核对');}check(value?.version==='kalshi-api-v1'&&value.accountHash===accountHash&&/^0x[a-f0-9]{40}$/.test(value.owner||'')&&uuid.test(value.clientId||'')&&typeof value.terminal==='boolean'&&Number.isSafeInteger(value.at)&&value.at>=0&&['preparing','submitting','unknown','not-submitted','rejected','filled','partial','unfilled'].includes(value.status)&&(!value.orderId||uuid.test(value.orderId)),'Kalshi 订单记录无效，请先核对');checkKalshiQuote(value.quote,value.quote?.at+1);check(value.filled==null||typeof value.filled==='string'&&/^\d+(?:\.\d{1,6})?$/.test(value.filled),'Kalshi 订单记录无效');check(value.spent==null||typeof value.spent==='string'&&/^\d+(?:\.\d{1,6})?$/.test(value.spent),'Kalshi 订单记录无效');return value;}
  return {load,save(value){const record={version:'kalshi-api-v1',accountHash,owner:value.owner.toLowerCase(),clientId:value.clientId,terminal:value.terminal,status:String(value.status||''),at:value.at,quote:{...value.quote},orderId:value.orderId||null,filled:value.filled||null,spent:value.spent||null,message:String(value.message||'')};check(/^0x[a-f0-9]{40}$/.test(record.owner)&&uuid.test(record.clientId),'Kalshi 订单记录无效');const safe=JSON.stringify(record);check(!/PRIVATE KEY|KALSHI-ACCESS|signature|passphrase|keyId/.test(safe),'订单记录包含认证数据');storage.setItem(key,safe);return load();}};
 }
 export function assertKalshiClear(storage,owner){if(!storage)throw Error('浏览器订单存储不可用');let count=0;for(let i=0;i<storage.length;i++){const key=storage.key(i);if(!key?.startsWith(prefix))continue;if(++count>100)throw Error('请先核对历史 Kalshi 订单');const r=kalshiJournal(storage,key.slice(prefix.length)).load();if(r?.terminal===false&&r.owner===owner.toLowerCase())throw Error('有 Kalshi 原订单待核对，不能重复交易');}}

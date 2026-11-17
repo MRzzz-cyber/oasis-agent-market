@@ -27,7 +27,7 @@ export async function createKalshiSession({keyId,pem,mode='production',fetchImpl
   await current();checkKalshiQuote(q);if(q.environment!==mode)throw Error('Kalshi 环境已变化');
   const order=kalshiOrder(q,clientId),balanceAuth=await auth('balance'),proof=await auth('submit');await current();checkKalshiQuote(q);
   const packet={environment:mode,resource:'submit',auth:proof,balanceAuth,review:q,order};onSending();
-  const r=await fetchImpl('/api/kalshi/account',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(packet),signal:AbortSignal.timeout(45000)});let p;try{p=await r.json();}catch{throw Error('Kalshi 回执暂未确认，请核对原订单');}return {ok:r.ok,...p};
+  const r=await fetchImpl('/api/kalshi/account',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(packet),signal:AbortSignal.timeout(45000)});let p;try{p=await r.json();}catch{throw Error('Kalshi 回执暂未确认，请核对原订单');}await current();return {ok:r.ok,...p};
  }
  function close(){closed=true;signer.close();keyId=null;}
  return {accountHash,environment:mode,keyType:signer.type,balance:exchangeIndex=>call('balance',exchangeIndex==null?{}:{exchange_index:exchangeIndex}),positions:()=>call('positions'),orders:query=>call('orders',query),submit,close,current};

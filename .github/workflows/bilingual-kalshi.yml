@@ -27,10 +27,28 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq fonts-noto-cjk
       - name: Bilingual desktop and mobile fixtures
-        run: node scripts/check-bilingual-ui.mjs
+        run: |
+          node scripts/check-bilingual-ui.mjs
+          node scripts/check-kalshi-ui.mjs
+          node scripts/check-prediction-ui.mjs
+          node scripts/check-polymarket-purchase-ui.mjs
+      - name: Kalshi replay guard in actual Workers SQLite
+        run: |
+          npm install --prefix "$RUNNER_TEMP/kalshi-worker" --no-audit --no-fund miniflare@4
+          node scripts/check-kalshi-worker.mjs
+      - name: Emit selected fixture images
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';for(const name of ['bilingual-ui/390-index.html-normal','kalshi-ui/390-language']){try{const data=(await readFile(process.env.RUNNER_TEMP+'/'+name+'.png')).toString('base64');for(let i=0;i<data.length;i+=6000)console.log('OASIS_UI:'+name+':'+data.slice(i,i+6000));}catch{}}
+          JS
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: bilingual-kalshi-fixtures
-          path: ${{ runner.temp }}/bilingual-ui/*.png
+          path: |
+            ${{ runner.temp }}/bilingual-ui/*.png
+            ${{ runner.temp }}/kalshi-ui/*.png
+            ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/polymarket-purchase-ui/*.png
           if-no-files-found: ignore
