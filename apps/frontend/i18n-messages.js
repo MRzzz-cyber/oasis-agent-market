@@ -928,7 +928,16 @@ export const messages={
   "行情暂不可用，可先讨论判断方法。": "Market data unavailable. Discuss the method first.",
   "已附行情 · ": "Market snapshot attached · ",
   "盘口英文原文": "Original English market title",
-  "Kalshi 金额格式无效": "Invalid Kalshi amount format"
+  "Kalshi 金额格式无效": "Invalid Kalshi amount format",
+  "每月 500 USDT，每次最多 80 USDT，回撤达到 5% 暂停。": "500 USDT per month, up to 80 USDT per trade; pause at 5% drawdown.",
+  "每月 500 USDT，每次最多 80 USDT，回撤达到 5% 暂停。请帮我检查参数，整理为每周定投模拟策略。": "Review a simulated weekly DCA plan: 500 USDT per month, up to 80 USDT per trade, pausing at 5% drawdown.",
+  "请设计突破前 20 根 K 线高点的观察规则，说明相对成交量阈值、确认条件和假突破后的退出条件。": "Design rules to watch for a breakout above the previous 20-candle high. Define relative-volume thresholds, confirmation and exits after false breakouts.",
+  "请用 300 USDT 模拟本金设计三次分批买入，明确回撤的计算起点，每一档的触发条件及停止规则。": "Design three staged simulated purchases using 300 USDT. Define the drawdown baseline, triggers for each stage and stopping rules.",
+  "请用英伟达永续的收盘价与均量设计趋势观察清单，说明正股休市期间需要额外确认什么。": "Build a trend checklist using NVIDIA perpetual closing prices and average volume. Explain additional checks when the underlying stock market is closed.",
+  "请设计回踩 20 周期均线后的模拟入场规则，比较收盘确认和盘中触及，列出失效条件。": "Design simulated entries after a 20-period moving-average retest. Compare closing confirmation with intrabar touches and define invalidation.",
+  "请围绕近 20 根 K 线的高低区间制定观察计划，区分接近边缘和已经突破两种情况。": "Plan observations around the last 20 candles' range, distinguishing approaching an edge from breaking through it.",
+  "请为特斯拉永续制定波动观察计划，区分活跃时段和低成交量时段，说明哪些情况下应继续等待。": "Plan Tesla perpetual volatility observations. Distinguish active and low-volume sessions and identify when to wait.",
+  "请为黄金永续设计基于已收盘 K 线的趋势过滤条件，列出需要的历史样本与风险约束。": "Design closed-candle trend filters for gold perpetuals. List required history and risk limits."
 };
 export const chromeLabels={
   "YOUR MARKET, IN CONTEXT": "市场判断，尽在掌握",

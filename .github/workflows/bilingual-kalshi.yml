@@ -28,11 +28,14 @@ jobs:
           sudo apt-get install -y -qq fonts-noto-cjk
       - name: Bilingual desktop and mobile fixtures
         run: |
-          node scripts/check-bilingual-ui.mjs
-          node scripts/check-kalshi-ui.mjs
-          node scripts/check-prediction-ui.mjs
-          node scripts/check-polymarket-purchase-ui.mjs
+          fixture_failures=0
+          node scripts/check-bilingual-ui.mjs || fixture_failures=1
+          node scripts/check-kalshi-ui.mjs || fixture_failures=1
+          node scripts/check-prediction-ui.mjs || fixture_failures=1
+          node scripts/check-polymarket-purchase-ui.mjs || fixture_failures=1
+          exit $fixture_failures
       - name: Kalshi replay guard in actual Workers SQLite
+        if: always()
         run: |
           npm install --prefix "$RUNNER_TEMP/kalshi-worker" --no-audit --no-fund miniflare@4
           node scripts/check-kalshi-worker.mjs
