@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,verify,constants} from 'node:crypto';
 import {kalshiPreview,kalshiOrder,checkKalshiOrder,receiptState,recoverKalshiFills,kalshiJournal,assertKalshiClear} from './kalshi-core.js';
-import {importKalshiKey,executeKalshi,createKalshiSession} from './kalshi-client.js';
+import {importKalshiKey,executeKalshi,createKalshiSession,reconcileKalshi} from './kalshi-client.js';
 import {kalshiService} from './kalshi-service.js';
 const owner='0x'+'1'.repeat(40),keyId='00000000-0000-4000-8000-000000000001',accountHash='a'.repeat(64),clientId='00000000-0000-4000-8000-000000000002';
 const market={ticker:'KXEVENT-YES',event_ticker:'KXEVENT',title:'Fixture: event?',status:'active',close_time:'2027-01-01T00:00:00Z',exchange_index:0};
@@ -13,7 +13,7 @@ const packet=(body)=>new Request('https://oasis.test/api/kalshi/account',{method
 const user=async()=>Response.json({id:'fixture-google',active:true});
 test('Kalshi FOK previews preserve integer caps and NO uses complementary YES ask',()=>{
  const q=quote();assert.equal(q.maxSpendAtomic,'4190000');assert.equal(q.feeReserveAtomic,'190000');assert.equal(kalshiOrder(q,clientId).side,'bid');
- const no=quote({outcome:'no'}),order=kalshiOrder(no,clientId);assert.equal(order.side,'ask');assert.equal(order.price,'0.6');assert.equal(order.time_in_force,'fill_or_kill');
+ const no=quote({outcome:'no'}),order=kalshiOrder(no,clientId);assert.equal(order.side,'ask');assert.equal(order.price,'0.6000');assert.equal(order.time_in_force,'fill_or_kill');
  assert.throws(()=>checkKalshiOrder({...order,price:'0.59'},no));assert.throws(()=>checkKalshiOrder({...order,time_in_force:'good_till_canceled'},no));
 });
 test('unknown fees, deadlines, exchange shards and incomplete depth fail closed',()=>{
@@ -87,4 +87,13 @@ test('modern order recovery verifies every fill, NO complement, fees and origina
  for(const f of [{...fill,fee_cost:'10'},{...fill,order_id:keyId},{...fill,no_price_dollars:'0.5'},{...fill,count_fp:'9'},{...fill,is_taker:false}])assert.equal(recoverKalshiFills(order,[f],q,clientId),null);
  assert.equal(recoverKalshiFills(order,[fill,fill],q,clientId),null);assert.equal(recoverKalshiFills({...order,status:'resting'},[fill],q,clientId),null);
  const no=quote({outcome:'no'});assert.equal(recoverKalshiFills({...order,outcome_side:'no',book_side:'ask'},[{...fill,outcome_side:'no',book_side:'ask',yes_price_dollars:'0.6',no_price_dollars:'0.4'}],no,clientId).spent,'4.168');
+});
+
+test('read-only recovery keeps incomplete evidence held and reconciles expired quotes by exact fill IDs',async()=>{
+ const s=storage(),q=quote({at:Date.now()-60000,expiresAt:Date.now()-30000}),j=kalshiJournal(s,accountHash);
+ j.save({owner,clientId,terminal:false,status:'unknown',at:Date.now()-60000,quote:q,message:'fixture pending'});
+ const order={order_id:clientId,client_order_id:clientId,ticker:q.ticker,exchange_index:0,subaccount_number:0,outcome_side:'yes',book_side:'bid',initial_count_fp:'10.00',fill_count_fp:'10.00',remaining_count_fp:'0.00',status:'executed'};
+ let complete=false,reads=0;const session={accountHash,current:async()=>{},orders:async args=>{reads++;assert.equal(args.ticker,q.ticker);return {orders:[order]};},fills:async args=>{assert.equal(args.order_id,clientId);return {fills:[{fill_id:'read-fixture',order_id:clientId,ticker:q.ticker,exchange_index:0,subaccount_number:0,outcome_side:'yes',book_side:'bid',count_fp:complete?'10.00':'9.00',yes_price_dollars:'0.4',no_price_dollars:'0.6',fee_cost:'0.168',is_taker:true}],cursor:null};},submit:()=>assert.fail('recovery attempted submission')};
+ assert.equal((await reconcileKalshi({session,storage:s})).terminal,false);complete=true;
+ const result=await reconcileKalshi({session,storage:s});assert.equal(result.status,'filled');assert.equal(result.spent,'4.168');assert.equal(reads,2);
 });

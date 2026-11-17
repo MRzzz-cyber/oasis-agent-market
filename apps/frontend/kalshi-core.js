@@ -31,7 +31,7 @@ export function checkKalshiQuote(q,now=Date.now()){
 }
 export function kalshiOrder(q,clientId,now=Date.now()){
  checkKalshiQuote(q,now);check(uuid.test(clientId||''),'客户订单号无效');const yesPrice=q.outcome==='yes'?BigInt(q.limitAtomic):SCALE-BigInt(q.limitAtomic);
- return {ticker:q.ticker,side:q.outcome==='yes'?'bid':'ask',count:q.count,price:display(yesPrice),time_in_force:'fill_or_kill',self_trade_prevention_type:'taker_at_cross',client_order_id:clientId,subaccount:0,exchange_index:q.exchangeIndex};
+ return {ticker:q.ticker,side:q.outcome==='yes'?'bid':'ask',count:q.count,price:'0.'+(yesPrice/100n).toString().padStart(4,'0'),time_in_force:'fill_or_kill',self_trade_prevention_type:'taker_at_cross',client_order_id:clientId,subaccount:0,exchange_index:q.exchangeIndex};
 }
 export function checkKalshiOrder(body,q,now=Date.now()){const expected=kalshiOrder(q,body?.client_order_id,now);check(exact(body,Object.keys(expected))&&Object.keys(expected).every(k=>body[k]===expected[k]),'订单与确认的盘口、结果、金额或限价不匹配');return expected;}
 export function receiptState(reply,q,clientId){

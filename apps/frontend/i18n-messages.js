@@ -967,7 +967,20 @@ export const messages={
   "这次准备买入多少 ETH？": "How much ETH would you like to buy?",
   "接下来，你想了解什么？": "What would you like to explore next?",
   "主网现货": "Mainnet spot",
-  "费用另计": "Fees extra"
+  "费用另计": "Fees extra",
+  "Google 登录尚未配置完成": "Google login is not configured",
+  "尝试次数过多，请在 15 分钟后再试": "Too many attempts. Try again in 15 minutes.",
+  "私人体验码不正确": "Incorrect access code",
+  "请输入体验码": "Enter your access code",
+  "管理员尚未设置体验码": "The administrator has not set an access code",
+  "请求来源无效": "Invalid request origin",
+  "接口不存在": "Endpoint not found",
+  "无效的订单保留请求": "Invalid order reservation",
+  "今日请求数量已达上限": "Daily request limit reached",
+  "原请求已存在": "Original request already exists",
+  "翻译额度已达上限": "Translation limit reached",
+  "请先登录": "Log in first",
+  "成交查询订单号无效": "Invalid fill-query order ID"
 };
 export const chromeLabels={
   "YOUR MARKET, IN CONTEXT": "市场判断，尽在掌握",
