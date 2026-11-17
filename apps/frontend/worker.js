@@ -1,3 +1,4 @@
+import {bridgeService} from './crosschain-service.js';
 import {localizePrediction} from './prediction-localization.js';
 import {kalshiService} from './kalshi-service.js';
 import {purchaseService,purchaseConfigured} from './polymarket-purchase-service.js';
@@ -13,7 +14,7 @@ import {account,authRoute,googleMode} from './auth.js';
 import {advisorRequest,normalizeAdvisorStream} from './advisor-stream.js';
 export {AccountStore} from './auth.js';
 const SYSTEM_PROMPT=[
- '预测市场当前版本只支持 Polymarket，不支持 Kalshi 或跨平台比价。主路径是简单对话、发现真实事件、选择结果、准备资金、核对价格、用户确认买入。首页和对话卡片展示实时读取的热门盘口，每60秒刷新，可搜索和换一批；点击结果直接进入站内买入，无需选择平台。先围绕用户关心的事件说明事实、规则和不确定性，回复简短并引导用户在卡片选择，不要强迫填写完整策略。没有实时工具结果不能编造盘口、概率或收益。Polymarket 使用 Polygon pUSD 交易账户余额，不是 Oasis 钱包的 Arbitrum USDC。余额不足时使用卡片内充值地址、收款码和刷新余额；当前不自动跨链或兑换，也不在聊天索取私钥。必须核对最多支付、最高成交单价、最低份额和费用预留。首次可能需要认证、创建或恢复平台交易账户、本次金额授权和订单签名，原 Oasis 钱包地址保持不变。只有用户显式确认才能提交 FOK 买入，未能全部成交则取消。未知回执保留并禁止重试，不把订单接收认作成交。保留 ETH 的 Arbitrum 钱包原生 USDC 现货路径，与预测市场分别核对资金。',
+ '预测市场当前版本只支持 Polymarket，不支持 Kalshi 或跨平台比价。主路径是简单对话、发现真实事件、选择结果、准备资金、核对价格、用户确认买入。首页和对话卡片展示实时读取的热门盘口，每60秒刷新，可搜索和换一批；点击结果直接进入站内买入，无需选择平台。先围绕用户关心的事件说明事实、规则和不确定性，回复简短并引导用户在卡片选择，不要强迫填写完整策略。没有实时工具结果不能编造盘口、概率或收益。Polymarket 使用 Polygon pUSD 交易账户余额，不是 Oasis 钱包的 Arbitrum USDC。余额不足时使用卡片内充值地址、收款码和刷新余额；当前支持通过站内跨链卡片，将 Arbitrum、Base、Optimism 的原生 USDC 经 Polymarket 官方桥自动转换为 Polygon pUSD；先展示金额、预计到账、费用和时间，再由用户确认转账。到账为预估，充值金额与买入预算分开核对。源转账成功不等于跨链完成，未知请求保留且禁止重试；实际到账后刷新原盘口价格再由用户确认买入。不要在聊天索取私钥。必须核对最多支付、最高成交单价、最低份额和费用预留。首次可能需要认证、创建或恢复平台交易账户、本次金额授权和订单签名，原 Oasis 钱包地址保持不变。只有用户显式确认才能提交 FOK 买入，未能全部成交则取消。未知回执保留并禁止重试，不把订单接收认作成交。保留 ETH 的 Arbitrum 钱包原生 USDC 现货路径，与预测市场分别核对资金。',
  '你是 Oasis AI 交易助手，按界面所选语言回答。ETH 现货购买入口是 Arbitrum One 钱包直接兑换：使用当前 Rabby、MetaMask 或已有 Oasis 钱包中的原生 USDC，通过 Uniswap V3 直连 USDC/WETH 池兑换并解包为 ETH，ETH 回到同一个钱包。',
  '购买流程：选择金额，核对网络与价格，点击购买，在钱包确认，查看回执。只需要钱包余额和用于网络费的少量 ETH，不需要 Hyperliquid 余额、充值、划转、API 会话或交易代理。不把旧 Hyperliquid UETH 报价当作当前兑换报价。',
  '首次如果 USDC 额度不足，需要用户在钱包确认两笔交易：仅授权本次金额，再确认兑换。已有足够额度就只确认兑换。不能承诺首次只有一个钱包弹窗，不申请无限额度。界面固定 0.5% 滑点保护，展示预计 ETH、最低 ETH、网络费和同钱包收款地址。',
@@ -39,7 +40,8 @@ async function secureEqual(a,b){const encoder=new TextEncoder(),[x,y]=await Prom
 export default {async fetch(request,env,ctx){const url=new URL(request.url);
  if(['/api/harness/events','/api/admin/metrics','/api/admin/metrics/prometheus'].includes(url.pathname))return harnessMetricsRoute(request,env);
  if(['/admin','/admin/','/admin.html'].includes(url.pathname)){if(request.method!=='GET')return respond({error:'后台页面只支持 GET'},405);const asset=await env.ASSETS.fetch(new Request(new URL('/admin',url),request)),headers=new Headers(asset.headers);headers.set('cache-control','no-store');headers.set('x-frame-options','DENY');headers.set('referrer-policy','no-referrer');headers.set('content-security-policy',"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");return new Response(asset.body,{status:asset.status,headers});}
- if(url.pathname==='/api/release'&&request.method==='GET')return respond({version:'native-mainnet-v15-20261116',purchaseFlow:'arbitrum-wallet-swap-v17',purchaseUI:'wallet-card-v18',predictionResearch:'prediction-v2',predictionDiscovery:'prediction-discovery-v1',languages:'zh-en-v1',kalshi:'recovery-only',predictionUI:'polymarket-focus-v1',predictionProviders:['polymarket'],predictionTrading:purchaseConfigured(env),predictionPurchase:'polymarket-purchase-v1',observability:'harness-metrics-v1',execution:'arbitrum-uniswap-v3',inputBalance:'wallet',defaultTestBudget:'20'});
+ if(url.pathname==='/api/release'&&request.method==='GET')return respond({version:'native-mainnet-v15-20261116',purchaseFlow:'arbitrum-wallet-swap-v17',purchaseUI:'wallet-card-v18',predictionResearch:'prediction-v2',predictionDiscovery:'prediction-discovery-v1',languages:'zh-en-v1',kalshi:'recovery-only',predictionUI:'polymarket-focus-v1',predictionFunding:'polymarket-bridge-v1',predictionProviders:['polymarket'],predictionTrading:purchaseConfigured(env),predictionPurchase:'polymarket-purchase-v1',observability:'harness-metrics-v1',execution:'arbitrum-uniswap-v3',inputBalance:'wallet',defaultTestBudget:'20'});
+ if(url.pathname.startsWith('/api/predictions/bridge/'))return bridgeService(request,env);
  if(url.pathname==='/api/predictions/localize')return localizePrediction(request,env);
  if(url.pathname.startsWith('/api/kalshi/'))return kalshiService(request,env,{readOnly:true});
  if(['/api/predictions/trading-status','/api/predictions/relay'].includes(url.pathname))return purchaseService(request,env);

@@ -4,7 +4,7 @@ async function patch(path,from,to){let s=await readFile(path,'utf8');if(s.includ
 await patch('apps/frontend/funding-core.js',"import {assertKalshiClear}","import {assertCrosschainClear} from './crosschain-core.js';\nimport {assertKalshiClear}");
 await patch('apps/frontend/funding-core.js','export function assertFundingClear(storage,user){','export function assertFundingClear(storage,user){\n assertCrosschainClear(storage,user);');
 await patch('apps/frontend/account-wallet.js',"import {POLYGON,canonical", "import {SOURCES,checkBridgeTx,bridgeRead,checkBridgeQuote} from './crosschain-core.js';\nimport {POLYGON,canonical");
-await patch('apps/frontend/account-wallet.js','armedPrediction=null;','armedPrediction=null,armedBridge=null;');
+await patch('apps/frontend/account-wallet.js','armedSwap=null,armedPrediction=null;','armedSwap=null,armedPrediction=null,armedBridge=null;');
 await patch('apps/frontend/account-wallet.js',"  armPredictionSignature(typed,context)",`  async armCrosschainTransfer(quote,attestation){checkBridgeQuote(quote);if(!isCurrent()||quote.owner!==address.toLowerCase())throw Error('跨链钱包不匹配');await session();const r=await fetch('/api/predictions/bridge/verify',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({quote,attestation})});const p=await r.json();if(!r.ok||p.verified!==true)throw Error(p.error||'跨链预览核对失败');if(!isCurrent())throw Error('跨链钱包会话已变化');armedBridge=structuredClone(quote);},
   armPredictionSignature(typed,context)`);
 await patch('apps/frontend/account-wallet.js','[ARBITRUM,POLYGON].some','[ARBITRUM,POLYGON,...Object.values(SOURCES).map(s=>s.chain)].some');
