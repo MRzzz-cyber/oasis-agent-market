@@ -3,7 +3,7 @@ on:
   push:
     branches: [feat/prediction-crosschain-funding]
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: crosschain-funding
   cancel-in-progress: true
@@ -16,17 +16,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply integration and commit concrete source for review
-        run: |
-          node scripts/prepare-crosschain.mjs
-          git add apps/frontend/funding-core.js apps/frontend/account-wallet.js apps/wallet-ui/polymarket-purchase-sdk.js apps/frontend/worker.js apps/frontend/polymarket-purchase.js apps/frontend/i18n-messages.js apps/frontend/crosschain-core.js apps/frontend/crosschain-service.js apps/frontend/crosschain-ui.js scripts/integrate-crosschain.mjs AGENTS.md
-          if ! git diff --cached --quiet; then
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Integrate reviewed crosschain funding into guards, Worker and purchase card'
-            git push origin HEAD:feat/prediction-crosschain-funding
-          fi
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Regression and bridge policy tests
         run: |
+          node --check apps/frontend/crosschain-ui.js
+          node --check apps/frontend/polymarket-purchase.js
           if npm test > "$RUNNER_TEMP/bridge-tests.txt" 2>&1; then tail -n 12 "$RUNNER_TEMP/bridge-tests.txt"; else rg -A 24 'not ok|error:|failureType:' "$RUNNER_TEMP/bridge-tests.txt"; exit 1; fi
       - name: Build wallet and Worker
         run: |
@@ -38,10 +32,12 @@ jobs:
           sudo apt-get install -y -qq fonts-noto-cjk
       - name: Desktop mobile and purchase regression fixtures
         run: |
-          node scripts/check-crosschain-ui.mjs
-          node scripts/check-polymarket-purchase-ui.mjs
-          node scripts/check-prediction-conversation.mjs
-          node scripts/check-bilingual-ui.mjs
+          failures=0
+          node scripts/check-crosschain-ui.mjs || failures=1
+          node scripts/check-polymarket-purchase-ui.mjs || failures=1
+          node scripts/check-prediction-conversation.mjs || failures=1
+          node scripts/check-bilingual-ui.mjs || failures=1
+          exit $failures
       - name: Public supported assets and estimate only
         run: |
           node --input-type=module <<'JS'
