@@ -1,5 +1,5 @@
 import {nativeTrade} from './mainnet-trade.js?v=native-mainnet-v15-20261116';
-import {predictionCards,predictionIntent} from './prediction-cards.js?v=prediction-v1';
+import {predictionCards,predictionIntent} from './prediction-cards.js?v=discovery-v1';
 import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=native-mainnet-v15-20261116';
 import {renderAccountButton} from "./account-avatar.js?v=native-mainnet-v15-20261116";
 import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=native-mainnet-v15-20261116";
@@ -514,7 +514,7 @@ async function sendToRealModel() {
 function renderChatChoices() {
   const actions=$("chat-next-actions");actions.replaceChildren();
   if(chatBusy || !state.conversation.length)return;
-  if(predictionIntent(state.conversation)){const b=node('button','reply-option','查看预测市场盘口与成本');b.type='button';b.onclick=showPredictionMarkets;actions.append(b);showPredictionMarkets();return;}
+  if(predictionIntent(state.conversation)){const b=node('button','reply-option','发现预测盘口 · 比较平台');b.type='button';b.onclick=showPredictionMarkets;actions.append(b);showPredictionMarkets();return;}
   const guide=conversationGuide(state.conversation);
   const progress=node("div","guide-progress");
   for(const [step,label] of [["research","行情研究"],["plan","确认计划"],["funds","准备资金"]]){const item=node("span",step===guide.stage?"active":"",label);if(step===guide.stage)item.setAttribute("aria-current","step");progress.append(item);}

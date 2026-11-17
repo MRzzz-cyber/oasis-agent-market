@@ -1,0 +1,40 @@
+name: Prediction discovery acceptance
+on:
+  push:
+    branches: [feat/prediction-discovery-compare]
+permissions:
+  contents: read
+concurrency:
+  group: prediction-discovery
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Discovery and existing purchase browser fixtures
+        run: |
+          node scripts/check-prediction-ui.mjs
+          node scripts/check-polymarket-purchase-ui.mjs
+      - name: Read-only live discovery, comparison and Workers runtime
+        run: |
+          npm install --prefix "$RUNNER_TEMP/discovery-worker" --no-audit --no-fund miniflare@4
+          node scripts/check-prediction-discovery.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prediction-discovery-fixtures
+          path: |
+            ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/polymarket-purchase-ui/*.png
+          if-no-files-found: ignore
