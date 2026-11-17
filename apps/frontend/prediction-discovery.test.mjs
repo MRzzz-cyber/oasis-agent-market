@@ -12,7 +12,7 @@ test('discovery preserves public event identity and never invents nonbinary outc
  for(const overrides of [{closed:true},{acceptingOrders:false},{outcomes:'["No","Yes"]'},{outcomes:'["A","B","C"]'},{outcomes:'invalid'}])assert.equal(normalizeDiscoveryMarket({...raw,...overrides}),null);
 });
 test('feed excludes closed events, deduplicates and takes one active binary market per event',async()=>{
- let requests=0;const p=await discoverPredictions({now:1000,fetchImpl:async(u,init)=>{requests++;const url=new URL(u);assert.equal(url.hostname,'gamma-api.polymarket.com');assert.equal(url.searchParams.get('closed'),'false');assert.equal(url.searchParams.get('order'),'volume24hr');assert.equal(init.redirect,'manual');return reply([{id:'e',markets:[raw,{...raw,id:'124',volume24hr:1}]},{id:'duplicate',markets:[raw]},{id:'closed',closed:true,markets:[{...raw,id:'125'}]}]);}});
+ let requests=0;const p=await discoverPredictions({now:1000,fetchImpl:async(u,init)=>{requests++;const url=new URL(u);assert.equal(url.hostname,'gamma-api.polymarket.com');assert.equal(url.searchParams.get('closed'),'false');assert.equal(init.headers['accept-encoding'],'gzip');assert.equal(url.searchParams.get('order'),'volume24hr');assert.equal(init.redirect,'manual');return reply([{id:'e',markets:[raw,{...raw,id:'124',volume24hr:1}]},{id:'duplicate',markets:[raw]},{id:'closed',closed:true,markets:[{...raw,id:'125'}]}]);}});
  assert.equal(requests,1);assert.equal(p.markets.length,1);assert.equal(p.refreshAfterSeconds,60);assert.equal(p.at,new Date(1000).toISOString());assert.match(p.coverage,/不是全站/);
 });
 test('malformed feeds fail without fabricated fixtures',async()=>{await assert.rejects(discoverPredictions({fetchImpl:async()=>reply({markets:[]})}));});
