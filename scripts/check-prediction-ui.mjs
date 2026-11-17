@@ -26,6 +26,8 @@ try{
    else{
     fail(card.querySelectorAll('.prediction-quote').length===2,'missing venue quotes');fail(card.textContent.includes('未核验等价'),'similarity presented as equivalence');fail(card.textContent.includes('截止时间不同'),'rule difference hidden');
     fail(card.querySelector('[data-provider=kalshi] .prediction-quote a')?.hostname==='kalshi.com','Kalshi destination missing');fail(!card.textContent.includes('推荐最低'),'unverified winner');
+    if(mode==='stale')fail(card.querySelector('.prediction-choose-venue').disabled,'stale quote enabled purchase');
+    if(mode==='expired'){await wait(()=>card.querySelector('.prediction-choose-venue').disabled);fail(card.textContent.includes('报价已过期'),'expiry not explained');}
     if(mode==='choose'){card.querySelector('.prediction-choose-venue').click();await wait(()=>card.querySelector('.prediction-purchase'));fail(walletWrites===0,'choosing venue signed');}
     if(mode==='change'){
      const shares=card.querySelector('.prediction-amount input');shares.value='20';shares.dispatchEvent(new Event('input'));fail(!card.querySelector('.prediction-quote strong'),'stale price retained');fail(!card.querySelector('.prediction-choose-venue'),'stale platform action retained');card.querySelector('.prediction-amount button').click();await wait(()=>!card.querySelector('.prediction-amount button').disabled);fail(card.textContent.includes('20 份卖盘小计'),'new amount not quoted');
@@ -44,14 +46,14 @@ const server=createServer(async(req,res)=>{try{const u=new URL(req.url,'http://l
  if(u.pathname==='/api/predictions/discover'){if(mode==='error'){res.statusCode=502;json({error:'平台响应超时'});}else json({at:new Date().toISOString(),markets:mode==='empty'?[]:Array.from({length:12},(_,i)=>({...market,id:String(123+i),question:market.question+' · fixture '+i}))});return;}
  if(u.pathname==='/api/predictions/search'){json({at:new Date().toISOString(),providers:[{provider:'polymarket',markets:[market],coverage:'Fixture'},{provider:'kalshi',markets:[],error:'平台响应超时',coverage:'Fixture'}]});return;}
  if(u.pathname==='/api/predictions/compare'){const selected={...market,id:u.searchParams.get('id')};json({source:selected,outcome:u.searchParams.get('outcome'),providers:[{provider:'polymarket',markets:[selected],coverage:'Fixture'},{provider:'kalshi',markets:mode==='partial'?[]:[other],coverage:'Fixture',...(mode==='partial'?{error:'平台响应超时'}:{})}]});return;}
- if(u.pathname==='/api/predictions/quote'){const provider=u.searchParams.get('provider'),shares=u.searchParams.get('shares');json({market:{...(provider==='polymarket'?market:other),id:u.searchParams.get('id')},outcome:u.searchParams.get('outcome'),subtotal:String(Number(shares)*.4),averagePrice:'0.4',requested:shares,filled:shares,depthEnough:true,minimumMet:true,sourceStale:false,receivedAt:Date.now(),expiresAt:Date.now()+30000});return;}
+ if(u.pathname==='/api/predictions/quote'){const provider=u.searchParams.get('provider'),shares=u.searchParams.get('shares');json({market:{...(provider==='polymarket'?market:other),id:u.searchParams.get('id')},outcome:u.searchParams.get('outcome'),subtotal:String(Number(shares)*.4),averagePrice:'0.4',requested:shares,filled:shares,depthEnough:true,minimumMet:true,sourceStale:mode==='stale',receivedAt:Date.now(),expiresAt:Date.now()+(mode==='expired'?200:30000)});return;}
  if(u.pathname==='/api/predictions/trading-status'){json({enabled:false});return;}
  if(u.pathname==='/fixture'){res.setHeader('content-type','text/html; charset=utf-8');res.end(fixture);return;}
  const p=resolve(root,'.'+u.pathname);if(!p.startsWith(root+'/')){res.writeHead(403).end();return;}res.setHeader('content-type',extname(p)==='.js'?'application/javascript':'text/css');res.end(await readFile(p));
  }catch{res.writeHead(404).end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));
-try{for(const width of [1280,390])for(const mode of ['feed','search','compare','partial','error','empty','choose','change','back']){
- const instrument=fixture.replace('window.requestCounts.quote>0','window.requestCounts.quote>0');
+try{for(const width of [1280,390])for(const mode of ['feed','search','compare','partial','error','empty','choose','change','back','stale','expired']){
+ 
  const url='http://127.0.0.1:'+server.address().port+'/fixture?mode='+mode,shot=join(out,width+'-'+mode+'.png');
  const r=await new Promise((resolve,reject)=>{const child=spawn(process.env.CHROME_BIN||'/usr/bin/google-chrome',['--headless','--no-sandbox','--disable-gpu','--hide-scrollbars','--virtual-time-budget=15000','--window-size='+width+',1800','--screenshot='+shot,'--dump-dom',url],{stdio:['ignore','pipe','pipe']});let text='';child.stdout.on('data',b=>text+=b);child.stderr.resume();child.on('error',reject);child.on('close',code=>resolve({code,text}));});
- assert.equal(r.code,0);assert.match(r.text,/name="prediction-ui-result" content="pass"/,'Browser '+width+' '+mode+': '+r.text.slice(-4000));console.log('PASS discovery UI',width,mode);
+ assert.equal(r.code,0);assert.ok(/name="prediction-ui-result" content="pass"/.test(r.text),'Browser '+width+' '+mode+': '+(r.text.match(/name="prediction-ui-result" content="([^"]+)/)?.[1]||r.text.slice(-1000)));console.log('PASS discovery UI',width,mode);
 }}finally{server.close();}

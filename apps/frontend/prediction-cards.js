@@ -14,7 +14,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  const header=el('header',null,'prediction-header'),heading=el('div');heading.append(el('span','OASIS / PREDICTIONS','prediction-eyebrow'),el('h3','下一件大事，你怎么看？'),el('p','发现正在发生的事件，比较平台，再做选择。','prediction-muted'));
  const live=el('span','每 60 秒刷新','prediction-live');header.append(heading,live);root.append(css,header);
  const discovery=el('div'),form=el('form',null,'prediction-search'),query=el('input');query.type='search';query.maxLength=120;query.placeholder='找一个事件，例如 Bitcoin、NBA、Fed…';query.setAttribute('aria-label','搜索预测事件');
- const submit=el('button','搜索');submit.type='submit';form.append(query,submit);discovery.append(form);
+ const submit=el('button','搜索');submit.type='submit';submit.disabled=true;form.append(query,submit);discovery.append(form);
  const toolbar=el('div',null,'prediction-toolbar'),presets=el('div',null,'prediction-presets'),shuffle=button('换一批 ↻','prediction-shuffle');
  let activeTopic='热门';
  for(const [label,term] of [['热门',''],['加密','Bitcoin'],['体育','NBA'],['科技','AI'],['宏观','Fed']]){
@@ -23,11 +23,12 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  toolbar.append(presets,shuffle);discovery.append(toolbar);
  const status=el('p','正在发现真实盘口…','prediction-muted prediction-feed-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
  const results=el('div',null,'prediction-results'),selected=el('div',null,'prediction-selected');discovery.append(status,results);root.append(discovery,selected);
- let disposed=false,feedGeneration=0,selectionGeneration=0,quoteGeneration=0,feedController=null,compareController=null,quoteController=null,pool=[],visible=[],source=null,comparison=null,purchase=null,loading=false,feedMode=true,feedStamp=null;
+ let disposed=false,feedGeneration=0,selectionGeneration=0,quoteGeneration=0,feedController=null,compareController=null,quoteController=null,pool=[],visible=[],source=null,comparison=null,purchase=null,loading=false,feedMode=true,feedStamp=null,expiryTimer=null;
  const selectedMarkets=new Map(),selectedOutcomes=new Map();
  async function request(path,signal){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)])});let data;try{data=await r.json();}catch{throw Error('服务暂时不可用，请稍后重试');}if(!r.ok&&!Array.isArray(data.providers))throw Error(data.error||'平台数据暂不可用');return data;}
+ function clearExpiry(){clearTimeout(expiryTimer);expiryTimer=null;}
  function disposePurchase(){purchase?.dispose?.();purchase=null;selected.querySelector('.prediction-purchase-host')?.replaceChildren();}
- function closeComparison(){selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();discovery.hidden=false;live.textContent='每 60 秒刷新';}
+ function closeComparison(){clearExpiry();selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();discovery.hidden=false;live.textContent='每 60 秒刷新';}
  function marketCard(m){
   const card=el('article',null,'prediction-market'),top=el('div',null,'prediction-market-top');top.append(el('span',marketTopic(m.question),'prediction-topic'),el('small',venue(m.provider),'prediction-muted'));
   const title=button(m.question,'prediction-market-title');title.onclick=()=>openComparison(m,'yes');
@@ -57,14 +58,14 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  shuffle.onclick=()=>feedMode?(pool.length?rotate():loadFeed()):runSearch();
  function rules(m){const d=el('details',null,'prediction-rules');d.append(el('summary','事件定义与结算规则'),el('p',m.description||'规则尚未获取，请在平台核对。'),el('p','结算来源：'+(m.resolutionSource||'待核实')),sourceLink(m));return d;}
  async function openComparison(m,outcome){
-  feedGeneration++;feedController?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;quoteGeneration++;quoteController?.abort();compareController?.abort();disposePurchase();
+  clearExpiry();feedGeneration++;feedController?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;quoteGeneration++;quoteController?.abort();compareController?.abort();disposePurchase();
   source=m;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();const ticket=++selectionGeneration;compareController=new AbortController();discovery.hidden=true;live.textContent='跨平台报价';selected.replaceChildren();
   const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;const title=el('h3',m.question);selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),title,el('p','正在查找 Polymarket / Kalshi 的相关盘口…','prediction-compare-status'));
   try{const payload=await request('/api/predictions/compare?'+new URLSearchParams({provider:m.provider,id:m.id,outcome,shares:'10'}),compareController.signal);if(ticket!==selectionGeneration||disposed)return;comparison=payload;for(const p of payload.providers)if(p.markets.length){selectedMarkets.set(p.provider,p.markets[0]);selectedOutcomes.set(p.provider,outcome);}renderComparison();loadQuotes();}
   catch(error){if(ticket===selectionGeneration&&!disposed&&error.name!=='AbortError'){selected.querySelector('.prediction-compare-status').textContent=error.message||'比价暂不可用';const retry=button('重新比价');retry.onclick=()=>openComparison(m,outcome);selected.append(retry);}}
  }
  let sharesInput=null,quoteButton=null,quoteStatus=null;
- function invalidatePurchase(){disposePurchase();quoteGeneration++;quoteController?.abort();selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren(el('p','选择已变化，正在重新读取报价…','prediction-muted')));}
+ function invalidatePurchase(){clearExpiry();disposePurchase();quoteGeneration++;quoteController?.abort();selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren(el('p','选择已变化，正在重新读取报价…','prediction-muted')));}
  function renderComparison(){
   selected.replaceChildren();const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),el('h3',comparison.source.question));
   const notice=el('p','自动查找相关盘口。请核对事件、YES/NO 定义、截止时间与结算规则；相似标题不代表同一合约。','prediction-match-note');selected.append(notice);
@@ -86,7 +87,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  }
  async function loadQuotes(){
   if(!comparison||disposed)return;const shares=sharesInput.value;if(!/^\d+$/.test(shares)||Number(shares)<1||Number(shares)>100000){quoteStatus.textContent='请输入 1–100000 的整数份额。';invalidatePurchase();return;}
-  disposePurchase();quoteController?.abort();quoteController=new AbortController();const signal=quoteController.signal,ticket=++quoteGeneration,selectionTicket=selectionGeneration;
+  clearExpiry();disposePurchase();quoteController?.abort();quoteController=new AbortController();const signal=quoteController.signal,ticket=++quoteGeneration,selectionTicket=selectionGeneration;
   quoteButton.disabled=true;quoteStatus.textContent='正在读取各平台卖盘…';
   const chosen=[...selectedMarkets.entries()].map(([id,m])=>({id,m,outcome:selectedOutcomes.get(id)}));selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren(el('p','读取中…','prediction-muted')));
   const settled=await Promise.allSettled(chosen.map(async item=>{const q=await request('/api/predictions/quote?'+new URLSearchParams({provider:item.id,id:item.m.id,outcome:item.outcome,shares}),signal);if(q.market?.id!==item.m.id||q.market?.provider!==item.id||q.outcome!==item.outcome||String(q.requested)!==shares)throw Error('报价与当前选择不匹配，请刷新');return q;}));
@@ -106,10 +107,11 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
    }else box.append(sourceLink(m,'选择 Kalshi · 前往平台 ↗'),el('small','需 Kalshi 账户与平台余额；尚未接入站内下单。','prediction-muted'));
   }
   quoteButton.disabled=false;quoteStatus.textContent='报价已更新 · 各平台按同一份额、各自结果定义展示';
+  const deadlines=settled.filter(r=>r.status==='fulfilled').map(r=>Number(r.value.expiresAt)).filter(Number.isFinite);if(deadlines.length)expiryTimer=setTimeout(()=>{if(disposed||ticket!==quoteGeneration)return;selected.querySelectorAll('.prediction-choose-venue').forEach(b=>b.disabled=true);if(!purchase)quoteStatus.textContent='报价已过期，请刷新后选择平台。';},Math.max(0,Math.min(...deadlines)-Date.now()));
  }
  const changed=()=>{if(source){disposePurchase();quoteGeneration++;quoteController?.abort();if(quoteButton)quoteButton.disabled=false;if(quoteStatus)quoteStatus.textContent='钱包已变化，请刷新报价后继续。';selected.querySelectorAll('.prediction-choose-venue').forEach(b=>b.disabled=true);}};
  window.addEventListener('oasis:funds-updated',changed);
  const timer=setInterval(()=>{if(!disposed&&!source&&feedMode&&!document.hidden)loadFeed({background:true});},60000);
- root.dispose=()=>{disposed=true;feedGeneration++;selectionGeneration++;quoteGeneration++;feedController?.abort();compareController?.abort();quoteController?.abort();disposePurchase();clearInterval(timer);window.removeEventListener('oasis:funds-updated',changed);};
+ root.dispose=()=>{clearExpiry();disposed=true;feedGeneration++;selectionGeneration++;quoteGeneration++;feedController?.abort();compareController?.abort();quoteController?.abort();disposePurchase();clearInterval(timer);window.removeEventListener('oasis:funds-updated',changed);};
  queueMicrotask(()=>{if(!disposed)loadFeed();});return root;
 }

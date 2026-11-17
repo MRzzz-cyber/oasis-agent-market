@@ -27,6 +27,7 @@ jobs:
           node scripts/check-prediction-ui.mjs
           node scripts/check-polymarket-purchase-ui.mjs
       - name: Read-only live discovery, comparison and Workers runtime
+        if: always()
         run: |
           npm install --prefix "$RUNNER_TEMP/discovery-worker" --no-audit --no-fund miniflare@4
           node scripts/check-prediction-discovery.mjs
