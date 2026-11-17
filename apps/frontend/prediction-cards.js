@@ -1,3 +1,6 @@
+import {bindMarketTitle} from './market-language.js';
+import {kalshiPurchase} from './kalshi-purchase.js';
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {polymarketPurchase} from './polymarket-purchase.js';
 import {predictionIntent} from './prediction-core.js';
 import {shuffledMarkets,marketTopic} from './prediction-discovery.js';
@@ -5,8 +8,8 @@ export {predictionIntent};
 const el=(tag,value,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(value==null?{}:{textContent:String(value)})});
 const venue=id=>id==='polymarket'?'Polymarket':'Kalshi';
 const cents=v=>v==null?'—':(Number(v)*100).toFixed(1)+'¢';
-const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
-const compact=v=>{const n=Number(v);return Number.isFinite(n)?Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(n):'—';};
+const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString(getLocale(),{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
+const compact=v=>{const n=Number(v);return Number.isFinite(n)?Intl.NumberFormat(getLocale(),{notation:'compact',maximumFractionDigits:1}).format(n):'—';};
 const button=(label,cls='')=>{const b=el('button',label,cls);b.type='button';return b;};
 function sourceLink(m,label='查看平台规则 ↗'){const a=el('a',label);try{const u=new URL(m.url);if(u.protocol==='https:'&&['polymarket.com','kalshi.com'].includes(u.hostname)){a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}}catch{}return a;}
 export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
@@ -31,7 +34,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  function closeComparison(){clearExpiry();selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();header.hidden=false;discovery.hidden=false;live.textContent='每 60 秒刷新';}
  function marketCard(m){
   const card=el('article',null,'prediction-market'),top=el('div',null,'prediction-market-top');top.append(el('span',m.topic||marketTopic(m.question),'prediction-topic'),el('small',venue(m.provider),'prediction-muted'));
-  const title=button(m.question,'prediction-market-title');title.onclick=()=>openComparison(m,'yes');
+  const title=button(m.question,'prediction-market-title');bindMarketTitle(title,m);title.onclick=()=>openComparison(m,'yes');
   const yes=m.outcomes.find(o=>o.key==='yes'),prob=Number(yes?.price),metric=el('div',null,'prediction-probability');
   metric.append(el('strong',yes?.price==null?'—':(prob*100).toFixed(0)+'%'),el('span','YES · 市场隐含概率'));
   const bar=el('div',null,'prediction-probability-bar'),fill=el('span');fill.style.width=(Number.isFinite(prob)?Math.max(0,Math.min(100,prob*100)):0)+'%';bar.append(fill);
@@ -56,28 +59,28 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  }
  form.onsubmit=e=>{e.preventDefault();activeTopic='搜索';presets.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));runSearch();};
  shuffle.onclick=()=>pool.length?rotate():(feedMode?loadFeed():runSearch());
- function rules(m){const d=el('details',null,'prediction-rules');d.append(el('summary','事件定义与结算规则'),el('p',m.description||'规则尚未获取，请在平台核对。'),el('p','结算来源：'+(m.resolutionSource||'待核实')),sourceLink(m));return d;}
+ function rules(m){const d=el('details',null,'prediction-rules');d.append(el('summary','事件定义与结算规则'),el('small','盘口英文原文'),el('p',m.question),el('p',m.description||'规则尚未获取，请在平台核对。'),el('p','结算来源：'+(m.resolutionSource||'待核实')),sourceLink(m));return d;}
  async function openComparison(m,outcome){
   clearExpiry();feedGeneration++;feedController?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;quoteGeneration++;quoteController?.abort();compareController?.abort();disposePurchase();
   source=m;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();const ticket=++selectionGeneration;compareController=new AbortController();header.hidden=true;discovery.hidden=true;live.textContent='跨平台报价';selected.replaceChildren();
-  const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;const title=el('h3',m.question);selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),title,el('p','正在查找 Polymarket / Kalshi 的相关盘口…','prediction-compare-status'));
+  const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;const title=bindMarketTitle(el('h3',m.question),m);selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),title,el('p','正在查找 Polymarket / Kalshi 的相关盘口…','prediction-compare-status'));
   try{const payload=await request('/api/predictions/compare?'+new URLSearchParams({provider:m.provider,id:m.id,outcome,shares:'10'}),compareController.signal);if(ticket!==selectionGeneration||disposed)return;comparison=payload;for(const p of payload.providers)if(p.markets.length){selectedMarkets.set(p.provider,p.markets[0]);selectedOutcomes.set(p.provider,outcome);}renderComparison();loadQuotes();}
   catch(error){if(ticket===selectionGeneration&&!disposed&&error.name!=='AbortError'){selected.querySelector('.prediction-compare-status').textContent=error.message||'比价暂不可用';const retry=button('重新比价');retry.onclick=()=>openComparison(m,outcome);selected.append(retry);}}
  }
  let sharesInput=null,quoteButton=null,quoteStatus=null;
  function invalidatePurchase(){clearExpiry();disposePurchase();quoteGeneration++;quoteController?.abort();selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren(el('p','选择已变化，正在重新读取报价…','prediction-muted')));}
  function renderComparison(){
-  selected.replaceChildren();const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),el('h3',comparison.source.question));
+  selected.replaceChildren();const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),bindMarketTitle(el('h3',comparison.source.question),comparison.source));
   const notice=el('p','自动查找相关盘口。请核对事件、YES/NO 定义、截止时间与结算规则；相似标题不代表同一合约。','prediction-match-note');selected.append(notice);
   const amount=el('div',null,'prediction-amount'),label=el('label','比较份额');sharesInput=el('input');sharesInput.type='number';sharesInput.min='1';sharesInput.max='100000';sharesInput.step='1';sharesInput.value='10';sharesInput.id='compare-shares-'+crypto.randomUUID();label.htmlFor=sharesInput.id;quoteButton=button('刷新报价');quoteButton.onclick=loadQuotes;amount.append(label,sharesInput,quoteButton);quoteStatus=el('p','正在读取相同份额的卖盘成本…','prediction-muted');quoteStatus.setAttribute('role','status');selected.append(amount,quoteStatus);
   sharesInput.oninput=()=>{invalidatePurchase();quoteButton.disabled=false;quoteStatus.textContent='份额已变化，请重新读取报价。';selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren());};
   const venues=el('div',null,'prediction-venues');for(const id of ['polymarket','kalshi']){
    const p=comparison.providers.find(x=>x.provider===id)||{provider:id,markets:[],coverage:'暂无数据'},block=el('section',null,'prediction-venue');block.dataset.provider=id;
-   const head=el('div',null,'prediction-venue-head');head.append(el('h4',venue(id)),el('span',id==='polymarket'?'站内买入':'前往平台交易','prediction-venue-tag'));block.append(head);
+   const head=el('div',null,'prediction-venue-head');head.append(el('h4',venue(id)),el('span',id==='polymarket'?'站内买入':'API 站内买入','prediction-venue-tag'));block.append(head);
    if(!p.markets.length){block.append(el('p',p.error||'本次范围内未找到相关盘口','prediction-empty'),el('small',p.coverage,'prediction-muted'));venues.append(block);continue;}
    const chooser=el('select');chooser.setAttribute('aria-label',venue(id)+' 盘口');for(const m of p.markets){const option=el('option',m.question);option.value=m.id;chooser.append(option);}chooser.value=selectedMarkets.get(id).id;chooser.hidden=p.markets.length===1;
    const marketBody=el('div',null,'prediction-venue-market'),quote=el('div',null,'prediction-quote');block.append(chooser,marketBody,quote);
-   function paintMarket(){const m=selectedMarkets.get(id);marketBody.replaceChildren(el('h4',m.question),el('span',m.match?.label||'相关盘口 · 未核验等价','prediction-match-badge'),el('p','截止 '+time(m.endDate)+' · '+m.network,'prediction-muted'));
+   function paintMarket(){const m=selectedMarkets.get(id);marketBody.replaceChildren(bindMarketTitle(el('h4',m.question),m),el('span',m.match?.label||'相关盘口 · 未核验等价','prediction-match-badge'),el('p','截止 '+time(m.endDate)+' · '+m.network,'prediction-muted'));
     if(m.match?.differences?.length)marketBody.append(el('p',m.match.differences.join('；'),'prediction-differences'));
     const outcomes=el('div',null,'prediction-venue-outcomes');for(const o of m.outcomes){const b=button(o.label);b.setAttribute('aria-pressed',String(selectedOutcomes.get(id)===o.key));b.onclick=()=>{selectedOutcomes.set(id,o.key);invalidatePurchase();paintMarket();loadQuotes();};outcomes.append(b);}marketBody.append(outcomes,rules(m));
    }
@@ -104,7 +107,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
     choose.onclick=()=>{if(disposed||ticket!==quoteGeneration)return;if(Date.now()>=expires){choose.disabled=true;quoteStatus.textContent='报价已过期，请刷新后选择平台。';return;}
      disposePurchase();purchase=polymarketPurchase({market:m,outcome,getWallet,pickWallet});selected.querySelector('.prediction-purchase-host').append(purchase);quoteStatus.textContent='已选择 Polymarket，请在下方核对金额与最新可执行价格。';};
     box.append(choose);
-   }else box.append(sourceLink(m,'选择 Kalshi · 前往平台 ↗'),el('small','需 Kalshi 账户与平台余额；尚未接入站内下单。','prediction-muted'));
+   }else{const choose=button('选择 Kalshi →','prediction-choose-venue prediction-choose-kalshi');choose.disabled=!validDepth;choose.onclick=()=>{if(disposed||ticket!==quoteGeneration)return;if(Date.now()>=expires){choose.disabled=true;quoteStatus.textContent='报价已过期，请刷新后选择平台。';return;}disposePurchase();purchase=kalshiPurchase({market:m,outcome,getWallet,pickWallet,initialCount:shares});selected.querySelector('.prediction-purchase-host').append(purchase);quoteStatus.textContent='已选择 Kalshi，请连接自己的 API 账户并核对 USD 余额。';};box.append(choose,sourceLink(m,'在 Kalshi 查看 ↗'));}
   }
   quoteButton.disabled=false;quoteStatus.textContent='报价已更新 · 各平台按同一份额、各自结果定义展示';
   const deadlines=settled.filter(r=>r.status==='fulfilled').map(r=>Number(r.value.expiresAt)).filter(Number.isFinite);if(deadlines.length)expiryTimer=setTimeout(()=>{if(disposed||ticket!==quoteGeneration)return;selected.querySelectorAll('.prediction-choose-venue').forEach(b=>b.disabled=true);if(!purchase)quoteStatus.textContent='报价已过期，请刷新后选择平台。';},Math.max(0,Math.min(...deadlines)-Date.now()));

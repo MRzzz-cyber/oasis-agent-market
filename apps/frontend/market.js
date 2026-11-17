@@ -1,3 +1,4 @@
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {normalize, intervals, buildCatalog} from "./candles.js";
 
 async function directInfo(payload, signal) {
@@ -98,7 +99,7 @@ export function marketView(analyze) {
       const bar=r.v/volume*32;
       g.globalAlpha=.55; g.fillRect(x-w/2,height-24-bar,w,bar); g.globalAlpha=1;
     });
-    const stamp = t=>new Date(t).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    const stamp = t=>new Date(t).toLocaleString(getLocale(),{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
     g.fillStyle="#8eaa94"; g.fillText(stamp(rows[0].t),0,height-5);
     g.textAlign="right";g.fillText(stamp(rows.at(-1).t),right,height-5);
     const r=rows[hover] || rows.at(-1);
@@ -163,7 +164,7 @@ export function marketView(analyze) {
         const merged=new Map(rows.map(r=>[r.t,r]));updates.forEach(r=>merged.set(r.t,r));
         rows=[...merged.values()].sort((a,b)=>a.t-b.t).slice(-100);
         refreshed=Date.now(); action.disabled=false; draw(); insights();
-        status.textContent="实时更新 · "+new Date(refreshed).toLocaleTimeString("zh-CN");
+        status.textContent="实时更新 · "+new Date(refreshed).toLocaleTimeString(getLocale());
         clearTimeout(timer);timer=setTimeout(start,45000);
       };
       timer=setTimeout(start,45000);
@@ -184,7 +185,9 @@ export function marketView(analyze) {
     const latest=rows.at(-1), window=rows.slice(-20);
     const high=Math.max(...window.map(r=>r.h)),low=Math.min(...window.map(r=>r.l));
     const tail=window.slice(-6).map(r=>[new Date(r.t).toISOString(),r.o,r.h,r.l,r.c,r.v].join(",")).join("\n");
+    if(getLanguage()==='en'){analyze('Analyze '+coin+' ('+selected().label+' · '+selected().group+') '+interval+' candles. Explain price action, volume and limitations. Hyperliquid data read at '+new Date(refreshed).toISOString()+'. Last close '+latest.c+' '+selected().quote+' (the last candle may still be open). The last '+window.length+' candles span '+low+'–'+high+' '+selected().quote+'. Samples are UTC open time, open, high, low, close, volume:\n'+tail);return;}
     analyze("请分析 "+coin+"（"+selected().label+" · "+selected().group+"）的 "+interval+" K 线，解释走势、成交量和判断局限。Hyperliquid 行情读取于 "+new Date(refreshed).toISOString()+"。最新收盘价 "+latest.c+" "+selected().quote+"（末根可能未收盘）。最近 "+window.length+" 根区间 "+low+"–"+high+" "+selected().quote+"。最近样本按 UTC 开盘时间、开、高、低、收、成交量（"+coin+"）排列：\n"+tail);
   };
+  window.addEventListener("oasis:language-changed",()=>{if(active)draw();});
   return visible=>{active=visible;if(visible){start();directory();}else {stop();clearTimeout(catalogRetry);}};
 }

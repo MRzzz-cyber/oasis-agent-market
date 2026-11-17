@@ -1,3 +1,4 @@
+import {assertKalshiClear} from './kalshi-core.js';
 import {assertPredictionClear} from './polymarket-purchase-core.js';
 import {MAINNET_API,address,atoms,text,splitSignature,journal as orderJournal} from './mainnet-order-core.js';
 export const ARBITRUM='0xa4b1';
@@ -44,6 +45,7 @@ export async function assertSafeModeChange(funds,fetchImpl=fetch){
  if(orders.some(rows=>!Array.isArray(rows)||rows.length))throw Error('账户存在挂单或无法核对，停止模式切换');
 }
 export function assertFundingClear(storage,user){
+ assertKalshiClear(storage,user);
  assertPredictionClear(storage,user);
  if(orderJournal(storage,user).load()?.terminal===false)throw Error('有交易订单待核对，请先核对原订单');
  if(fundingJournal(storage,user).load()?.terminal===false)throw Error('有资金请求待核对，请先核对原请求');

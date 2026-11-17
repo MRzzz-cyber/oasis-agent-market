@@ -1,0 +1,60 @@
+name: Bilingual and Kalshi acceptance
+on:
+  push:
+    branches: [feat/bilingual-kalshi-api]
+permissions:
+  contents: read
+concurrency:
+  group: bilingual-kalshi
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild';await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Bilingual desktop and mobile fixtures
+        run: |
+          fixture_failures=0
+          node scripts/check-bilingual-ui.mjs || fixture_failures=1
+          node scripts/check-kalshi-ui.mjs || fixture_failures=1
+          node scripts/check-prediction-ui.mjs || fixture_failures=1
+          node scripts/check-polymarket-purchase-ui.mjs || fixture_failures=1
+          exit $fixture_failures
+      - name: Kalshi replay guard in actual Workers SQLite
+        if: always()
+        run: |
+          npm install --prefix "$RUNNER_TEMP/kalshi-worker" --no-audit --no-fund miniflare@4
+          node scripts/check-kalshi-worker.mjs
+      - name: Read-only live Kalshi preflight
+        if: always()
+        run: node scripts/check-kalshi-readonly.mjs
+      - name: Emit selected fixture images
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';for(const name of ['bilingual-ui/390-index.html-normal','bilingual-ui/390-index.html-app-en','kalshi-ui/390-language']){try{const data=(await readFile(process.env.RUNNER_TEMP+'/'+name+'.png')).toString('base64');for(let i=0;i<data.length;i+=6000)console.log('OASIS_UI:'+name+':'+data.slice(i,i+6000));}catch{}}
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bilingual-kalshi-fixtures
+          path: |
+            ${{ runner.temp }}/bilingual-ui/*.png
+            ${{ runner.temp }}/kalshi-ui/*.png
+            ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/polymarket-purchase-ui/*.png
+          if-no-files-found: ignore

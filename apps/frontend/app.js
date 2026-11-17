@@ -1,3 +1,4 @@
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {nativeTrade} from './mainnet-trade.js?v=native-mainnet-v15-20261116';
 import {predictionCards,predictionIntent} from './prediction-cards.js?v=discovery-v1';
 import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=native-mainnet-v15-20261116';
@@ -245,7 +246,7 @@ function updateModelLabels() {
   $("active-model-label").textContent = model ? model.name : "未选择模型";
   $("policy-model").textContent = model ? model.name + "（OpenRouter）" : "未选择模型";
   $("model-primary").title = model
-    ? model.provider + " · 上下文 " + (model.contextLength ? model.contextLength.toLocaleString("zh-CN") : "未知") +
+    ? model.provider + " · 上下文 " + (model.contextLength ? model.contextLength.toLocaleString(getLocale()) : "未知") +
       " · 输入 " + formatModelPrice(model.inputPricePerMillion) + " · 输出 " + formatModelPrice(model.outputPricePerMillion)
     : "请选择一个模型";
 }
@@ -445,7 +446,7 @@ async function sendToRealModel() {
     const response = await fetch("/api/ai/chat", {
       method: "POST",
       headers: { "content-type": "application/json", ...(!googleLogin ? {"x-oasis-access-code": code} : {}) },
-      body: JSON.stringify({ model: state.model, messages })
+      body: JSON.stringify({ model: state.model, messages,language:getLanguage() })
     });
     if (!response.ok) {
       if (googleLogin && response.status === 401) { currentUser = null; openAccount(); }
@@ -582,27 +583,27 @@ function historicalStatus(run){return ({manual_testnet:'测试记录',blocked:'�
 function showArchivedRun(run){
   const panel=$('run-panel');panel.classList.remove('hidden');const head=panel.querySelector('.activity-head');head.querySelector('h3').textContent='历史记录';head.querySelector('p').textContent='保存时的快照，不代表当前行情或有效交易计划。';head.querySelector('.status-pill').textContent=run.mode==='testnet'?'旧版测试网':'旧版模拟';
   $('flowchart').replaceChildren();$('order-followup').replaceChildren();$('order-followup').classList.add('hidden');const body=$('decision');body.replaceChildren();
-  body.append(node('h3','',run.asset+' · '+(run.mode==='testnet'?'测试记录':'模拟记录')),node('p','note',historyDate(run.createdAt)),node('p','',run.goal||'未保存原始目标'));
+  body.append(node('h3','',run.asset+' · '+(run.mode==='testnet'?'测试记录':'模拟记录')),node('p','note',historyDate(run.createdAt)),node('p','history-goal',run.goal||'未保存原始目标'));
   let receipt;try{receipt=JSON.parse(localStorage.getItem('oasis-hl-test-order:'+run.id));}catch{}
   body.append(node('p','note',receipt?.message?'本地回执：'+receipt.message:'记录状态：'+historicalStatus(run)+'。没有已保存的成交回执。'));
   if(run.terms)body.append(node('p','note','历史参数：'+Object.entries(run.terms).map(([key,value])=>key+' '+value).join(' · ')));
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function historyDate(value){return Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('zh-CN',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'较早记录';}
+function historyDate(value){return Number.isFinite(Date.parse(value))?new Date(value).toLocaleString(getLocale(),{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'较早记录';}
 async function refreshStrategies(){
   persistConversation();const [items,runs]=await Promise.all([request('/api/strategies'),request('/api/runs')]);state.strategies=items;
   $('run-panel').classList.add('hidden');const root=$('strategy-list');root.replaceChildren();
   const search=$('history-search').value.trim().toLowerCase(),conversations=conversationStore().list();
   for(const [key,label,count] of [['conversations','历史对话',conversations.length],['strategies','已存策略',items.length],['archive','交易与旧版记录',runs.length]]){const b=document.querySelector('[data-history-filter="'+key+'"]');b.textContent=label+' '+count;b.setAttribute('aria-pressed',String(historyFilter===key));}
   const matches=record=>!search||JSON.stringify(record).toLowerCase().includes(search);
-  function card(title,summary,meta,label,open){const article=node('article','record-card');const info=node('div','record-info');info.append(node('strong','',title),node('p','record-summary',summary),node('small','record-meta',meta));const button=node('button','ghost',label);button.type='button';button.onclick=open;article.append(info,button);root.append(article);return info;}
+  function card(title,summary,meta,label,open){const article=node('article','record-card');const info=node('div','record-info');info.append(node('strong','history-title',title),node('p','record-summary history-goal',summary),node('small','record-meta',meta));const button=node('button','ghost',label);button.type='button';button.onclick=open;article.append(info,button);root.append(article);return info;}
   if(historyFilter==='conversations')for(const record of conversations.filter(matches)){
     const last=[...record.messages].reverse().find(m=>m.role==='assistant')||record.messages.at(-1);
     card(record.title,historyTitle(last?.content).slice(0,100),historyDate(record.updatedAt)+' · '+record.messages.length+' 条消息'+(record.model?' · '+record.model:''),'继续对话',()=>restoreConversation(record));
   }
   if(historyFilter==='strategies')for(const item of [...items].reverse().filter(matches)){
     const info=card(historyTitle(item.goal),item.terms?item.asset+' · '+item.terms.cadence+' · 单次上限 '+item.terms.maxOrder+' '+item.terms.quoteAsset:'早期保存的策略草案',historyDate(item.createdAt)+' · 历史草案'+(item.model?' · '+item.model:''),'继续讨论',()=>restoreConversation({id:'strategy-'+item.id,goal:item.goal,messages:cleanMessages(item.conversation).length?item.conversation:[{role:'user',content:item.goal}],modelId:item.modelId,createdAt:item.createdAt}));
-    const details=node('details','record-terms');details.append(node('summary','','查看策略内容'),node('p','',item.goal||''));if(item.terms){const terms=node('dl','record-parameters');for(const [label,value] of [['标的',item.asset],['执行节奏',item.terms.cadence],['单次上限',item.terms.maxOrder+' '+item.terms.quoteAsset],['投资预算',item.terms.capital],['暂停回撤',item.terms.stopPercent?item.terms.stopPercent+'%':null]])if(value){terms.append(node('dt','',label),node('dd','',String(value)));}details.append(terms);}details.append(node('small','note','保存的参数仅供回顾，继续使用前需重新研究与确认。'));info.append(details);
+    const details=node('details','record-terms');details.append(node('summary','','查看策略内容'),node('p','history-goal',item.goal||''));if(item.terms){const terms=node('dl','record-parameters');for(const [label,value] of [['标的',item.asset],['执行节奏',item.terms.cadence],['单次上限',item.terms.maxOrder+' '+item.terms.quoteAsset],['投资预算',item.terms.capital],['暂停回撤',item.terms.stopPercent?item.terms.stopPercent+'%':null]])if(value){terms.append(node('dt','',label),node('dd','',String(value)));}details.append(terms);}details.append(node('small','note','保存的参数仅供回顾，继续使用前需重新研究与确认。'));info.append(details);
   }
   if(historyFilter==='archive')for(const run of [...runs].reverse().filter(matches))card(run.asset+' · '+(run.mode==='mainnet'?'主网现货订单':run.mode==='testnet'?'旧版测试记录':'旧版模拟记录'),historyTitle(run.goal||'历史运行快照'),historyDate(run.createdAt)+' · '+historicalStatus(run),'查看记录',()=>run.mode==='mainnet'?showMainnetReceipt(run):showArchivedRun(run));
   if(!root.children.length){const empty=node('div','history-empty');empty.append(node('span','',search?'没有找到匹配记录':historyFilter==='conversations'?'还没有保存的对话':historyFilter==='strategies'?'还没有保存的策略':'暂无交易或旧版记录'),node('p','note',search?'试试币种、关键词或模型名称。':historyFilter==='conversations'?'新对话会自动保存在这里。早期未保存的对话无法恢复，可在已存策略里继续讨论。':'与 Oasis 讨论后，可以选择保存策略。'));root.append(empty);}
@@ -617,7 +618,7 @@ async function reviewTestnet(run, quote, output) {
   const headers = {"content-type":"application/json"};
   if (!googleLogin) headers["x-oasis-access-code"] = $("ai-access-code").value.trim();
   const content = "请只做测试网订单风险评审：核对盘口价差、原策略的触发条件和暂停阈值。说明仍缺少的证据，不推断已满足交易条件。\n"+JSON.stringify({goal:run.goal?.slice(0,600),terms:run.terms,quote});
-  const r = await fetch("/api/ai/chat",{method:"POST",headers,body:JSON.stringify({model:run.modelId,messages:[{role:"user",content}]})});
+  const r = await fetch("/api/ai/chat",{method:"POST",headers,body:JSON.stringify({model:run.modelId,language:getLanguage(),messages:[{role:"user",content}]})});
   if (!r.ok) throw Error((await r.json().catch(()=>({}))).error || "模型评审失败");
   const stream = await r.text();
   let reply="", actual=run.modelId, complete=false;
@@ -705,7 +706,7 @@ function renderOrderFollowup(run) {
   const root = $("order-followup"); root.replaceChildren(); root.classList.add("hidden");
   if (!run.order) return;
   root.classList.remove("hidden");
-  root.append(node("h3", "", "订单后续"), node("p", "note", "订单编号：" + run.order.id.slice(0, 8) + " · 创建时间：" + new Date(run.order.executedAt).toLocaleString("zh-CN")));
+  root.append(node("h3", "", "订单后续"), node("p", "note", "订单编号：" + run.order.id.slice(0, 8) + " · 创建时间：" + new Date(run.order.executedAt).toLocaleString(getLocale())));
   const status = node("div", "order-status");
   status.append(node("span", "", "订单状态"), node("strong", "", run.status === "monitoring" ? "跟踪中（模拟）" : "已创建（模拟）"));
   root.appendChild(status);
@@ -758,7 +759,7 @@ function resetStarter() {
 }
 async function chooseStarter(question) {
   resetStarter();
-  $("goal").value = question.label;
+  $("goal").value = translateUI(question.label);
   $("goal").focus();
   if (!question.coin) return;
   const controller = new AbortController();
@@ -776,7 +777,7 @@ async function chooseStarter(question) {
     if (controller.signal.aborted) return;
     const time = new Date(closed.at(-1).t + duration);
     attachedContext = "\nHyperliquid "+question.coin+" 永续，"+question.interval+"，样本截至 "+time.toISOString()+"。最近20根已收盘 K 线：涨跌 "+m.change.toFixed(2)+"%，最低 "+m.low+"，最高 "+m.high+"，末根收盘 "+m.close+"，均价 "+m.sma.toFixed(4)+"，末根成交量与此前20根均量之比 "+(m.volumeRatio?.toFixed(2) ?? "未知")+"。请根据样本作答，注明时间与局限。";
-    $("question-context").textContent = "已附行情 · "+question.coin+" · "+question.interval+" · "+time.toLocaleString("zh-CN");
+    $("question-context").textContent = "已附行情 · "+question.coin+" · "+question.interval+" · "+time.toLocaleString(getLocale());
   } catch {
     if (controller.signal.aborted) return;
     attachedContext = "\n当前行情读取失败，请只解释判断方法。";
@@ -843,7 +844,7 @@ async function renderReplays() {
     const strip=node("span","template-strip",""),quote=node("span","template-quote","");
     const amount=node("b","",(value>0?"↗ +":value<0?"↘ ":"→ ")+value.toFixed(2)+"%");
     amount.style.color=color;
-    quote.append(amount,node("small","","模拟收益 · 截至 "+new Date(result.end).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})));
+    quote.append(amount,node("small","","模拟收益 · 截至 "+new Date(result.end).toLocaleString(getLocale(),{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})));
     strip.append(quote,sparkline(result.curve,color));
     card.append(header,strip,node("small","","同期标的 "+result.underlying.toFixed(2)+"% · 收盘净值最大回撤 "+result.drawdown.toFixed(2)+"% · "+result.trades+" 次开仓"));
     card.onclick=()=>chooseStarter({label:continuous ? "请解释 "+coin+" 持续空头对照：在样本开始时按初始本金等额模拟开空，持有至24小时结束。该样本截至 "+new Date(result.end).toISOString()+"，计入进出成本后的模拟收益为 "+value+"%，未计资金费。请解释其风险和与均线择时的区别。" : "请帮我分析「"+name+"」：上一小时收盘价"+(side===1?"高于均线时模拟做多":"低于均线时模拟做空")+"，否则空仓；以20小时简单均线为参照，下一小时开盘成交。最近24小时样本截至 "+new Date(result.end).toISOString()+"，模拟收益 "+value+"%，每次进出各计0.05%成本，未计资金费和实际滑点。请解释该模型在哪些行情下容易失效。"});

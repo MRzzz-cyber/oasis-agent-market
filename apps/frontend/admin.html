@@ -9,4 +9,4 @@
 <section id="tasks" class="panel"><div class="panel-head"><div><h2>最近任务</h2><p class="muted">点击记录查看事件时间线。任务标识仅用于排查，不含钱包地址。</p></div><span id="task-count" class="badge">0 条记录</span></div><div id="task-list" class="task-list"></div></section>
 <section id="errors" class="two-columns"><article class="panel"><h2>失败与待核对原因</h2><div id="error-list"></div></article><article class="panel"><h2>按任务类型查看</h2><div id="type-list"></div></article></section>
 <section id="quality" class="panel quality"><div><h2>数据口径与采集质量</h2><p id="trust"></p><p id="coverage" class="muted"></p><p>钱包任务从点击有效购买按钮起算；模型任务包含流式响应结果。没有样本的比率显示“—”。恢复率仅统计明确进入“待核对”的任务；普通失败后的新请求尚未关联为重试。</p><p>用户取消单独记录。历史交易未回填；客户端可能漏报。实际错误成交次数尚无服务端独立核验数据，不能显示为零。</p></div><div class="exports"><a id="export-json" href="#">导出指标 JSON ↗</a><a id="export-prometheus" href="#">Prometheus 格式 ↗</a><a id="export-otlp" href="#">OTLP 日志 JSON ↗</a></div></section></div>
-<footer>仅记录任务阶段、耗时和固定错误码。对话正文、钱包地址、签名和密钥不进入指标日志。</footer></main></div></body></html>
+<footer>仅记录任务阶段、耗时和固定错误码。对话正文、钱包地址、签名和密钥不进入指标日志。</footer></main></div><script type="module" src="/i18n.js"></script></body></html>
