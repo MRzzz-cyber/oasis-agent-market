@@ -25,9 +25,10 @@ export class AccountStore {
     this.sql.exec("CREATE TABLE IF NOT EXISTS accounts (sub TEXT PRIMARY KEY, active INTEGER DEFAULT 0, tries INTEGER DEFAULT 0, retry_at INTEGER DEFAULT 0)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, sub TEXT NOT NULL, email TEXT NOT NULL, expires INTEGER NOT NULL)");
     this.sql.exec("CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS kalshi_submissions (fingerprint TEXT PRIMARY KEY, client_key TEXT UNIQUE NOT NULL, body_hash TEXT NOT NULL, owner_sub TEXT NOT NULL, at_ms INTEGER NOT NULL)");
   }
   async fetch(request) {
-    const {op, token, sub, email, matches} = await request.json();
+    const {op, token, sub, email, matches, kalshi} = await request.json();
     const now = Date.now();
     if (op === "create") {
       this.sql.exec("DELETE FROM sessions WHERE expires <= ?", now);
@@ -41,6 +42,12 @@ export class AccountStore {
     }
     const [user] = this.sql.exec("SELECT accounts.*, sessions.email FROM sessions JOIN accounts USING(sub) WHERE token=? AND expires>?", token, now).toArray();
     if (!user) return json({error:"请先使用 Google 登录"}, 401);
+    if(op==="kalshi-reserve"){
+      if(!user.active||!kalshi||![kalshi.fingerprint,kalshi.clientKey,kalshi.bodyHash].every(v=>/^[a-f0-9]{64}$/.test(v||"")))return json({error:"无效的订单保留请求"},400);
+      const [count]=this.sql.exec("SELECT COUNT(*) AS n FROM kalshi_submissions WHERE owner_sub=? AND at_ms>?",user.sub,now-86400000).toArray();
+      if(count.n>=100)return json({error:"今日请求数量已达上限"},429);
+      try{this.sql.exec("INSERT INTO kalshi_submissions VALUES (?,?,?,?,?)",kalshi.fingerprint,kalshi.clientKey,kalshi.bodyHash,user.sub,now);return json({ok:true});}catch{return json({error:"原请求已存在"},409);}
+    }
     if (op === "activate" && !user.active) {
       if (user.tries >= 5 && user.retry_at > now) return json({error:"尝试次数过多，请在 15 分钟后再试"}, 429);
       if (!matches) {
@@ -108,3 +115,5 @@ export async function authRoute(request, env, fetchImpl=fetch) {
   }
   return json({error:"接口不存在"},404);
 }
+
+export async function reserveKalshiSubmission(request,env,kalshi){const raw=readCookie(request,SESSION);if(!/^[\w-]{43}$/.test(raw))return json({error:'请先登录'},401);return db(env,{op:'kalshi-reserve',token:await hash(raw),kalshi});}
