@@ -25,6 +25,8 @@ export class AccountStore {
     this.sql.exec("CREATE TABLE IF NOT EXISTS accounts (sub TEXT PRIMARY KEY, active INTEGER DEFAULT 0, tries INTEGER DEFAULT 0, retry_at INTEGER DEFAULT 0)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, sub TEXT NOT NULL, email TEXT NOT NULL, expires INTEGER NOT NULL)");
     this.sql.exec("CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS translation_usage (window INTEGER PRIMARY KEY, calls INTEGER NOT NULL)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS translation_user_usage (sub TEXT NOT NULL, window INTEGER NOT NULL, calls INTEGER NOT NULL, PRIMARY KEY(sub,window))");
     this.sql.exec("CREATE TABLE IF NOT EXISTS kalshi_submissions (fingerprint TEXT PRIMARY KEY, client_key TEXT UNIQUE NOT NULL, body_hash TEXT NOT NULL, owner_sub TEXT NOT NULL, at_ms INTEGER NOT NULL)");
   }
   async fetch(request) {
@@ -42,6 +44,13 @@ export class AccountStore {
     }
     const [user] = this.sql.exec("SELECT accounts.*, sessions.email FROM sessions JOIN accounts USING(sub) WHERE token=? AND expires>?", token, now).toArray();
     if (!user) return json({error:"请先使用 Google 登录"}, 401);
+    if(op==="localize-reserve"){
+      if(!user.active)return json({error:"请先激活账号"},403);const window=Math.floor(now/3600000);
+      this.sql.exec("DELETE FROM translation_usage WHERE window<?",window-24);this.sql.exec("DELETE FROM translation_user_usage WHERE window<?",window-24);
+      const [global]=this.sql.exec("SELECT calls FROM translation_usage WHERE window=?",window).toArray();const [personal]=this.sql.exec("SELECT calls FROM translation_user_usage WHERE sub=? AND window=?",user.sub,window).toArray();
+      if((global?.calls||0)>=80||(personal?.calls||0)>=48)return json({error:"翻译额度已达上限"},429);
+      this.sql.exec("INSERT INTO translation_usage VALUES (?,1) ON CONFLICT(window) DO UPDATE SET calls=calls+1",window);this.sql.exec("INSERT INTO translation_user_usage VALUES (?,?,1) ON CONFLICT(sub,window) DO UPDATE SET calls=calls+1",user.sub,window);return json({ok:true});
+    }
     if(op==="kalshi-reserve"){
       if(!user.active||!kalshi||![kalshi.fingerprint,kalshi.clientKey,kalshi.bodyHash].every(v=>/^[a-f0-9]{64}$/.test(v||"")))return json({error:"无效的订单保留请求"},400);
       const [count]=this.sql.exec("SELECT COUNT(*) AS n FROM kalshi_submissions WHERE owner_sub=? AND at_ms>?",user.sub,now-86400000).toArray();
@@ -117,3 +126,5 @@ export async function authRoute(request, env, fetchImpl=fetch) {
 }
 
 export async function reserveKalshiSubmission(request,env,kalshi){const raw=readCookie(request,SESSION);if(!/^[\w-]{43}$/.test(raw))return json({error:'请先登录'},401);return db(env,{op:'kalshi-reserve',token:await hash(raw),kalshi});}
+
+export async function reserveTranslationUsage(request,env){const raw=readCookie(request,SESSION);if(!/^[\w-]{43}$/.test(raw))return json({error:'请先登录'},401);return db(env,{op:'localize-reserve',token:await hash(raw)});}

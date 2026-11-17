@@ -46,7 +46,7 @@ jobs:
         if: always()
         run: |
           node --input-type=module <<'JS'
-          import {readFile} from 'node:fs/promises';for(const name of ['bilingual-ui/390-index.html-normal','kalshi-ui/390-language']){try{const data=(await readFile(process.env.RUNNER_TEMP+'/'+name+'.png')).toString('base64');for(let i=0;i<data.length;i+=6000)console.log('OASIS_UI:'+name+':'+data.slice(i,i+6000));}catch{}}
+          import {readFile} from 'node:fs/promises';for(const name of ['bilingual-ui/390-index.html-normal','bilingual-ui/390-index.html-app-en','kalshi-ui/390-language']){try{const data=(await readFile(process.env.RUNNER_TEMP+'/'+name+'.png')).toString('base64');for(let i=0;i<data.length;i+=6000)console.log('OASIS_UI:'+name+':'+data.slice(i,i+6000));}catch{}}
           JS
       - uses: actions/upload-artifact@v4
         if: always()

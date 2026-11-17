@@ -13,5 +13,7 @@ try{
  assert.equal((await call({op:'kalshi-reserve',token,kalshi:{...kalshi,fingerprint:'d'.repeat(64)}})).status,409);
  assert.equal((await call({op:'kalshi-reserve',token:'invalid',kalshi:{fingerprint:'e'.repeat(64),clientKey:'f'.repeat(64),bodyHash:'a'.repeat(64)}})).status,401);
  assert.equal((await call({op:'session',token})).status,200);
- console.log('PASS workerd SQLite: active-session enforcement, concurrent nonce reservation and duplicate client-order guard; no platform requests');
+ for(let i=0;i<48;i++)assert.equal((await call({op:'localize-reserve',token})).status,200);assert.equal((await call({op:'localize-reserve',token})).status,429);
+ const token2='s'.repeat(64);assert.equal((await call({op:'create',token:token2,sub:'second-fixture',email:'second@example.invalid'})).status,200);assert.equal((await call({op:'activate',token:token2,matches:true})).status,200);for(let i=0;i<32;i++)assert.equal((await call({op:'localize-reserve',token:token2})).status,200);assert.equal((await call({op:'localize-reserve',token:token2})).status,429);
+ console.log('PASS workerd SQLite: active-session enforcement, concurrent nonce/client-order guards, durable 48/user and 80/global translation caps; no platform requests');
 }finally{await mf.dispose();}
