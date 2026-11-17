@@ -1,33 +1,117 @@
 import {polymarketPurchase} from './polymarket-purchase.js';
 import {predictionIntent} from './prediction-core.js';
-const el=(tag,value,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(value==null?{}:{textContent:String(value)})});
-const providerName=id=>id==='polymarket'?'Polymarket':'Kalshi';
-const price=value=>value==null?'暂无报价':(Number(value)*100).toFixed(2)+'¢';
-const short=a=>a.slice(0,6)+'…'+a.slice(-4);
+import {shuffledMarkets,marketTopic} from './prediction-discovery.js';
 export {predictionIntent};
+const el=(tag,value,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(value==null?{}:{textContent:String(value)})});
+const venue=id=>id==='polymarket'?'Polymarket':'Kalshi';
+const cents=v=>v==null?'—':(Number(v)*100).toFixed(1)+'¢';
+const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
+const compact=v=>{const n=Number(v);return Number.isFinite(n)?Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(n):'—';};
+const button=(label,cls='')=>{const b=el('button',label,cls);b.type='button';return b;};
+function sourceLink(m,label='查看平台规则 ↗'){const a=el('a',label);try{const u=new URL(m.url);if(u.protocol==='https:'&&['polymarket.com','kalshi.com'].includes(u.hostname)){a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}}catch{}return a;}
 export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
- const root=el('section',null,'prediction-cards'),css=el('link');css.rel='stylesheet';css.href='/prediction-cards.css?v=prediction-v1';root.append(css,el('span','预测市场 · 盘口研究','prediction-eyebrow'),el('h3','找盘口，比较买入成本'),el('p','输入事件关键词，查看不同平台的相关盘口。','prediction-muted'));
- const form=el('form',null,'prediction-search'),query=el('input');query.type='search';query.maxLength=120;query.placeholder='例如 Bitcoin、Fed、NBA 或事件名称';query.setAttribute('aria-label','预测事件关键词');query.required=true;const submit=el('button','搜索盘口');submit.type='submit';form.append(query,submit);root.append(form);
- const presets=el('div',null,'prediction-presets');for(const term of ['Bitcoin','Fed','NBA']){const b=el('button',term);b.type='button';b.onclick=()=>{query.value=term;form.requestSubmit();};presets.append(b);}root.append(presets);
- const status=el('p','选择关键词开始搜索。结果按平台展示，成交量高不代表胜率高。','prediction-muted');status.setAttribute('role','status');status.setAttribute('aria-live','polite');const results=el('div',null,'prediction-results'),selected=el('div',null,'prediction-selected');root.append(status,results,selected);
- let generation=0,quoteGeneration=0,controller=null,markets=[],selection=new Map(),lastQuery='';
- async function request(path,signal){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(18000)])});const payload=await r.json();if(!r.ok&&!Array.isArray(payload.providers))throw Error(payload.error||'平台数据暂不可用');return payload;}
- const key=(m,outcome)=>m.provider+':'+m.id+':'+outcome;
- function paintSelected(){quoteGeneration++;selected.querySelectorAll('.prediction-purchase').forEach(r=>r.dispose?.());selected.replaceChildren();if(!selection.size)return;const latest=[...selection.values()].at(-1);if(latest.market.provider==='polymarket')selected.append(polymarketPurchase({...latest,getWallet,pickWallet}));const panel=el('section',null,'prediction-compare');panel.append(el('h4','并列查看所选盘口'),el('p','请先核对事件、结果定义、截止时间和结算规则。下列盘口尚未验证等价，不评选最便宜平台。','prediction-muted'));
-  const amountLine=el('div',null,'prediction-amount'),label=el('label','比较份额'),shares=el('input');shares.type='number';shares.min='1';shares.max='100000';shares.step='1';shares.value='10';shares.id='prediction-shares-'+crypto.randomUUID();label.htmlFor=shares.id;const calculate=el('button','读取卖盘成本');calculate.type='button';amountLine.append(label,shares,calculate);panel.append(amountLine);const quotes=el('div');panel.append(quotes);selected.append(panel);
-  shares.oninput=()=>{quoteGeneration++;calculate.disabled=false;quotes.replaceChildren(el('p','份额已变化，请重新读取报价。','prediction-muted'));};
-  calculate.onclick=async()=>{const ticket=++quoteGeneration;calculate.disabled=true;quotes.replaceChildren(el('p','正在读取各平台卖盘…','prediction-muted'));const chosen=[...selection.values()];const settled=await Promise.allSettled(chosen.map(({market,outcome})=>request('/api/predictions/quote?'+new URLSearchParams({provider:market.provider,id:market.id,outcome,shares:shares.value}),controller.signal)));if(ticket!==quoteGeneration||!root.isConnected)return;quotes.replaceChildren();settled.forEach((result,i)=>{const {market,outcome}=chosen[i],row=el('article',null,'prediction-quote');row.append(el('strong',providerName(market.provider)+' · '+market.question),el('p',market.outcomes.find(o=>o.key===outcome)?.label||outcome));if(result.status==='fulfilled'){const q=result.value;row.append(el('b','卖盘成本 '+q.subtotal+' '+q.currency),el('p','目标 '+q.requested+' 份 · 当前深度可覆盖 '+q.filled+' 份'),el('p','手续费、网络费、跨链费：尚未计入；总成本未知。','prediction-muted'),el('small','读取于 '+new Date(q.receivedAt).toLocaleTimeString('zh-CN')+' · '+q.reason));}else row.append(el('p',result.reason?.name==='TimeoutError'?'盘口读取超时，请重试':result.reason?.message||'报价暂不可用'));row.append(el('p',market.execution.reason,'prediction-availability'));quotes.append(row);});calculate.disabled=false;};
+ const root=el('section',null,'prediction-cards'),css=el('link');css.rel='stylesheet';css.href='/prediction-cards.css?v=discovery-v1';
+ const header=el('header',null,'prediction-header'),heading=el('div');heading.append(el('span','OASIS / PREDICTIONS','prediction-eyebrow'),el('h3','下一件大事，你怎么看？'),el('p','发现正在发生的事件，比较平台，再做选择。','prediction-muted'));
+ const live=el('span','每 60 秒刷新','prediction-live');header.append(heading,live);root.append(css,header);
+ const discovery=el('div'),form=el('form',null,'prediction-search'),query=el('input');query.type='search';query.maxLength=120;query.placeholder='找一个事件，例如 Bitcoin、NBA、Fed…';query.setAttribute('aria-label','搜索预测事件');
+ const submit=el('button','搜索');submit.type='submit';submit.disabled=true;form.append(query,submit);discovery.append(form);
+ const toolbar=el('div',null,'prediction-toolbar'),presets=el('div',null,'prediction-presets'),shuffle=button('换一批 ↻','prediction-shuffle');
+ let activeTopic='热门';
+ for(const [label,term] of [['热门',''],['加密','Bitcoin'],['体育','NBA'],['科技','AI'],['宏观','Fed']]){
+  const b=button(label);b.setAttribute('aria-pressed',String(label===activeTopic));b.onclick=()=>{activeTopic=label;presets.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));query.value=term;term?runSearch():loadFeed();};presets.append(b);
  }
- function paintMarkets(payload){results.replaceChildren();markets=payload.providers.flatMap(p=>p.markets);for(const provider of payload.providers){const block=el('section',null,'prediction-provider');block.append(el('h4',providerName(provider.provider)),el('small',provider.coverage,'prediction-muted'));if(provider.error)block.append(el('p',provider.error,'prediction-availability'));else if(!provider.markets.length)block.append(el('p','本次范围内没有匹配盘口。可使用英文关键词或更具体的事件名。','prediction-muted'));
-   for(const market of provider.markets){const card=el('article',null,'prediction-market');card.append(el('h4',market.question));if(market.subtitle)card.append(el('p',market.subtitle));card.append(el('p',(market.endDate?'截止 '+new Date(market.endDate).toLocaleString('zh-CN'):'截止时间待核实')+' · '+market.network,'prediction-muted'));if(market.volume)card.append(el('small',market.volumeLabel+' '+market.volume+' · 仅作为活跃度参考'));
-    const outcomes=el('div',null,'prediction-outcomes');for(const outcome of market.outcomes){const b=el('button',outcome.label+' · '+price(outcome.price));b.type='button';b.setAttribute('aria-pressed',String(selection.has(key(market,outcome.key))));b.onclick=()=>{const k=key(market,outcome.key);if(selection.has(k))selection.delete(k);else if(selection.size<4)selection.set(k,{market,outcome:outcome.key});else{status.textContent='一次最多并列查看 4 个结果。';return;}b.setAttribute('aria-pressed',String(selection.has(k)));paintSelected();};outcomes.append(b);}card.append(outcomes);
-    const rules=el('details'),body=el('p',market.description||'规则尚未获取，请在平台原页核对。');rules.append(el('summary','查看结算规则'),body,el('p','结算来源：'+(market.resolutionSource||'待核实')));card.append(rules,el('p',market.execution.reason,'prediction-availability'));const link=el('a','查看平台原页 ↗');link.href=market.url;link.target='_blank';link.rel='noopener noreferrer';card.append(link);block.append(card);
-   }results.append(block);}
-  const failed=payload.providers.filter(p=>p.error),time=new Date(payload.at).toLocaleTimeString('zh-CN');status.textContent=failed.length===payload.providers.length?'本次未能获取盘口，请重新搜索。平台连接失败，不代表没有相关盘口。':markets.length?'已读取 '+markets.length+' 个相关盘口 · '+time+(failed.length?'。部分平台暂不可用，以下展示已获取的结果。':'。选择结果后比较相同份额的卖盘成本。'):'搜索完成 · '+time+'。本次检索范围内没有匹配盘口，请换一个关键词。';
+ toolbar.append(presets,shuffle);discovery.append(toolbar);
+ const status=el('p','正在发现真实盘口…','prediction-muted prediction-feed-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+ const results=el('div',null,'prediction-results'),selected=el('div',null,'prediction-selected');discovery.append(status,results);root.append(discovery,selected);
+ let disposed=false,feedGeneration=0,selectionGeneration=0,quoteGeneration=0,feedController=null,compareController=null,quoteController=null,pool=[],visible=[],source=null,comparison=null,purchase=null,loading=false,feedMode=true,feedStamp=null,expiryTimer=null;
+ const selectedMarkets=new Map(),selectedOutcomes=new Map();
+ async function request(path,signal){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)])});let data;try{data=await r.json();}catch{throw Error('服务暂时不可用，请稍后重试');}if(!r.ok&&!Array.isArray(data.providers))throw Error(data.error||'平台数据暂不可用');return data;}
+ function clearExpiry(){clearTimeout(expiryTimer);expiryTimer=null;}
+ function disposePurchase(){purchase?.dispose?.();purchase=null;selected.querySelector('.prediction-purchase-host')?.replaceChildren();}
+ function closeComparison(){clearExpiry();selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();header.hidden=false;discovery.hidden=false;live.textContent='每 60 秒刷新';}
+ function marketCard(m){
+  const card=el('article',null,'prediction-market'),top=el('div',null,'prediction-market-top');top.append(el('span',m.topic||marketTopic(m.question),'prediction-topic'),el('small',venue(m.provider),'prediction-muted'));
+  const title=button(m.question,'prediction-market-title');title.onclick=()=>openComparison(m,'yes');
+  const yes=m.outcomes.find(o=>o.key==='yes'),prob=Number(yes?.price),metric=el('div',null,'prediction-probability');
+  metric.append(el('strong',yes?.price==null?'—':(prob*100).toFixed(0)+'%'),el('span','YES · 市场隐含概率'));
+  const bar=el('div',null,'prediction-probability-bar'),fill=el('span');fill.style.width=(Number.isFinite(prob)?Math.max(0,Math.min(100,prob*100)):0)+'%';bar.append(fill);
+  const outcomes=el('div',null,'prediction-outcomes');for(const o of m.outcomes){const b=button(o.label+' '+cents(o.price));b.onclick=()=>openComparison(m,o.key);outcomes.append(b);}
+  const foot=el('div',null,'prediction-market-foot');foot.append(el('small','24h '+compact(m.volume)+' · 截止 '+time(m.endDate)),el('span','比较平台 →'));
+  card.append(top,title,metric,bar,outcomes,foot);return card;
  }
- form.onsubmit=async event=>{event.preventDefault();if(!query.value.trim())return;controller?.abort();controller=new AbortController();const ticket=++generation;quoteGeneration++;selection.clear();selected.querySelectorAll('.prediction-purchase').forEach(r=>r.dispose?.());selected.replaceChildren();results.replaceChildren();submit.disabled=true;status.textContent='正在搜索真实盘口…';lastQuery=query.value.trim();try{const payload=await request('/api/predictions/search?'+new URLSearchParams({q:lastQuery}),controller.signal);if(ticket===generation&&root.isConnected)paintMarkets(payload);}catch(error){if(ticket===generation)status.textContent=error?.name==='AbortError'?'搜索已取消':error.message||'搜索失败，请重试';}finally{if(ticket===generation)submit.disabled=false;}};
- const wallet=el('div',null,'prediction-wallet');function paintWallet(){const current=getWallet();wallet.replaceChildren(el('span',current?'当前钱包 '+(current.name||'')+' '+short(current.address):'尚未选择钱包'),el('small','研究不请求签名；选择 Polymarket 结果后，在交易卡片核对 Polygon、pUSD 和价格。'));const b=el('button',current?'更换钱包':'选择已有钱包');b.type='button';b.onclick=pickWallet;wallet.append(b);}paintWallet();root.append(wallet);
- const changed=()=>{quoteGeneration++;paintWallet();selected.querySelectorAll('.prediction-purchase').forEach(r=>r.dispose?.());selected.replaceChildren();selection.clear();};window.addEventListener('oasis:funds-updated',changed);
- root.dispose=()=>{selected.querySelectorAll('.prediction-purchase').forEach(r=>r.dispose?.());generation++;quoteGeneration++;controller?.abort();window.removeEventListener('oasis:funds-updated',changed);};
- return root;
+ function renderMarkets(rows){visible=rows;results.replaceChildren();for(const m of rows)results.append(marketCard(m));if(!rows.length)results.append(el('div','本次检索范围内没有匹配盘口，试试其他关键词。','prediction-empty'));}
+ function rotate(){if(!pool.length)return;const previous=new Set(visible.map(m=>m.provider+':'+m.id));const shuffled=shuffledMarkets(pool);renderMarkets([...shuffled.filter(m=>!previous.has(m.provider+':'+m.id)),...shuffled.filter(m=>previous.has(m.provider+':'+m.id))].slice(0,6));}
+ async function loadFeed({background=false}={}){
+  if(disposed||loading&&background)return;feedController?.abort();feedController=new AbortController();const ticket=++feedGeneration;loading=true;feedMode=true;
+  submit.disabled=true;shuffle.disabled=true;if(!background)status.textContent='正在读取 Polymarket 热门事件…';
+  try{const payload=await request('/api/predictions/discover',feedController.signal);if(ticket!==feedGeneration||disposed)return;pool=payload.markets||[];feedStamp=payload.at;rotate();if(!pool.length)renderMarkets([]);status.textContent='Polymarket 热门事件 · '+time(payload.at)+' 更新 · 点击盘口自动比较平台';}
+  catch(error){if(ticket===feedGeneration&&!disposed&&error.name!=='AbortError'){status.textContent=(background&&pool.length?'刷新失败，保留上次数据（'+time(feedStamp)+'） · ':'')+(error.message||'暂时无法读取，请重试');if(!pool.length)results.replaceChildren(el('p','平台连接失败，不代表没有相关盘口。','prediction-empty'));}}
+  finally{if(ticket===feedGeneration){loading=false;submit.disabled=false;shuffle.disabled=false;}}
+ }
+ async function runSearch(){
+  const term=query.value.trim();if(!term)return loadFeed();feedController?.abort();feedController=new AbortController();const ticket=++feedGeneration;feedMode=false;loading=true;submit.disabled=true;shuffle.disabled=true;status.textContent='正在搜索两平台的真实盘口…';results.replaceChildren();
+  try{const payload=await request('/api/predictions/search?'+new URLSearchParams({q:term}),feedController.signal);if(ticket!==feedGeneration||disposed)return;pool=payload.providers.flatMap(p=>p.markets);rotate();if(!pool.length)renderMarkets([]);const failed=payload.providers.filter(p=>p.error);status.textContent=failed.length===payload.providers.length?'平台连接失败，不代表没有相关盘口。':pool.length?'已读取 '+pool.length+' 个相关盘口'+(failed.length?' · 部分平台暂不可用':'')+' · 点击自动比价':'本次检索范围内没有匹配盘口，请换一个关键词。';for(const p of failed)results.append(el('p',venue(p.provider)+'：'+p.error,'prediction-availability'));}
+  catch(error){if(ticket===feedGeneration&&!disposed&&error.name!=='AbortError')status.textContent=error.message||'搜索失败，请重试';}
+  finally{if(ticket===feedGeneration){loading=false;submit.disabled=false;shuffle.disabled=false;}}
+ }
+ form.onsubmit=e=>{e.preventDefault();activeTopic='搜索';presets.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));runSearch();};
+ shuffle.onclick=()=>pool.length?rotate():(feedMode?loadFeed():runSearch());
+ function rules(m){const d=el('details',null,'prediction-rules');d.append(el('summary','事件定义与结算规则'),el('p',m.description||'规则尚未获取，请在平台核对。'),el('p','结算来源：'+(m.resolutionSource||'待核实')),sourceLink(m));return d;}
+ async function openComparison(m,outcome){
+  clearExpiry();feedGeneration++;feedController?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;quoteGeneration++;quoteController?.abort();compareController?.abort();disposePurchase();
+  source=m;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();const ticket=++selectionGeneration;compareController=new AbortController();header.hidden=true;discovery.hidden=true;live.textContent='跨平台报价';selected.replaceChildren();
+  const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;const title=el('h3',m.question);selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),title,el('p','正在查找 Polymarket / Kalshi 的相关盘口…','prediction-compare-status'));
+  try{const payload=await request('/api/predictions/compare?'+new URLSearchParams({provider:m.provider,id:m.id,outcome,shares:'10'}),compareController.signal);if(ticket!==selectionGeneration||disposed)return;comparison=payload;for(const p of payload.providers)if(p.markets.length){selectedMarkets.set(p.provider,p.markets[0]);selectedOutcomes.set(p.provider,outcome);}renderComparison();loadQuotes();}
+  catch(error){if(ticket===selectionGeneration&&!disposed&&error.name!=='AbortError'){selected.querySelector('.prediction-compare-status').textContent=error.message||'比价暂不可用';const retry=button('重新比价');retry.onclick=()=>openComparison(m,outcome);selected.append(retry);}}
+ }
+ let sharesInput=null,quoteButton=null,quoteStatus=null;
+ function invalidatePurchase(){clearExpiry();disposePurchase();quoteGeneration++;quoteController?.abort();selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren(el('p','选择已变化，正在重新读取报价…','prediction-muted')));}
+ function renderComparison(){
+  selected.replaceChildren();const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),el('h3',comparison.source.question));
+  const notice=el('p','自动查找相关盘口。请核对事件、YES/NO 定义、截止时间与结算规则；相似标题不代表同一合约。','prediction-match-note');selected.append(notice);
+  const amount=el('div',null,'prediction-amount'),label=el('label','比较份额');sharesInput=el('input');sharesInput.type='number';sharesInput.min='1';sharesInput.max='100000';sharesInput.step='1';sharesInput.value='10';sharesInput.id='compare-shares-'+crypto.randomUUID();label.htmlFor=sharesInput.id;quoteButton=button('刷新报价');quoteButton.onclick=loadQuotes;amount.append(label,sharesInput,quoteButton);quoteStatus=el('p','正在读取相同份额的卖盘成本…','prediction-muted');quoteStatus.setAttribute('role','status');selected.append(amount,quoteStatus);
+  sharesInput.oninput=()=>{invalidatePurchase();quoteButton.disabled=false;quoteStatus.textContent='份额已变化，请重新读取报价。';selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren());};
+  const venues=el('div',null,'prediction-venues');for(const id of ['polymarket','kalshi']){
+   const p=comparison.providers.find(x=>x.provider===id)||{provider:id,markets:[],coverage:'暂无数据'},block=el('section',null,'prediction-venue');block.dataset.provider=id;
+   const head=el('div',null,'prediction-venue-head');head.append(el('h4',venue(id)),el('span',id==='polymarket'?'站内买入':'前往平台交易','prediction-venue-tag'));block.append(head);
+   if(!p.markets.length){block.append(el('p',p.error||'本次范围内未找到相关盘口','prediction-empty'),el('small',p.coverage,'prediction-muted'));venues.append(block);continue;}
+   const chooser=el('select');chooser.setAttribute('aria-label',venue(id)+' 盘口');for(const m of p.markets){const option=el('option',m.question);option.value=m.id;chooser.append(option);}chooser.value=selectedMarkets.get(id).id;chooser.hidden=p.markets.length===1;
+   const marketBody=el('div',null,'prediction-venue-market'),quote=el('div',null,'prediction-quote');block.append(chooser,marketBody,quote);
+   function paintMarket(){const m=selectedMarkets.get(id);marketBody.replaceChildren(el('h4',m.question),el('span',m.match?.label||'相关盘口 · 未核验等价','prediction-match-badge'),el('p','截止 '+time(m.endDate)+' · '+m.network,'prediction-muted'));
+    if(m.match?.differences?.length)marketBody.append(el('p',m.match.differences.join('；'),'prediction-differences'));
+    const outcomes=el('div',null,'prediction-venue-outcomes');for(const o of m.outcomes){const b=button(o.label);b.setAttribute('aria-pressed',String(selectedOutcomes.get(id)===o.key));b.onclick=()=>{selectedOutcomes.set(id,o.key);invalidatePurchase();paintMarket();loadQuotes();};outcomes.append(b);}marketBody.append(outcomes,rules(m));
+   }
+   chooser.onchange=()=>{selectedMarkets.set(id,p.markets.find(m=>m.id===chooser.value));invalidatePurchase();paintMarket();loadQuotes();};paintMarket();venues.append(block);
+  }
+  selected.append(venues,el('p','展示的是卖盘小计；手续费、网络费及跨链费未计入，不标记“总成本最低”。选择平台后再核对实际交易金额。','prediction-muted'),el('div',null,'prediction-purchase-host'));
+ }
+ async function loadQuotes(){
+  if(!comparison||disposed)return;const shares=sharesInput.value;if(!/^\d+$/.test(shares)||Number(shares)<1||Number(shares)>100000){quoteStatus.textContent='请输入 1–100000 的整数份额。';invalidatePurchase();return;}
+  clearExpiry();disposePurchase();quoteController?.abort();quoteController=new AbortController();const signal=quoteController.signal,ticket=++quoteGeneration,selectionTicket=selectionGeneration;
+  quoteButton.disabled=true;quoteStatus.textContent='正在读取各平台卖盘…';
+  const chosen=[...selectedMarkets.entries()].map(([id,m])=>({id,m,outcome:selectedOutcomes.get(id)}));selected.querySelectorAll('.prediction-quote').forEach(n=>n.replaceChildren(el('p','读取中…','prediction-muted')));
+  const settled=await Promise.allSettled(chosen.map(async item=>{const q=await request('/api/predictions/quote?'+new URLSearchParams({provider:item.id,id:item.m.id,outcome:item.outcome,shares}),signal);if(q.market?.id!==item.m.id||q.market?.provider!==item.id||q.outcome!==item.outcome||String(q.requested)!==shares)throw Error('报价与当前选择不匹配，请刷新');return q;}));
+  if(disposed||ticket!==quoteGeneration||selectionTicket!==selectionGeneration)return;
+  for(let i=0;i<chosen.length;i++){
+   const {id,m,outcome}=chosen[i],box=selected.querySelector('[data-provider="'+id+'"] .prediction-quote'),r=settled[i];if(!box)continue;box.replaceChildren();
+   if(r.status==='rejected'){box.append(el('p',r.reason?.message||'报价读取失败'));continue;}
+   const q=r.value,validDepth=q.depthEnough&&q.minimumMet,expires=Number(q.expiresAt),fresh=!q.sourceStale&&Number.isFinite(expires)&&expires>Date.now(),value=el('div',null,'prediction-cost');
+   value.append(el('strong',q.subtotal+' '+(id==='polymarket'?'pUSD':'USD')),el('span',q.requested+' 份卖盘小计'));box.append(value,el('p','均价 '+cents(q.averagePrice)+' / 份 · 深度 '+q.filled+' 份','prediction-muted'));
+   box.append(el('small',q.sourceStale?'盘口源时间待核实，仅供参考':'读取于 '+time(new Date(q.receivedAt).toISOString())+' · 报价有效 30 秒','prediction-muted'));
+   if(!validDepth)box.append(el('p',q.reason||'深度不足或低于最小订单','prediction-availability'));
+   if(id==='polymarket'){
+    const choose=button(validDepth?'选择 Polymarket →':'当前份额不可买入','prediction-choose-venue');choose.disabled=!validDepth||!fresh;
+    choose.onclick=()=>{if(disposed||ticket!==quoteGeneration)return;if(Date.now()>=expires){choose.disabled=true;quoteStatus.textContent='报价已过期，请刷新后选择平台。';return;}
+     disposePurchase();purchase=polymarketPurchase({market:m,outcome,getWallet,pickWallet});selected.querySelector('.prediction-purchase-host').append(purchase);quoteStatus.textContent='已选择 Polymarket，请在下方核对金额与最新可执行价格。';};
+    box.append(choose);
+   }else box.append(sourceLink(m,'选择 Kalshi · 前往平台 ↗'),el('small','需 Kalshi 账户与平台余额；尚未接入站内下单。','prediction-muted'));
+  }
+  quoteButton.disabled=false;quoteStatus.textContent='报价已更新 · 各平台按同一份额、各自结果定义展示';
+  const deadlines=settled.filter(r=>r.status==='fulfilled').map(r=>Number(r.value.expiresAt)).filter(Number.isFinite);if(deadlines.length)expiryTimer=setTimeout(()=>{if(disposed||ticket!==quoteGeneration)return;selected.querySelectorAll('.prediction-choose-venue').forEach(b=>b.disabled=true);if(!purchase)quoteStatus.textContent='报价已过期，请刷新后选择平台。';},Math.max(0,Math.min(...deadlines)-Date.now()));
+ }
+ const changed=()=>{if(source){disposePurchase();quoteGeneration++;quoteController?.abort();if(quoteButton)quoteButton.disabled=false;if(quoteStatus)quoteStatus.textContent='钱包已变化，请刷新报价后继续。';selected.querySelectorAll('.prediction-choose-venue').forEach(b=>b.disabled=true);}};
+ window.addEventListener('oasis:funds-updated',changed);
+ const timer=setInterval(()=>{if(!disposed&&!source&&feedMode&&!document.hidden&&root.isConnected&&root.getClientRects().length)loadFeed({background:true});},60000);
+ root.dispose=()=>{clearExpiry();disposed=true;feedGeneration++;selectionGeneration++;quoteGeneration++;feedController?.abort();compareController?.abort();quoteController?.abort();disposePurchase();clearInterval(timer);window.removeEventListener('oasis:funds-updated',changed);};
+ queueMicrotask(()=>{if(!disposed)loadFeed();});return root;
 }

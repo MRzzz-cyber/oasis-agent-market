@@ -1,0 +1,52 @@
+name: Prediction discovery acceptance
+on:
+  push:
+    branches: [feat/prediction-discovery-compare]
+permissions:
+  contents: read
+concurrency:
+  group: prediction-discovery
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Install Chinese fonts for fixture visual review
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Discovery and existing purchase browser fixtures
+        run: |
+          node scripts/check-prediction-ui.mjs
+          node scripts/check-polymarket-purchase-ui.mjs
+      - name: Read-only live discovery, comparison and Workers runtime
+        if: always()
+        run: |
+          npm install --prefix "$RUNNER_TEMP/discovery-worker" --no-audit --no-fund miniflare@4
+          node scripts/check-prediction-discovery.mjs
+      - name: Emit fixture images for visual review
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';
+          for(const name of ['1280-feed','390-compare']){try{const data=(await readFile(process.env.RUNNER_TEMP+'/prediction-ui/'+name+'.png')).toString('base64');for(let i=0;i<data.length;i+=6000)console.log('OASIS_UI:'+name+':'+data.slice(i,i+6000));}catch{console.log('Fixture not available '+name);}}
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prediction-discovery-fixtures
+          path: |
+            ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/polymarket-purchase-ui/*.png
+          if-no-files-found: ignore
