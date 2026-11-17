@@ -40,7 +40,7 @@ test('comparison rejects mismatched source and invalid inputs before remote quot
  await assert.rejects(comparePredictions({provider:'polymarket',id:'999'},{client:{fetchMarket:async()=>poly}}),/请选择/);
  const options={fetchImpl:()=>assert.fail('unexpected public fetch')};
  for(const path of ['/api/predictions/compare?provider=x&id=123','/api/predictions/compare?provider=polymarket&id=..%2F&shares=10']){
-  assert.equal((await predictionRoute(new Request('https://test.invalid'+path),options)).status,400);
+  assert.equal((await predictionRoute(new Request('https://test.invalid'+path),options)).status,410);
  }
  assert.equal((await predictionRoute(new Request('https://test.invalid/api/predictions/discover',{method:'POST'}),options)).status,405);
 });

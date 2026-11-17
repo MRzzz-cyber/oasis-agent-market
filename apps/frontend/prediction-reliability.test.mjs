@@ -14,7 +14,7 @@ test('a redirect is rejected without a second request or leaked destination',asy
  assert.equal(requests,1);
 });
 test('direct Kalshi reads use the same redirect policy',async()=>{
- let calls=0;const result=await searchPredictions('event',{client:emptyClient,fetchImpl:async(url,init)=>{calls++;assert.equal(init.redirect,'manual');return reply({markets:[],cursor:''});}});
+ let calls=0;const result=await searchPredictions('event',{client:emptyClient,legacyProviders:true,fetchImpl:async(url,init)=>{calls++;assert.equal(init.redirect,'manual');return reply({markets:[],cursor:''});}});
  assert.equal(calls,1);assert.equal(result.providers[1].error,undefined);
 });
 test('both unavailable providers return 502 with safe per-provider details',async()=>{
@@ -24,13 +24,12 @@ test('both unavailable providers return 502 with safe per-provider details',asyn
  assert.ok(payload.providers.every(p=>p.errorCode==='timeout'));assert.ok(payload.providers.every(p=>p.markets.length===0));
  assert.ok(!JSON.stringify(payload).includes('internal-secret'));
 });
-test('partial results stay successful and expose bounded status codes',async()=>{
- const response=await predictionRoute(new Request('https://oasis.test/api/predictions/search?q=Bitcoin'),{client:emptyClient,fetchImpl:async()=>new Response('private detail',{status:429})});
- assert.equal(response.status,200);const payload=await response.json();
- assert.equal(payload.providers[0].error,undefined);assert.equal(payload.providers[1].errorCode,'rate_limit');assert.equal(payload.providers[1].upstreamStatus,429);assert.ok(!JSON.stringify(payload).includes('private detail'));
+test('active search never contacts a retired provider, even when it would rate limit',async()=>{
+ let calls=0;const response=await predictionRoute(new Request('https://oasis.test/api/predictions/search?q=Bitcoin'),{client:emptyClient,fetchImpl:async()=>{calls++;return new Response('private detail',{status:429});}});
+ assert.equal(response.status,200);const payload=await response.json();assert.equal(payload.providers.length,1);assert.equal(payload.providers[0].provider,'polymarket');assert.equal(calls,0);
 });
 test('invalid JSON and redirects have distinct safe failure states',async()=>{
  for(const [response,code] of [[new Response('not json'),'format'],[new Response(null,{status:301}),'redirect']]){
- const payload=await searchPredictions('event',{client:emptyClient,fetchImpl:async()=>response});assert.equal(payload.providers[1].errorCode,code);
+ const payload=await searchPredictions('event',{client:emptyClient,legacyProviders:true,fetchImpl:async()=>response});assert.equal(payload.providers[1].errorCode,code);
  }
 });

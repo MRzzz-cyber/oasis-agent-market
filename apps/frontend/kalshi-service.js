@@ -24,13 +24,14 @@ export async function prepareKalshi({ticker,outcome,count,mode='production'},{fe
  const seriesId=event.event?.series_ticker;marketId(seriesId);const series=(await publicJSON(base+'/series/'+encodeURIComponent(seriesId),fetchImpl)).series;fail(series?.ticker===seriesId,'Kalshi 系列身份未匹配');
  return kalshiPreview({market,estimate,series,outcome,count,mode,now});
 }
-export async function kalshiService(request,env,{fetchImpl=fetch,getAccount=account,reserve=reserveKalshiSubmission,now=Date.now}={}){
- const url=new URL(request.url);if(url.pathname==='/api/kalshi/status'&&request.method==='GET')return send({version:'kalshi-api-v1',credentials:'per-user-browser-session',keyTypes:['Ed25519','RSA-PSS'],walletBalance:false,orderType:'fill_or_kill',maximumSpend:'1000 USD',configured:!!env.ACCOUNTS});
- if(url.pathname==='/api/kalshi/preview'&&request.method==='GET'){try{return send(await prepareKalshi({ticker:url.searchParams.get('ticker'),outcome:url.searchParams.get('outcome'),count:url.searchParams.get('count'),mode:url.searchParams.get('environment')||'production'},{fetchImpl,now:now()}));}catch(error){return send({error:error.message||'Kalshi 报价暂不可用'},400);}}
+export async function kalshiService(request,env,{fetchImpl=fetch,getAccount=account,reserve=reserveKalshiSubmission,now=Date.now,readOnly=false}={}){
+ const url=new URL(request.url);if(url.pathname==='/api/kalshi/status'&&request.method==='GET')return send({version:'kalshi-api-v1',credentials:'per-user-browser-session',keyTypes:['Ed25519','RSA-PSS'],walletBalance:false,orderType:'fill_or_kill',maximumSpend:'1000 USD',configured:!readOnly&&!!env.ACCOUNTS,readOnly});
+ if(url.pathname==='/api/kalshi/preview'&&request.method==='GET'){if(readOnly)return send({error:'当前版本仅支持 Polymarket',submitted:false},410);try{return send(await prepareKalshi({ticker:url.searchParams.get('ticker'),outcome:url.searchParams.get('outcome'),count:url.searchParams.get('count'),mode:url.searchParams.get('environment')||'production'},{fetchImpl,now:now()}));}catch(error){return send({error:error.message||'Kalshi 报价暂不可用'},400);}}
  if(url.pathname!=='/api/kalshi/account'||request.method!=='POST')return send({error:'接口不存在',submitted:false},404);
  if(request.headers.get('origin')!==url.origin)return send({error:'只允许同源请求',submitted:false},403);
  let user;try{const current=await getAccount(request,env);if(!current.ok)return current;user=await current.json();if(!user.active)return send({error:'请先激活账号',submitted:false},403);}catch{return send({error:'请先使用 Google 登录',submitted:false},401);}
  let packet;try{packet=await boundedBody(request);fail(packet&&['environment','resource','auth','query','review','order','balanceAuth'].every(k=>Object.hasOwn(packet,k)||!['environment','resource','auth'].includes(k))&&Object.keys(packet).every(k=>['environment','resource','auth','query','review','order','balanceAuth'].includes(k)),'请求字段无效');environment(packet.environment);fail(Object.hasOwn(allowed,packet.resource),'Kalshi 接口未开放');authHeaders(packet.auth,now());}catch{return send({error:'Kalshi 请求格式或认证无效',submitted:false},400);}
+ if(readOnly&&packet.resource==='submit')return send({error:'Kalshi 新订单已停用，原订单可继续只读核对',submitted:false},410);
  const {resource,environment:mode,auth}=packet,base=KALSHI_HOSTS[mode]+KALSHI_PATH,path=allowed[resource],method=resource==='submit'?'POST':'GET';let body,submitted=false;
  try{
   const headers={...authHeaders(auth,now()),accept:'application/json'};
