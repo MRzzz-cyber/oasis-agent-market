@@ -1,3 +1,4 @@
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {initDeposit} from './deposit.js?v=native-mainnet-v15-20261116';
 import {readMainnetAccount,readNativeBalance,displayAmount} from "./mainnet-wallet.js?v=native-mainnet-v15-20261116";
 import {availableWallets} from './testnet.js?v=native-mainnet-v15-20261116';
@@ -60,14 +61,14 @@ export function initWorkbench({prompt,trade,account}) {
   }
   function setGroup(){document.querySelectorAll('[data-watch-group]').forEach(b=>b.classList.toggle('active',b.dataset.watchGroup===group));}
   async function load() {
-    try{const r=await fetch('/api/market/overview',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const data=await r.json();if(!data.markets?.length)throw Error();rows=data.markets.map(row=>({...row,observedAt:data.observedAt}));observedAt=data.observedAt;render();$('watch-status').textContent=data.partial?'部分市场暂不可用':'行情已更新 · '+new Date(observedAt).toLocaleTimeString('zh-CN',{hour12:false});}
+    try{const r=await fetch('/api/market/overview',{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error();const data=await r.json();if(!data.markets?.length)throw Error();rows=data.markets.map(row=>({...row,observedAt:data.observedAt}));observedAt=data.observedAt;render();$('watch-status').textContent=data.partial?'部分市场暂不可用':'行情已更新 · '+new Date(observedAt).toLocaleTimeString(getLocale(),{hour12:false});}
     catch{$('watch-status').textContent=rows.length?'行情更新中断 · 显示上次快照':'行情暂不可用 · 点击刷新重试';if(!rows.length){$('watchlist').replaceChildren(el('p','watch-empty','暂无可用行情，仍可讨论方法或整理交易计划。'));prompts();}}
   }
   function connectFeed() {
     if(disposed||typeof WebSocket==='undefined')return;
     socket=new WebSocket('wss://api.hyperliquid.xyz/ws');
     socket.onopen=()=>{socket.send(JSON.stringify({method:'subscribe',subscription:{type:'allMids'}}));socket.send(JSON.stringify({method:'subscribe',subscription:{type:'allMids',dex:'xyz'}}));};
-    socket.onmessage=event=>{let msg;try{msg=JSON.parse(event.data);}catch{return;}if(msg.channel!=='allMids'||!rows.length)return;rows=priceUpdate(rows,msg.data?.mids);observedAt=Date.now();updatePrices();$('watch-status').textContent='实时行情 · '+new Date().toLocaleTimeString('zh-CN',{hour12:false});};
+    socket.onmessage=event=>{let msg;try{msg=JSON.parse(event.data);}catch{return;}if(msg.channel!=='allMids'||!rows.length)return;rows=priceUpdate(rows,msg.data?.mids);observedAt=Date.now();updatePrices();$('watch-status').textContent='实时行情 · '+new Date().toLocaleTimeString(getLocale(),{hour12:false});};
     socket.onclose=()=>{if(!disposed)reconnect=setTimeout(connectFeed,5000);};socket.onerror=()=>socket.close();
   }
   $('watch-search').oninput=render;$('watch-refresh').onclick=load;
@@ -119,7 +120,7 @@ export function initWorkbench({prompt,trade,account}) {
         for(const asset of data.spot.assets.slice(0,12)){const row=el('div','spot-asset-row');row.append(el('span','',asset.coin),el('strong','',displayAmount(asset.total)));list.append(row);}
       }else fundsStatus='error';
       if(data.perp)$('funds-perp').textContent=displayAmount(data.perp.withdrawable,6);
-      emitFunds();$('funds-status').textContent=(data.spot&&data.perp?'正式网账户已更新':data.spot||data.perp?'部分账户数据暂不可用，未读取的项目显示 —':'正式网资产读取失败，请重试；不代表余额为零。')+' · '+new Date().toLocaleTimeString('zh-CN',{hour12:false});
+      emitFunds();$('funds-status').textContent=(data.spot&&data.perp?'正式网账户已更新':data.spot||data.perp?'部分账户数据暂不可用，未读取的项目显示 —':'正式网资产读取失败，请重试；不代表余额为零。')+' · '+new Date().toLocaleTimeString(getLocale(),{hour12:false});
       await nativeTask;
     }catch{if(stillCurrent()){fundsStatus='error';fundsAvailable=null;emitFunds();$('funds-status').textContent='正式网资产读取失败，请重试；不代表余额为零。';}}
   }

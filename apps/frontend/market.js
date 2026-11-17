@@ -1,3 +1,4 @@
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {normalize, intervals, buildCatalog} from "./candles.js";
 
 async function directInfo(payload, signal) {
@@ -98,7 +99,7 @@ export function marketView(analyze) {
       const bar=r.v/volume*32;
       g.globalAlpha=.55; g.fillRect(x-w/2,height-24-bar,w,bar); g.globalAlpha=1;
     });
-    const stamp = t=>new Date(t).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    const stamp = t=>new Date(t).toLocaleString(getLocale(),{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
     g.fillStyle="#8eaa94"; g.fillText(stamp(rows[0].t),0,height-5);
     g.textAlign="right";g.fillText(stamp(rows.at(-1).t),right,height-5);
     const r=rows[hover] || rows.at(-1);
@@ -163,7 +164,7 @@ export function marketView(analyze) {
         const merged=new Map(rows.map(r=>[r.t,r]));updates.forEach(r=>merged.set(r.t,r));
         rows=[...merged.values()].sort((a,b)=>a.t-b.t).slice(-100);
         refreshed=Date.now(); action.disabled=false; draw(); insights();
-        status.textContent="实时更新 · "+new Date(refreshed).toLocaleTimeString("zh-CN");
+        status.textContent="实时更新 · "+new Date(refreshed).toLocaleTimeString(getLocale());
         clearTimeout(timer);timer=setTimeout(start,45000);
       };
       timer=setTimeout(start,45000);

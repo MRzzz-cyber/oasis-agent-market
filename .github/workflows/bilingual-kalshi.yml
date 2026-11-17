@@ -1,0 +1,36 @@
+name: Bilingual and Kalshi acceptance
+on:
+  push:
+    branches: [feat/bilingual-kalshi-api]
+permissions:
+  contents: read
+concurrency:
+  group: bilingual-kalshi
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild';await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Bilingual desktop and mobile fixtures
+        run: node scripts/check-bilingual-ui.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bilingual-kalshi-fixtures
+          path: ${{ runner.temp }}/bilingual-ui/*.png
+          if-no-files-found: ignore

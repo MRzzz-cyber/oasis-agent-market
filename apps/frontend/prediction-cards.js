@@ -1,3 +1,4 @@
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {polymarketPurchase} from './polymarket-purchase.js';
 import {predictionIntent} from './prediction-core.js';
 import {shuffledMarkets,marketTopic} from './prediction-discovery.js';
@@ -5,8 +6,8 @@ export {predictionIntent};
 const el=(tag,value,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(value==null?{}:{textContent:String(value)})});
 const venue=id=>id==='polymarket'?'Polymarket':'Kalshi';
 const cents=v=>v==null?'—':(Number(v)*100).toFixed(1)+'¢';
-const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
-const compact=v=>{const n=Number(v);return Number.isFinite(n)?Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:1}).format(n):'—';};
+const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString(getLocale(),{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
+const compact=v=>{const n=Number(v);return Number.isFinite(n)?Intl.NumberFormat(getLocale(),{notation:'compact',maximumFractionDigits:1}).format(n):'—';};
 const button=(label,cls='')=>{const b=el('button',label,cls);b.type='button';return b;};
 function sourceLink(m,label='查看平台规则 ↗'){const a=el('a',label);try{const u=new URL(m.url);if(u.protocol==='https:'&&['polymarket.com','kalshi.com'].includes(u.hostname)){a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}}catch{}return a;}
 export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){

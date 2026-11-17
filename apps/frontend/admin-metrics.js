@@ -1,10 +1,11 @@
+import {getLanguage,getLocale,translateUI} from './i18n.js';
 const $=id=>document.getElementById(id);
 const el=(tag,text,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(text==null?{}:{textContent:String(text)})});
 const names={advisor:'模型顾问',prediction_search:'预测盘口搜索',prediction_quote:'预测盘口报价',wallet_swap:'钱包兑换'};
 const eventNames={'task.started':'任务发起','quote.ready':'报价已核对','funds.insufficient':'资金不足','wallet.confirmation_requested':'请求钱包确认','submission.started':'交易已提交','order.pending':'等待回执','task.succeeded':'任务完成','task.failed':'任务失败','task.cancelled':'用户取消','recovery.required':'需要核对原请求','recovery.completed':'已恢复','guard.blocked':'规则拦截'};
 const codeNames={none:'未分类',rpc_timeout:'钱包读取超时',fee_unavailable:'网络费不可用',insufficient_usdc:'USDC 不足',insufficient_eth:'网络费 ETH 不足',receipt_mismatch:'回执不匹配',unknown_submission:'提交结果不明确',user_cancelled:'用户取消',validation_failed:'校验未通过',duplicate_submission:'重复提交拦截',wallet_changed:'钱包变化',network_changed:'网络变化',http_error:'接口错误',stream_error:'模型流式错误',stream_incomplete:'模型响应不完整'};
 const states={pending:'处理中',succeeded:'已完成',failed:'失败',cancelled:'用户取消',reconciliation_required:'待核对'};
-const time=ms=>new Date(ms).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+const time=ms=>new Date(ms).toLocaleString(getLocale(),{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
 const duration=ms=>ms==null?'—':ms<1000?Math.round(ms)+' ms':ms<60000?(ms/1000).toFixed(1)+' 秒':ms<3600000?(ms/60000).toFixed(1)+' 分钟':(ms/3600000).toFixed(1)+' 小时';
 const percent=n=>n==null?'—':(n*100).toFixed(1)+'%';
 let generation=0,controller=null,current=null;
