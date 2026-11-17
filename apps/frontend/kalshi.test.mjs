@@ -97,3 +97,13 @@ test('read-only recovery keeps incomplete evidence held and reconciles expired q
  assert.equal((await reconcileKalshi({session,storage:s})).terminal,false);complete=true;
  const result=await reconcileKalshi({session,storage:s});assert.equal(result.status,'filled');assert.equal(result.spent,'4.168');assert.equal(reads,2);
 });
+
+test('production read-only mode refuses new previews and orders but retains authenticated recovery',async()=>{
+ const deps={readOnly:true,getAccount:user,fetchImpl:()=>assert.fail('retired order forwarded'),reserve:()=>assert.fail('retired order reserved')};
+ const status=await (await kalshiService(new Request('https://oasis.test/api/kalshi/status'),{ACCOUNTS:{}},deps)).json();assert.equal(status.configured,false);assert.equal(status.readOnly,true);
+ assert.equal((await kalshiService(new Request('https://oasis.test/api/kalshi/preview?ticker=EVENT'),{},deps)).status,410);
+ const q=quote(),rejected=await kalshiService(packet({environment:'production',resource:'submit',auth:auth(),balanceAuth:auth(),review:q,order:kalshiOrder(q,clientId)}),{},deps);
+ assert.equal(rejected.status,410);assert.equal((await rejected.json()).submitted,false);
+ let reads=0;const result=await kalshiService(packet({environment:'production',resource:'orders',auth:auth(),query:{}}),{}, {...deps,fetchImpl:async(url,init)=>{reads++;assert.equal(init.method,'GET');assert.ok(String(url).includes('/portfolio/orders'));return Response.json({orders:[],cursor:null});}});
+ assert.equal(result.status,200);assert.equal(reads,1);
+});
