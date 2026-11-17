@@ -31,6 +31,7 @@ jobs:
           fixture_failures=0
           node scripts/check-bilingual-ui.mjs || fixture_failures=1
           node scripts/check-prediction-ui.mjs || fixture_failures=1
+          node scripts/check-prediction-conversation.mjs || fixture_failures=1
           node scripts/check-polymarket-purchase-ui.mjs || fixture_failures=1
           exit $fixture_failures
       - name: Polymarket relay and retained recovery guards in Workers
@@ -54,5 +55,6 @@ jobs:
           path: |
             ${{ runner.temp }}/bilingual-ui/*.png
             ${{ runner.temp }}/prediction-ui/*.png
+            ${{ runner.temp }}/prediction-conversation/*.png
             ${{ runner.temp }}/polymarket-purchase-ui/*.png
           if-no-files-found: ignore

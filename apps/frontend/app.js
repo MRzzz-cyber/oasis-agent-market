@@ -886,9 +886,10 @@ $("change-model").addEventListener("change", event => {
 });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
-  if(/换.{0,12}(?:盘口|事件)|其他.{0,12}盘口|找.{0,12}(?:预测|盘口|市场)|search|find .{0,24}markets?/i.test(value))predictionContext=null;
-  clearChatTradePlan();
+  const nextTopic=predictionQuery([{role:'user',content:value}]),resetPrediction=/换.{0,12}(?:盘口|事件)|其他.{0,12}盘口|找.{0,12}(?:预测|盘口|市场)|search|find .{0,24}markets?/i.test(value)||nextTopic&&nextTopic!==predictionQuery(state.conversation);
+  if(resetPrediction)predictionContext=null;
   try { appendUserMessage(value); } catch (error) { toast(error.message); return; }
+  if(resetPrediction||!predictionIntent(state.conversation))clearChatTradePlan();
   const guide=conversationGuide(state.conversation);if(guide.stage==='funds')showChatTradePlan(guide.budget);
   state.goal = (state.goal + "；补充要求：" + value).slice(-2000); $("chat-input").value = "";
   makeDraftSummary();

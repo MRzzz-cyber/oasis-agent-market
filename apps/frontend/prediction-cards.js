@@ -7,7 +7,7 @@ export {predictionIntent};
 const el=(tag,value,cls='')=>Object.assign(document.createElement(tag),{className:cls,...(value==null?{}:{textContent:String(value)})});
 const cents=v=>v==null?'—':(Number(v)*100).toFixed(1)+'¢';
 const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString(getLocale(),{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
-const compact=v=>Number.isFinite(Number(v))?Intl.NumberFormat(getLocale(),{notation:'compact',maximumFractionDigits:1}).format(Number(v)):'—';
+const compact=v=>Number.isFinite(Number(v))?Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(Number(v)):'—';
 const button=(label,cls='')=>{const b=el('button',label,cls);b.type='button';return b;};
 export function predictionCards({getWallet=()=>null,pickWallet=()=>{},onDiscuss,onSelect,initialQuery='',initialMarket=null,initialOutcome='yes'}={}){
  const root=el('section',null,'prediction-cards'),css=el('link');css.rel='stylesheet';css.href='/prediction-cards.css?v=polymarket-focus-v1';

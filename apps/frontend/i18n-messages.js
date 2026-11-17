@@ -1058,3 +1058,5 @@ Object.assign(messages,{
 });
 
 Object.assign(messages,{" 更新 · ":" updated · ","每 60 秒刷新":"Refreshes every 60s"});
+
+Object.assign(messages,{"世界正在发生什么，":"What happens next?","你怎么看？":"Make your call."});
