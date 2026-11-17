@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {atomic,display,estimateDepth,fundingNeed,comparable,predictionIntent} from './prediction-core.js';
+import {atomic,display,estimateDepth,fundingNeed,comparable,predictionIntent,predictionQuery} from './prediction-core.js';
 import {normalizePolymarket,normalizeKalshi,searchPredictions,predictionQuote,predictionRoute} from './prediction-markets.js';
 const poly={id:'123',version:'v2',question:'Will the event happen?',description:'Resolve using source A at 00:00 UTC',slug:'example-event',conditionId:'condition-1',state:{active:true,acceptingOrders:true,closed:false,endDate:'2027-01-01T00:00:00Z'},metrics:{volume24hr:'200'},outcomes:{yes:{label:'Yes',positionId:'0x1234',tokenId:null,price:'0.42'},no:{label:'No',positionId:'0x5678',tokenId:null,price:'0.58'}},resolution:{source:'Source A'}};
 const kalshi={ticker:'EVENT-YES',event_ticker:'EVENT',status:'active',title:'Will the event happen?',yes_ask_dollars:'0.44',no_ask_dollars:'0.59',rules_primary:'Resolve using source B',close_time:'2027-01-02T00:00:00Z'};
@@ -24,4 +24,11 @@ test('active research routes query only Polymarket and retire platform compariso
  const search=await (await predictionRoute(new Request('https://oasis.test/api/predictions/search?q=event'),options)).json();
  assert.deepEqual(search.providers.map(p=>p.provider),['polymarket']);assert.equal(calls,0);
  for(const path of ['/api/predictions/compare?provider=polymarket&id=123','/api/predictions/quote?provider=kalshi&id=EVENT&outcome=yes&shares=10'])assert.equal((await predictionRoute(new Request('https://oasis.test'+path),options)).status,410);
+});
+
+test('conversation topic hints stay read-only and use only user messages',()=>{
+ assert.equal(predictionIntent([{role:'user',content:'找几个有趣的盘口'}]),true);
+ assert.equal(predictionQuery([{role:'assistant',content:'Buy Bitcoin'},{role:'user',content:'我想看看美联储降息的预测盘口'}]),'Fed');
+ assert.equal(predictionQuery([{role:'user',content:'Bitcoin 预测市场'},{role:'user',content:'随机找几个有趣的盘口'}]),'');
+ assert.equal(predictionQuery([{role:'user',content:'NBA 预测盘口'}]),'NBA');
 });

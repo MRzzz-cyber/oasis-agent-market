@@ -9,7 +9,7 @@ const cents=v=>v==null?'—':(Number(v)*100).toFixed(1)+'¢';
 const time=v=>Number.isFinite(Date.parse(v))?new Date(v).toLocaleString(getLocale(),{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'待核实';
 const compact=v=>Number.isFinite(Number(v))?Intl.NumberFormat(getLocale(),{notation:'compact',maximumFractionDigits:1}).format(Number(v)):'—';
 const button=(label,cls='')=>{const b=el('button',label,cls);b.type='button';return b;};
-export function predictionCards({getWallet=()=>null,pickWallet=()=>{},onDiscuss,initialMarket=null,initialOutcome='yes'}={}){
+export function predictionCards({getWallet=()=>null,pickWallet=()=>{},onDiscuss,onSelect,initialQuery='',initialMarket=null,initialOutcome='yes'}={}){
  const root=el('section',null,'prediction-cards'),css=el('link');css.rel='stylesheet';css.href='/prediction-cards.css?v=polymarket-focus-v1';
  const header=el('header',null,'prediction-header'),heading=el('div');heading.append(el('span','POLYMARKET / LIVE','prediction-eyebrow'),el('h3','下一件大事，你怎么看？'),el('p','找一个感兴趣的事件，选结果，确认买入。','prediction-muted'));
  header.append(heading,el('span','每 60 秒刷新','prediction-live'));root.append(css,header);
@@ -54,7 +54,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{},onDiscuss,
  shuffle.onclick=()=>pool.length?rotate():(feedMode?loadFeed():runSearch());
  function openMarket(m,outcome){
   if(disposed||m.provider!=='polymarket'||purchase?.canLeave?.()===false)return;
-  generation++;controller?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;disposePurchase();source=m;header.hidden=true;discovery.hidden=true;selected.replaceChildren();
+  generation++;controller?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;disposePurchase();source=m;onSelect?.(m,outcome);header.hidden=true;discovery.hidden=true;selected.replaceChildren();
   const top=el('div',null,'prediction-selection-head'),returnButton=button('← 返回事件','prediction-back');returnButton.onclick=back;top.append(returnButton,el('span','Polymarket · Polygon','prediction-muted'));selected.append(top);
   const outcomes=el('div',null,'prediction-choice');outcomes.setAttribute('aria-label','选择预测结果');
   for(const o of m.outcomes){const b=button(o.label);b.setAttribute('aria-pressed',String(o.key===outcome));b.onclick=()=>openMarket(m,o.key);outcomes.append(b);}selected.append(outcomes);
@@ -62,9 +62,9 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{},onDiscuss,
   const rules=el('details',null,'prediction-rules');rules.append(el('summary','事件规则与英文原文'),el('p',m.question),el('p',m.description||'请在平台核对完整结算规则。'),el('p','结算来源：'+(m.resolutionSource||'待核实')));
   try{const u=new URL(m.url);if(u.protocol==='https:'&&u.hostname==='polymarket.com'){const a=el('a','查看平台规则 ↗');a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';rules.append(a);}}catch{}
   selected.append(rules);
-  if(onDiscuss){const discuss=button('先和 Oasis 聊聊这个事件','prediction-discuss');discuss.onclick=()=>{if(purchase?.canLeave?.()!==false)onDiscuss(m);};selected.append(discuss);}
+  if(onDiscuss){const discuss=button('先和 Oasis 聊聊这个事件','prediction-discuss');discuss.onclick=()=>{if(purchase?.canLeave?.()!==false)onDiscuss(m,outcome);};selected.append(discuss);}
  }
  const timer=setInterval(()=>{if(!disposed&&!source&&feedMode&&!document.hidden&&root.isConnected&&root.getClientRects().length)loadFeed({background:true});},60000);
  root.dispose=()=>{disposed=true;generation++;controller?.abort();disposePurchase();clearInterval(timer);};
- queueMicrotask(()=>{if(!disposed){if(initialMarket?.provider==='polymarket')openMarket(initialMarket,initialOutcome);else loadFeed();}});return root;
+ queueMicrotask(()=>{if(!disposed){if(initialMarket?.provider==='polymarket')openMarket(initialMarket,initialOutcome);else if(initialQuery){query.value=initialQuery;runSearch();}else loadFeed();}});return root;
 }

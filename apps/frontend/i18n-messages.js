@@ -1056,3 +1056,5 @@ Object.assign(messages,{
   "当前版本仅支持 Polymarket": "This version supports Polymarket only",
   "Kalshi 新订单已停用，原订单可继续只读核对": "New Kalshi orders are disabled. Original orders can still be checked read-only."
 });
+
+Object.assign(messages,{" 更新 · ":" updated · ","每 60 秒刷新":"Refreshes every 60s"});

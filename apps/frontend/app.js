@@ -1,5 +1,6 @@
 import {getLanguage,getLocale,translateUI} from './i18n.js';
 import {nativeTrade} from './mainnet-trade.js?v=native-mainnet-v15-20261116';
+import {predictionQuery} from './prediction-core.js';
 import {predictionCards,predictionIntent} from './prediction-cards.js?v=polymarket-focus-v1';
 import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=native-mainnet-v15-20261116';
 import {renderAccountButton} from "./account-avatar.js?v=native-mainnet-v15-20261116";
@@ -551,7 +552,7 @@ async function startChatSimulation() {
   }catch(e){toast(e.message);}
 }
 function clearChatTradePlan(){const host=$('chat-trade-plan');host.firstElementChild?.dispose?.();host.replaceChildren();}
-function showPredictionMarkets(){const host=$('chat-trade-plan');if(host.querySelector('.prediction-cards'))return;clearChatTradePlan();host.append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,initialMarket:predictionContext}));predictionContext=null;$('chat-funding-card').replaceChildren();}
+function showPredictionMarkets(){const host=$('chat-trade-plan');if(host.querySelector('.prediction-cards'))return;clearChatTradePlan();host.append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,initialMarket:predictionContext?.market,initialOutcome:predictionContext?.outcome,initialQuery:predictionQuery(state.conversation),onSelect:(market,outcome)=>{predictionContext={market,outcome};}}));$('chat-funding-card').replaceChildren();}
 function showChatTradePlan(amount=conversationGuide(state.conversation).budget||10){
  if(predictionIntent(state.conversation))return showPredictionMarkets();
  clearChatTradePlan();const host=$('chat-trade-plan');host.replaceChildren(nativeTrade({budget:amount,getWallet:workbench.wallet,pickWallet:workbench.openFunds,openDeposit:workbench.openDeposit,
@@ -559,13 +560,14 @@ function showChatTradePlan(amount=conversationGuide(state.conversation).budget||
  onReceipt:record=>{const db=readDemoState(),id='mainnet:'+record.cloid,prior=db.runs.find(r=>r.id===id);const run={...prior,id,mode:'mainnet',asset:'ETH',createdAt:new Date(record.nonce).toISOString(),goal:'站内 ETH 现货买入',status:record.status,receipt:record};if(prior)Object.assign(prior,run);else db.runs.push(run);writeDemoState(db);}
  }));renderFundingCard();host.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
-function beginConversation() {
+function beginConversation({marketContext=null}={}) {
   if (chatBusy) { toast("请等待当前模型回复完成"); return; }
   if (googleLogin && !currentUser?.active) { openAccount(); return; }
   const nextGoal = $("goal").value.trim();
   if (!nextGoal) return;
   updateModelLabels();
   if (!state.model) { toast("请先在策略工作台中选择一个 OpenRouter 模型"); showTab("overview"); return; }
+  predictionContext=marketContext;
   persistConversation();state.goal=nextGoal;conversationId=crypto.randomUUID();conversationCreatedAt=new Date().toISOString();
   state.conversation = [];
   $("chat-next-actions").replaceChildren();clearChatTradePlan();$("chat-funding-card").replaceChildren();
@@ -884,6 +886,7 @@ $("change-model").addEventListener("change", event => {
 });
 $("chat-form").addEventListener("submit", event => {
   event.preventDefault(); const value = $("chat-input").value.trim(); if (!value || chatBusy) return;
+  if(/换.{0,12}(?:盘口|事件)|其他.{0,12}盘口|找.{0,12}(?:预测|盘口|市场)|search|find .{0,24}markets?/i.test(value))predictionContext=null;
   clearChatTradePlan();
   try { appendUserMessage(value); } catch (error) { toast(error.message); return; }
   const guide=conversationGuide(state.conversation);if(guide.stage==='funds')showChatTradePlan(guide.budget);
@@ -920,7 +923,7 @@ const workbench=initWorkbench({
   },account:openAccount
 });
 
-$('home-predictions').append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,onDiscuss:market=>{predictionContext=market;resetStarter();$('goal').value='我想研究 Polymarket 预测市场：'+market.question+'。请帮我梳理需要核对的信息，买入由我确认。';beginConversation();}}));
+$('home-predictions').append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,onDiscuss:(market,outcome)=>{resetStarter();$('goal').value='我想研究 Polymarket 预测市场：'+market.question+'。请帮我梳理需要核对的信息，买入由我确认。';beginConversation({marketContext:{market,outcome}});}}));
 document.querySelectorAll('[data-prediction-prompt]').forEach(b=>b.onclick=()=>{predictionContext=null;resetStarter();$('goal').value=b.dataset.predictionPrompt;beginConversation();});
 $('home-eth-trade').onclick=()=>{predictionContext=null;resetStarter();$('goal').value='我想买入 10 USDC 的 ETH 现货，请先核对余额和价格，不要自动下单。';beginConversation();};
 configureAccountWallet({openAccount});
