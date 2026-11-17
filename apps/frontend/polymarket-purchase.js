@@ -74,7 +74,7 @@ export function polymarketPurchase({market,outcome,getWallet,pickWallet,createSe
  async function updateWallet(){
   generation++;wallet=getWallet();session=null;quote=null;facts.replaceChildren();funding.replaceChildren();extra.replaceChildren();balance.textContent='连接后查看 Polymarket 可用余额';wrongChain=false;
   if(wallet){const candidate=wallet;wrongChain=await wallet.provider.request({method:'eth_chainId'})!==POLYGON;if(getWallet()!==candidate||closed)return;record=journal().load();}
-  status.textContent=record?.terminal===false?'发现原交易，请连接同一钱包后核对。':'连接后核对余额与价格，再由你确认买入。';paint();
+  status.textContent=record?.terminal===false?'发现原交易，请连接同一钱包后核对。':'首次连接需创建或恢复 Polymarket 交易账户，原 Oasis 钱包地址保持不变。';paint();
  }
  async function initialize(){try{const r=await fetch('/api/predictions/trading-status',{cache:'no-store',signal:AbortSignal.timeout(10000)}),p=await r.json();if(closed)return;enabled=r.ok&&p.enabled===true;if(!enabled){status.textContent='平台交易服务正在准备，当前仍可查看盘口。';paint();return;}await updateWallet();}catch(error){if(!closed){status.textContent=error.message||'交易服务暂不可用';paint();}}}
  const changed=()=>{if(!closed&&!busy&&getWallet()!==wallet)updateWallet().catch(e=>{status.textContent=e.message;});};window.addEventListener('oasis:funds-updated',changed);

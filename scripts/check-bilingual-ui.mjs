@@ -20,7 +20,7 @@ try{
  const excluded='script,style,svg,code,pre,textarea,[data-i18n-skip],[data-language-switch]';const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n,missing=[];while(n=walker.nextNode())if(!n.parentElement.closest(excluded)&&/[\u3400-\u9fff]/.test(n.data))missing.push(n.data.trim());
  fail(!missing.length,'untranslated static copy: '+JSON.stringify([...new Set(missing)].slice(0,25)));
  fail(document.documentElement.scrollWidth<=innerWidth+1,'English page overflow');switcher.click();await wait();fail(getLanguage()==='zh'&&document.documentElement.lang==='zh-CN','Chinese restore failed');fail(status.textContent==='报价已过期，请刷新后选择平台。','dynamic original lost');fail(localStorage.getItem(storeKey)==='DO NOT MODIFY','existing history modified');
- const page=document.querySelector('#page-overview');if(page)fail(page.getBoundingClientRect().right<=innerWidth+1,'page overflow');
+ const page=document.querySelector('#page-overview');if(page)fail(page.getBoundingClientRect().right<=innerWidth+1,'page overflow');const rail=document.querySelector('.tool-rail');if(rail&&innerWidth<=700)fail(rail.getBoundingClientRect().top>=innerHeight-80,'mobile rail covers content');
  if(mode==='app-en'){switcher.click();await wait();}const meta=document.createElement('meta');meta.name='bilingual-ui-result';meta.content='pass';document.head.append(meta);
 }catch(e){const m=document.createElement('meta');m.name='bilingual-ui-result';m.content='fail:'+e.message;document.head.append(m);}
 </script>`;

@@ -1060,3 +1060,5 @@ Object.assign(messages,{
 Object.assign(messages,{" 更新 · ":" updated · ","每 60 秒刷新":"Refreshes every 60s"});
 
 Object.assign(messages,{"世界正在发生什么，":"What happens next?","你怎么看？":"Make your call."});
+
+Object.assign(messages,{"首次连接需创建或恢复 Polymarket 交易账户，原 Oasis 钱包地址保持不变。":"First connection creates or restores your Polymarket trading account. Your Oasis wallet address stays the same."});
