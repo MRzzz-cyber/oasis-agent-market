@@ -90,7 +90,7 @@ test('modern order recovery verifies every fill, NO complement, fees and origina
 });
 
 test('read-only recovery keeps incomplete evidence held and reconciles expired quotes by exact fill IDs',async()=>{
- const s=storage(),q=quote({at:Date.now()-60000,expiresAt:Date.now()-30000}),j=kalshiJournal(s,accountHash);
+ const s=storage(),at=Date.now()-60000,q=quote({at,expiresAt:at+30000}),j=kalshiJournal(s,accountHash);
  j.save({owner,clientId,terminal:false,status:'unknown',at:Date.now()-60000,quote:q,message:'fixture pending'});
  const order={order_id:clientId,client_order_id:clientId,ticker:q.ticker,exchange_index:0,subaccount_number:0,outcome_side:'yes',book_side:'bid',initial_count_fp:'10.00',fill_count_fp:'10.00',remaining_count_fp:'0.00',status:'executed'};
  let complete=false,reads=0;const session={accountHash,current:async()=>{},orders:async args=>{reads++;assert.equal(args.ticker,q.ticker);return {orders:[order]};},fills:async args=>{assert.equal(args.order_id,clientId);return {fills:[{fill_id:'read-fixture',order_id:clientId,ticker:q.ticker,exchange_index:0,subaccount_number:0,outcome_side:'yes',book_side:'bid',count_fp:complete?'10.00':'9.00',yes_price_dollars:'0.4',no_price_dollars:'0.6',fee_cost:'0.168',is_taker:true}],cursor:null};},submit:()=>assert.fail('recovery attempted submission')};
