@@ -552,7 +552,7 @@ async function startChatSimulation() {
   }catch(e){toast(e.message);}
 }
 function clearChatTradePlan(){const host=$('chat-trade-plan');host.firstElementChild?.dispose?.();host.replaceChildren();}
-function showPredictionMarkets(){const host=$('chat-trade-plan');if(host.querySelector('.prediction-cards'))return;clearChatTradePlan();host.append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,initialMarket:predictionContext?.market,initialOutcome:predictionContext?.outcome,initialQuery:predictionQuery(state.conversation),onSelect:(market,outcome)=>{predictionContext={market,outcome};}}));$('chat-funding-card').replaceChildren();}
+function showPredictionMarkets(){const host=$('chat-trade-plan');if(host.querySelector('.prediction-cards'))return;clearChatTradePlan();host.append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,initialMarket:predictionContext?.market,initialOutcome:predictionContext?.outcome,initialQuery:predictionQuery(state.conversation)}));predictionContext=null;$('chat-funding-card').replaceChildren();}
 function showChatTradePlan(amount=conversationGuide(state.conversation).budget||10){
  if(predictionIntent(state.conversation))return showPredictionMarkets();
  clearChatTradePlan();const host=$('chat-trade-plan');host.replaceChildren(nativeTrade({budget:amount,getWallet:workbench.wallet,pickWallet:workbench.openFunds,openDeposit:workbench.openDeposit,
