@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {normalizeDiscoveryMarket,discoverPredictions,comparePredictions,predictionRoute} from './prediction-markets.js';
 import {matchAssessment,relatedScore,shuffledMarkets,searchTerms,discoveryQuery} from './prediction-discovery.js';
 const reply=p=>Response.json(p);
-const raw={id:'123',question:'Will Bitcoin reach $100000 by December?',active:true,acceptingOrders:true,closed:false,archived:false,outcomes:'["Yes","No"]',outcomePrices:'["0.4","0.6"]',volume24hr:123,endDate:'2026-12-31T00:00:00Z',description:'Use the daily closing price.'};
+const raw={id:'123',question:'Will Bitcoin reach $100000 by December?',active:true,acceptingOrders:true,closed:false,archived:false,outcomes:'["Yes","No"]',outcomePrices:'["0.4","0.6"]',volume24hr:123,bestAsk:0.4,endDate:'2026-12-31T00:00:00Z',description:'Use the daily closing price.'};
 const poly={id:'123',version:'v1',question:raw.question,description:raw.description,slug:'btc',conditionId:'cond',state:{active:true,acceptingOrders:true,endDate:raw.endDate},outcomes:{yes:{label:'Yes',price:'0.4',tokenId:'1'},no:{label:'No',price:'0.6',tokenId:'2'}}};
 const kal={ticker:'KXBTC-100K',event_ticker:'KXBTC',status:'active',title:raw.question,yes_ask_dollars:'0.42',no_ask_dollars:'0.6',close_time:'2027-01-01T00:00:00Z',rules_primary:'Use a different price source.'};
 test('discovery preserves public event identity and never invents nonbinary outcome mappings',()=>{
@@ -48,4 +48,13 @@ test('shuffling is bounded, nonmutating and deduplicates real IDs',()=>{
  const rows=[{provider:'polymarket',id:'1'},{provider:'polymarket',id:'2'},{provider:'polymarket',id:'1'}],result=shuffledMarkets(rows,()=>0);
  assert.equal(result.length,2);assert.equal(rows.length,3);assert.notEqual(result[0].id,result[1].id);assert.equal(relatedScore('the Bitcoin price','bitcoin closing price'),1);
  assert.ok(searchTerms('我想找比特币').includes('bitcoin'));assert.ok(discoveryQuery({question:'Will Bitcoin reach 100000?'}).length<=120);
+});
+
+test('discovery excludes advertised empty asks, expired contracts and player props',async()=>{
+ const p=await discoverPredictions({now:Date.parse('2026-11-17'),fetchImpl:async()=>reply([{markets:[{...raw,id:'e',endDate:'2026-01-01'}]},{markets:[{...raw,id:'n',bestAsk:0}]},{markets:[{...raw,id:'p',question:'Player: Rebounds O/U 1.5'}]},{markets:[raw]}])});
+ assert.deepEqual(p.markets.map(m=>m.id),['123']);
+});
+test('discovery caps repeated topics and preserves diversity in an active pool',async()=>{
+ const p=await discoverPredictions({now:1000,fetchImpl:async()=>reply(Array.from({length:20},(_,i)=>({id:'e'+i,markets:[{...raw,id:String(100+i),question:i<18?'Bitcoin price '+i:'Will the Fed cut rates '+i}]})))});
+ assert.equal(p.markets.length,8);assert.equal(p.markets.filter(m=>m.topic==='加密').length,6);assert.equal(p.markets.filter(m=>m.topic==='宏观').length,2);
 });

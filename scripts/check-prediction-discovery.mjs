@@ -4,7 +4,7 @@ import {build} from 'esbuild';
 import {pathToFileURL} from 'node:url';
 import {discoverPredictions,comparePredictions,predictionQuote} from '../apps/frontend/prediction-markets.js';
 const feed=await discoverPredictions();assert.ok(feed.markets.length,'No live binary markets');assert.equal(feed.version,'prediction-discovery-v1');
-console.log('LIVE FEED',JSON.stringify({count:feed.markets.length,at:feed.at,first:feed.markets[0].question}));
+console.log('LIVE FEED',JSON.stringify({count:feed.markets.length,at:feed.at,titles:feed.markets.slice(0,8).map(m=>m.question)}));
 const source=feed.markets[0],comparison=await comparePredictions({provider:source.provider,id:source.id,outcome:'yes',shares:'10'});
 assert.equal(comparison.source.id,source.id);assert.equal(comparison.equivalenceVerified,false);assert.equal(comparison.providers.length,2);
 console.log('LIVE COMPARISON',JSON.stringify(comparison.providers.map(p=>({provider:p.provider,count:p.markets.length,error:p.errorCode,coverage:p.coverage}))));

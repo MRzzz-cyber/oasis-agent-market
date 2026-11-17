@@ -1,4 +1,4 @@
-import {relatedScore,discoveryQuery,matchAssessment} from './prediction-discovery.js';
+import {relatedScore,discoveryQuery,matchAssessment,marketTopic} from './prediction-discovery.js';
 import {estimateDepth,sharesInput} from './prediction-core.js';
 const KALSHI='https://api.elections.kalshi.com/trade-api/v2';
 const noStore={'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'};
@@ -42,19 +42,20 @@ export function normalizeDiscoveryMarket(raw,event={}){
  const market=normalizePolymarket({id:raw.id,question:raw.question,description:raw.description,slug:event.slug||raw.slug,version:raw.version,
   state:{active:raw.active,closed:raw.closed,archived:raw.archived,acceptingOrders:raw.acceptingOrders,endDate:raw.endDate},
   metrics:{volume24hr:raw.volume24hr},outcomes:{yes:{label:labels[0],price:prices[0]},no:{label:labels[1],price:prices[1]}},resolution:{source:raw.resolutionSource}});
- return market?{...market,eventTitle:text(event.title,400),eventId:String(event.id||raw.id)}:null;
+ return market?{...market,eventTitle:text(event.title,400),eventId:String(event.id||raw.id),topic:marketTopic([event.title,raw.question,...(Array.isArray(event.tags)?event.tags.map(t=>t.label):[])].join(' '))}:null;
 }
 let discoveryCache=null,discoveryAt=0;
 export async function discoverPredictions({fetchImpl=fetch,now=Date.now()}={}){
  if(fetchImpl===fetch&&discoveryCache&&now-discoveryAt<45000)return discoveryCache;
- const events=await json(GAMMA+'/events?'+new URLSearchParams({active:'true',closed:'false',archived:'false',order:'volume24hr',ascending:'false',limit:'36'}),fetchImpl);
+ const events=await json(GAMMA+'/events?'+new URLSearchParams({active:'true',closed:'false',archived:'false',order:'volume24hr',ascending:'false',limit:'100'}),fetchImpl);
  if(!Array.isArray(events))throw new ProviderDataError('format');
  const markets=[],seen=new Set();
  for(const event of events){if(event.closed||event.archived||event.active===false)continue;
-  const candidates=(event.markets||[]).map(raw=>normalizeDiscoveryMarket(raw,event)).filter(Boolean).sort((a,b)=>Number(b.volume||0)-Number(a.volume||0));
+  const candidates=(event.markets||[]).filter(raw=>Number(raw.bestAsk)>0&&Number(raw.bestAsk)<1&&raw.enableOrderBook!==false&&!/:.*\bO\/U\b/i.test(raw.question||'')).map(raw=>normalizeDiscoveryMarket(raw,event)).filter(m=>m&&Number.isFinite(Date.parse(m.endDate))&&Date.parse(m.endDate)>now).sort((a,b)=>Number(b.volume||0)-Number(a.volume||0));
   const m=candidates[0];if(m&&!seen.has(m.id)){seen.add(m.id);markets.push(m);}
  }
- const payload={version:'prediction-discovery-v1',at:new Date(now).toISOString(),refreshAfterSeconds:60,source:'Polymarket',coverage:'按 24 小时活跃度读取前 36 个事件，每个事件展示一个开放的二元盘口；不是全站或投资推荐',markets:markets.slice(0,24)};
+ const groups=new Map();for(const m of markets){const group=groups.get(m.topic)||[];if(group.length<6)group.push(m);groups.set(m.topic,group);}const diverse=[];for(let i=0;i<6;i++)for(const group of groups.values())if(group[i])diverse.push(group[i]);
+ const payload={version:'prediction-discovery-v1',at:new Date(now).toISOString(),refreshAfterSeconds:60,source:'Polymarket',coverage:'按 24 小时活跃度读取前 100 个事件，每事件一个开放二元盘口，排除已到期、无卖价及球员大小分盘口；不是全站或投资推荐',markets:diverse.slice(0,24)};
  if(fetchImpl===fetch){discoveryCache=payload;discoveryAt=now;}return payload;
 }
 async function kalshiRelated(source,fetchImpl){

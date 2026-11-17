@@ -30,7 +30,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  function disposePurchase(){purchase?.dispose?.();purchase=null;selected.querySelector('.prediction-purchase-host')?.replaceChildren();}
  function closeComparison(){clearExpiry();selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();discovery.hidden=false;live.textContent='每 60 秒刷新';}
  function marketCard(m){
-  const card=el('article',null,'prediction-market'),top=el('div',null,'prediction-market-top');top.append(el('span',marketTopic(m.question),'prediction-topic'),el('small',venue(m.provider),'prediction-muted'));
+  const card=el('article',null,'prediction-market'),top=el('div',null,'prediction-market-top');top.append(el('span',m.topic||marketTopic(m.question),'prediction-topic'),el('small',venue(m.provider),'prediction-muted'));
   const title=button(m.question,'prediction-market-title');title.onclick=()=>openComparison(m,'yes');
   const yes=m.outcomes.find(o=>o.key==='yes'),prob=Number(yes?.price),metric=el('div',null,'prediction-probability');
   metric.append(el('strong',yes?.price==null?'—':(prob*100).toFixed(0)+'%'),el('span','YES · 市场隐含概率'));
@@ -50,12 +50,12 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  }
  async function runSearch(){
   const term=query.value.trim();if(!term)return loadFeed();feedController?.abort();feedController=new AbortController();const ticket=++feedGeneration;feedMode=false;loading=true;submit.disabled=true;shuffle.disabled=true;status.textContent='正在搜索两平台的真实盘口…';results.replaceChildren();
-  try{const payload=await request('/api/predictions/search?'+new URLSearchParams({q:term}),feedController.signal);if(ticket!==feedGeneration||disposed)return;pool=payload.providers.flatMap(p=>p.markets);renderMarkets(pool);const failed=payload.providers.filter(p=>p.error);status.textContent=failed.length===payload.providers.length?'平台连接失败，不代表没有相关盘口。':pool.length?'已读取 '+pool.length+' 个相关盘口'+(failed.length?' · 部分平台暂不可用':'')+' · 点击自动比价':'本次检索范围内没有匹配盘口，请换一个关键词。';for(const p of failed)results.append(el('p',venue(p.provider)+'：'+p.error,'prediction-availability'));}
+  try{const payload=await request('/api/predictions/search?'+new URLSearchParams({q:term}),feedController.signal);if(ticket!==feedGeneration||disposed)return;pool=payload.providers.flatMap(p=>p.markets);rotate();if(!pool.length)renderMarkets([]);const failed=payload.providers.filter(p=>p.error);status.textContent=failed.length===payload.providers.length?'平台连接失败，不代表没有相关盘口。':pool.length?'已读取 '+pool.length+' 个相关盘口'+(failed.length?' · 部分平台暂不可用':'')+' · 点击自动比价':'本次检索范围内没有匹配盘口，请换一个关键词。';for(const p of failed)results.append(el('p',venue(p.provider)+'：'+p.error,'prediction-availability'));}
   catch(error){if(ticket===feedGeneration&&!disposed&&error.name!=='AbortError')status.textContent=error.message||'搜索失败，请重试';}
   finally{if(ticket===feedGeneration){loading=false;submit.disabled=false;shuffle.disabled=false;}}
  }
  form.onsubmit=e=>{e.preventDefault();activeTopic='搜索';presets.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));runSearch();};
- shuffle.onclick=()=>feedMode?(pool.length?rotate():loadFeed()):runSearch();
+ shuffle.onclick=()=>pool.length?rotate():(feedMode?loadFeed():runSearch());
  function rules(m){const d=el('details',null,'prediction-rules');d.append(el('summary','事件定义与结算规则'),el('p',m.description||'规则尚未获取，请在平台核对。'),el('p','结算来源：'+(m.resolutionSource||'待核实')),sourceLink(m));return d;}
  async function openComparison(m,outcome){
   clearExpiry();feedGeneration++;feedController?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;quoteGeneration++;quoteController?.abort();compareController?.abort();disposePurchase();
@@ -111,7 +111,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  }
  const changed=()=>{if(source){disposePurchase();quoteGeneration++;quoteController?.abort();if(quoteButton)quoteButton.disabled=false;if(quoteStatus)quoteStatus.textContent='钱包已变化，请刷新报价后继续。';selected.querySelectorAll('.prediction-choose-venue').forEach(b=>b.disabled=true);}};
  window.addEventListener('oasis:funds-updated',changed);
- const timer=setInterval(()=>{if(!disposed&&!source&&feedMode&&!document.hidden)loadFeed({background:true});},60000);
+ const timer=setInterval(()=>{if(!disposed&&!source&&feedMode&&!document.hidden&&root.isConnected&&root.getClientRects().length)loadFeed({background:true});},60000);
  root.dispose=()=>{clearExpiry();disposed=true;feedGeneration++;selectionGeneration++;quoteGeneration++;feedController?.abort();compareController?.abort();quoteController?.abort();disposePurchase();clearInterval(timer);window.removeEventListener('oasis:funds-updated',changed);};
  queueMicrotask(()=>{if(!disposed)loadFeed();});return root;
 }
