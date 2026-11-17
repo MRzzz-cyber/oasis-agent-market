@@ -28,7 +28,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  async function request(path,signal){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)])});let data;try{data=await r.json();}catch{throw Error('服务暂时不可用，请稍后重试');}if(!r.ok&&!Array.isArray(data.providers))throw Error(data.error||'平台数据暂不可用');return data;}
  function clearExpiry(){clearTimeout(expiryTimer);expiryTimer=null;}
  function disposePurchase(){purchase?.dispose?.();purchase=null;selected.querySelector('.prediction-purchase-host')?.replaceChildren();}
- function closeComparison(){clearExpiry();selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();discovery.hidden=false;live.textContent='每 60 秒刷新';}
+ function closeComparison(){clearExpiry();selectionGeneration++;quoteGeneration++;compareController?.abort();quoteController?.abort();disposePurchase();source=null;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();selected.replaceChildren();header.hidden=false;discovery.hidden=false;live.textContent='每 60 秒刷新';}
  function marketCard(m){
   const card=el('article',null,'prediction-market'),top=el('div',null,'prediction-market-top');top.append(el('span',m.topic||marketTopic(m.question),'prediction-topic'),el('small',venue(m.provider),'prediction-muted'));
   const title=button(m.question,'prediction-market-title');title.onclick=()=>openComparison(m,'yes');
@@ -59,7 +59,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
  function rules(m){const d=el('details',null,'prediction-rules');d.append(el('summary','事件定义与结算规则'),el('p',m.description||'规则尚未获取，请在平台核对。'),el('p','结算来源：'+(m.resolutionSource||'待核实')),sourceLink(m));return d;}
  async function openComparison(m,outcome){
   clearExpiry();feedGeneration++;feedController?.abort();loading=false;submit.disabled=false;shuffle.disabled=false;quoteGeneration++;quoteController?.abort();compareController?.abort();disposePurchase();
-  source=m;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();const ticket=++selectionGeneration;compareController=new AbortController();discovery.hidden=true;live.textContent='跨平台报价';selected.replaceChildren();
+  source=m;comparison=null;selectedMarkets.clear();selectedOutcomes.clear();const ticket=++selectionGeneration;compareController=new AbortController();header.hidden=true;discovery.hidden=true;live.textContent='跨平台报价';selected.replaceChildren();
   const back=button('← 返回发现','prediction-back');back.onclick=closeComparison;const title=el('h3',m.question);selected.append(back,el('span','COMPARE / 选择平台','prediction-eyebrow'),title,el('p','正在查找 Polymarket / Kalshi 的相关盘口…','prediction-compare-status'));
   try{const payload=await request('/api/predictions/compare?'+new URLSearchParams({provider:m.provider,id:m.id,outcome,shares:'10'}),compareController.signal);if(ticket!==selectionGeneration||disposed)return;comparison=payload;for(const p of payload.providers)if(p.markets.length){selectedMarkets.set(p.provider,p.markets[0]);selectedOutcomes.set(p.provider,outcome);}renderComparison();loadQuotes();}
   catch(error){if(ticket===selectionGeneration&&!disposed&&error.name!=='AbortError'){selected.querySelector('.prediction-compare-status').textContent=error.message||'比价暂不可用';const retry=button('重新比价');retry.onclick=()=>openComparison(m,outcome);selected.append(retry);}}
@@ -75,7 +75,7 @@ export function predictionCards({getWallet=()=>null,pickWallet=()=>{}}={}){
    const p=comparison.providers.find(x=>x.provider===id)||{provider:id,markets:[],coverage:'暂无数据'},block=el('section',null,'prediction-venue');block.dataset.provider=id;
    const head=el('div',null,'prediction-venue-head');head.append(el('h4',venue(id)),el('span',id==='polymarket'?'站内买入':'前往平台交易','prediction-venue-tag'));block.append(head);
    if(!p.markets.length){block.append(el('p',p.error||'本次范围内未找到相关盘口','prediction-empty'),el('small',p.coverage,'prediction-muted'));venues.append(block);continue;}
-   const chooser=el('select');chooser.setAttribute('aria-label',venue(id)+' 盘口');for(const m of p.markets){const option=el('option',m.question);option.value=m.id;chooser.append(option);}chooser.value=selectedMarkets.get(id).id;
+   const chooser=el('select');chooser.setAttribute('aria-label',venue(id)+' 盘口');for(const m of p.markets){const option=el('option',m.question);option.value=m.id;chooser.append(option);}chooser.value=selectedMarkets.get(id).id;chooser.hidden=p.markets.length===1;
    const marketBody=el('div',null,'prediction-venue-market'),quote=el('div',null,'prediction-quote');block.append(chooser,marketBody,quote);
    function paintMarket(){const m=selectedMarkets.get(id);marketBody.replaceChildren(el('h4',m.question),el('span',m.match?.label||'相关盘口 · 未核验等价','prediction-match-badge'),el('p','截止 '+time(m.endDate)+' · '+m.network,'prediction-muted'));
     if(m.match?.differences?.length)marketBody.append(el('p',m.match.differences.join('；'),'prediction-differences'));

@@ -22,6 +22,10 @@ jobs:
         run: |
           npm run build:wallet
           node --input-type=module -e "import {build} from 'esbuild'; await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Install Chinese fonts for fixture visual review
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
       - name: Discovery and existing purchase browser fixtures
         run: |
           node scripts/check-prediction-ui.mjs
