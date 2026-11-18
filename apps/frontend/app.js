@@ -5,7 +5,7 @@ import {predictionCards,predictionIntent} from './prediction-cards.js?v=polymark
 import {createConversationStore,cleanMessages,historyTitle} from './conversation-history.js?v=native-mainnet-v15-20261116';
 import {renderAccountButton} from "./account-avatar.js?v=native-mainnet-v15-20261116";
 import {syncAccountWallet,configureAccountWallet,stopAccountWallet} from "./privy-wallet.js?v=native-mainnet-v15-20261116";
-import {conversationGuide,fundingState,tradeBudget} from "./conversation-guide.js?v=native-mainnet-v15-20261116";
+import {conversationGuide,tradeBudget} from "./conversation-guide.js?v=native-mainnet-v15-20261116";
 import {setMarkdown} from "./markdown.js?v=native-mainnet-v15-20261116";
 import {initEyeMotion} from "./eye-logo.js?v=native-mainnet-v15-20261116";
 import {initWorkbench} from "./workbench.js?v=native-mainnet-v15-20261116";
@@ -15,7 +15,7 @@ import { indicators, marketView } from "./market.js";
 const $ = (id) => document.getElementById(id);
 let predictionContext=null;
 const state = { goal: "", strategy: null, run: null, strategies: [], model: "", modelName: "", committee: [], conversation: [] };
-const tabs = ["overview", "market", "create", "strategies", "testnet"];
+const tabs = ["overview", "market", "create", "strategies", "testnet", "predictions"];
 const UI_RELEASE="native-mainnet-v15-20261116";
 let availableModels = [];
 function toast(message) {
@@ -203,6 +203,8 @@ function showTab(tab) {
   toggleMarket(tab === "market");
   if (tab === "strategies") refreshStrategies();
   if (tab === "testnet") mountDirectTestnet();
+  if (tab === "predictions") mountPredictionWorkspace();
+  else unmountPredictionWorkspace();
 }
 function mountDirectTestnet() {
   const host=$("testnet-direct-host");if(host.children.length)return;
@@ -531,7 +533,7 @@ function renderChatChoices() {
 }
 function renderFundingCard(){
  const host=$('chat-funding-card');host.replaceChildren();if(predictionIntent(state.conversation))return;const guide=conversationGuide(state.conversation);if(chatBusy||guide.stage!=='funds'||$('chat-trade-plan').children.length)return;
- const info=fundingState(workbench.funds(),guide.budget),card=node('section','funding-cta guided-funding'),copy=node('div');copy.append(node('span','funding-network-label','Hyperliquid Mainnet · 真实资金'),node('strong','',info.title),node('p','note',info.body));
+ const info={title:'核对钱包与金额',body:'在交易预览中核对 Arbitrum 钱包的原生 USDC 余额、价格和费用。确认前不会提交交易。'},card=node('section','funding-cta guided-funding'),copy=node('div');copy.append(node('span','funding-network-label','Arbitrum One · 真实资金'),node('strong','',info.title),node('p','note',info.body));
  const button=node('button','primary','站内预览买入');button.type='button';button.onclick=()=>showChatTradePlan();card.append(copy,button);host.append(card);
 }
 window.addEventListener('oasis:funds-updated',()=>{if(state.conversation.length)renderFundingCard();});
@@ -854,7 +856,12 @@ async function renderReplays() {
     $("replay-list").append(card);
   }
 }
-renderReplays();
+const replayDetails = $("replay-list").closest("details");
+replayDetails.addEventListener("toggle", () => {
+  if (!replayDetails.open || replayDetails.dataset.loaded) return;
+  replayDetails.dataset.loaded = "true";
+  void renderReplays();
+});
 function renderTemplates() {
   const root=$("template-list");root.replaceChildren();
   for(const [coin,title,rule,prompt] of templates.slice(templatePage*4,templatePage*4+4)) {
@@ -924,8 +931,46 @@ const workbench=initWorkbench({
   },account:openAccount
 });
 
-$('home-predictions').append(predictionCards({getWallet:workbench.wallet,pickWallet:workbench.openFunds,onDiscuss:(market,outcome)=>{resetStarter();$('goal').value='我想研究 Polymarket 预测市场：'+market.question+'。请帮我梳理需要核对的信息，买入由我确认。';beginConversation({marketContext:{market,outcome}});}}));
-document.querySelectorAll('[data-prediction-prompt]').forEach(b=>b.onclick=()=>{predictionContext=null;resetStarter();$('goal').value=b.dataset.predictionPrompt;beginConversation();});
-$('home-eth-trade').onclick=()=>{predictionContext=null;resetStarter();$('goal').value='我想买入 10 USDC 的 ETH 现货，请先核对余额和价格，不要自动下单。';beginConversation();};
+function mountPredictionWorkspace() {
+  const host = $("prediction-workspace");
+  if (host.firstElementChild) return;
+  host.append(predictionCards({
+    getWallet: workbench.wallet,
+    pickWallet: workbench.openFunds,
+    onDiscuss: (market, outcome) => {
+      resetStarter();
+      $("goal").value = "我想研究 Polymarket 预测市场：" + market.question + "。请帮我梳理需要核对的信息，买入由我确认。";
+      beginConversation({ marketContext: { market, outcome } });
+    }
+  }));
+}
+
+function unmountPredictionWorkspace() {
+  const host = $("prediction-workspace");
+  host.firstElementChild?.dispose?.();
+  host.replaceChildren();
+}
+
+const assistantPrompts = {
+  "analysis": [
+    "结合提供的 ETH 行情样本，先说明趋势和成交量，再列出支持与推翻判断的信号。只研究，不执行交易。",
+    "Analyze ETH using the attached market sample. Summarize trend and volume, then list what would support or invalidate the view. Research only."
+  ],
+  "risk": [
+    "帮我检查一笔交易的风险。先问标的、时间周期和可承受损失，再列出反例、证据缺口和暂停条件。只研究，不执行交易。",
+    "Help me review trade risk. Ask about the asset, timeframe and loss tolerance, then identify counterarguments, missing evidence and when to pause. Research only."
+  ],
+  "strategy": [
+    "帮我起草一份可复盘的模拟策略。先问标的、周期和预算，列出观察信号、入场条件、退出规则与失效条件。只研究，不执行交易。",
+    "Help me draft a reviewable simulated strategy. Ask about the asset, timeframe and budget, then outline observation, entry, exit and invalidation rules. Research only."
+  ]
+};
+document.querySelectorAll("[data-assistant-task]").forEach(button => {
+  button.addEventListener("click", () => {
+    const task = button.dataset.assistantTask;
+    const label = assistantPrompts[task][getLanguage() === "en" ? 1 : 0];
+    void chooseStarter({ label, ...(task === "analysis" ? { coin: "ETH", interval: "1h" } : {}) });
+  });
+});
 configureAccountWallet({openAccount});
 initEyeMotion();
