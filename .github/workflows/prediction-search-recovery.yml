@@ -43,7 +43,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';import {searchPredictions,discoverPredictions} from './apps/frontend/prediction-markets.js';
-          for(const query of ['Bitcoin','NBA','Fed']){const p=await searchPredictions(query);console.log('LIVE Gamma search',query,JSON.stringify(p.providers.map(v=>({provider:v.provider,count:v.markets.length,errorCode:v.errorCode}))));assert.ok(p.providers[0].markets.length);assert.ok(!p.stale);}
+          for(const query of ['Bitcoin','NBA','Fed']){const p=await searchPredictions(query,{fetchImpl:async(url,init)=>{const r=await fetch(url,init);if(String(url).includes('/public-search')){const d=await r.clone().json();console.log('LIVE search shape',JSON.stringify({status:r.status,keys:Object.keys(d),eventKeys:Object.keys(d.events?.[0]||{}),marketKeys:Object.keys(d.events?.[0]?.markets?.[0]||{}),sample:d.events?.[0]?.markets?.[0]&&(({id,closed,active,archived,acceptingOrders,endDate,outcomes,bestAsk})=>({id,closed,active,archived,acceptingOrders,endDate,outcomes,bestAsk}))(d.events[0].markets[0])}));}return r;}});console.log('LIVE Gamma search',query,JSON.stringify(p.providers.map(v=>({provider:v.provider,count:v.markets.length,errorCode:v.errorCode}))));assert.ok(p.providers[0].markets.length);assert.ok(!p.stale);}
           const feed=await discoverPredictions();assert.ok(feed.markets.length);console.log('LIVE Gamma feed',feed.markets.length,'public metadata only; no wallet actions');
           JS
       - uses: actions/upload-artifact@v4

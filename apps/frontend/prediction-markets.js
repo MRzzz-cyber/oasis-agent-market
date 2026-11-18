@@ -26,18 +26,20 @@ function providerFailure(error){
 }
 const publicSnapshots=predictionSnapshotCache();
 async function searchPolyPublic(query,fetchImpl,now){
- const payload=await json('https://gamma-api.polymarket.com/public-search?'+new URLSearchParams({q:query,limit_per_type:'6',events_status:'active',keep_closed_markets:'0',search_profiles:'false',search_tags:'false',optimized:'true'}),fetchImpl);
+ const payload=await json('https://gamma-api.polymarket.com/public-search?'+new URLSearchParams({q:query,limit_per_type:'6',events_status:'active',keep_closed_markets:'0',search_profiles:'false',search_tags:'false',optimized:'false'}),fetchImpl);
  if(!payload||!Array.isArray(payload.events))throw new ProviderDataError('format');
- const markets=[],seen=new Set();
+ const markets=[],seen=new Set();let readRows=0,hasOrderability=false;
  for(const event of payload.events){
   if(!event||event.closed||event.archived||event.active===false||!Array.isArray(event.markets))continue;
   for(const raw of event.markets){
+   if(raw&&typeof raw==='object'){readRows++;if(typeof raw.acceptingOrders==='boolean')hasOrderability=true;}
    if(!raw||raw.enableOrderBook===false||raw.bestAsk!=null&&!(Number(raw.bestAsk)>0&&Number(raw.bestAsk)<1))continue;
    const m=normalizeDiscoveryMarket(raw,event);
    if(m&&Number.isFinite(Date.parse(m.endDate))&&Date.parse(m.endDate)>now&&!seen.has(m.id)){seen.add(m.id);markets.push(m);if(markets.length===12)break;}
   }
   if(markets.length===12)break;
  }
+ if(readRows&&!hasOrderability)throw new ProviderDataError('format');
  return {provider:'polymarket',markets,coverage:'关键词搜索首批事件中的开放二元盘口；不是全站结果',partial:payload.pagination?.hasMore===true||markets.length===12};
 }
 export async function searchPredictions(query,{fetchImpl=fetch,client,legacyProviders=false,now=Date.now(),cache=fetchImpl===fetch&&!client?publicSnapshots:null}={}){

@@ -1068,3 +1068,5 @@ Object.assign(messages,{"跨链资金待核对":"Bridge funds awaiting verificat
 
 // Public market outage recovery
 Object.assign(messages,{"重试连接":"Retry connection","快照 · 买入前刷新价格":"Snapshot · refresh before buying","连接待恢复":"Waiting to reconnect","平台暂时不可用，展示上次快照（":"Provider unavailable. Showing the last snapshot (","更新失败，保留上次数据（":"Refresh failed. Showing the last snapshot (","） · 买入前重新核对实时价格":") · Check a fresh price before buying","盘口服务返回异常，请重试连接":"Market service returned an invalid response. Retry connection.","盘口服务暂不可用，请重试连接":"Market service is temporarily unavailable. Retry connection.","盘口查询繁忙，请稍后重试":"Market search is busy. Retry shortly."});
+
+Object.assign(messages,{"盘口快照已过期，请重试连接":"Market snapshot expired. Retry connection."});

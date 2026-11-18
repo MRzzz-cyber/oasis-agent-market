@@ -31,8 +31,8 @@ test('snapshots coalesce reads, preserve source timestamps, isolate terms and ex
 test('snapshot capacity bounds concurrent work and evicts the oldest successful key',async()=>{
  const cache=predictionSnapshotCache({limit:1});let resolve;const held=cache.read('first',()=>new Promise(r=>resolve=r));await assert.rejects(cache.read('second',()=>assert.fail('capacity bypassed')));resolve({id:1});await held;await cache.read('second',async()=>({id:2}));let loads=0;await cache.read('first',async()=>{loads++;return {id:3};});assert.equal(loads,1);
 });
-test('public search reads official optimized Gamma metadata without the trading SDK and filters invalid markets',async()=>{
- let calls=0;const p=await searchPredictions('Bitcoin',{fetchImpl:async(url,init)=>{calls++;const u=new URL(url);assert.equal(u.origin,'https://gamma-api.polymarket.com');assert.equal(u.pathname,'/public-search');assert.equal(u.searchParams.get('optimized'),'true');assert.equal(u.searchParams.get('q'),'Bitcoin');assert.equal(init.method,'GET');assert.equal(init.redirect,'manual');
+test('public search reads complete official Gamma metadata without the trading SDK and filters invalid markets',async()=>{
+ let calls=0;const p=await searchPredictions('Bitcoin',{fetchImpl:async(url,init)=>{calls++;const u=new URL(url);assert.equal(u.origin,'https://gamma-api.polymarket.com');assert.equal(u.pathname,'/public-search');assert.equal(u.searchParams.get('optimized'),'false');assert.equal(u.searchParams.get('q'),'Bitcoin');assert.equal(init.method,'GET');assert.equal(init.redirect,'manual');
  return Response.json({events:[...events,{id:'mixed',markets:[raw,{...raw,id:'2',closed:true},{...raw,id:'3',outcomes:null},{...raw,id:'4',bestAsk:0},{...raw,id:'5',endDate:'2000-01-01'},null]},null],pagination:{hasMore:true}});}});
  assert.equal(calls,1);assert.deepEqual(p.providers[0].markets.map(m=>m.id),['123']);assert.equal(p.providers[0].markets[0].eventId,'event');assert.equal(p.providers[0].markets[0].execution.enabled,false);assert.equal(p.executionEnabled,false);
  assert.equal(normalizeDiscoveryMarket({...raw,outcomes:null}),null);
@@ -50,4 +50,9 @@ test('discovery uses the same bounded snapshot fallback while an uncached outage
  const good=await discoverPredictions({cache,now:start,fetchImpl:async()=>Response.json(events)});
  const stale=await discoverPredictions({cache,now:start+21000,fetchImpl:async()=>new Response('gateway',{status:503})});assert.equal(stale.stale,true);assert.equal(stale.at,good.at);
  const r=await predictionRoute(new Request('https://fixture.invalid/api/predictions/search?q=Bitcoin'),{fetchImpl:async()=>new Response('gateway',{status:503})});assert.equal(r.status,502);const p=await r.json();assert.equal(p.providers[0].markets.length,0);assert.equal(p.providers[0].errorCode,'http');
+});
+
+test('a sparse provider payload cannot masquerade as a successful empty search',async()=>{
+ const {acceptingOrders,...sparse}=raw;const p=await searchPredictions('Bitcoin',{fetchImpl:async()=>Response.json({events:[{markets:[sparse]}]})});
+ assert.equal(p.providers[0].errorCode,'format');assert.equal(p.providers[0].markets.length,0);
 });
