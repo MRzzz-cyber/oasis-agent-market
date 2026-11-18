@@ -48,3 +48,10 @@ npx wrangler dev --config apps/frontend/wrangler.jsonc
 本地 Worker 密钥放在 `apps/frontend/.dev.vars`，不要提交。`npm run dev` 仅启动 Node 模拟 API 与静态页面，不提供 Cloudflare OpenRouter 路由；验证真实对话应使用 Wrangler。
 
 更多说明见 [OpenRouter 接入](openrouter-integration.md)。
+
+## 研究采购页面
+
+- `/research.html` 展示 Base Sepolia USDC 的模拟采购、主动拒购和策略拦截。
+- `/api/research/demo` 返回采购案例，`/api/research/replay` 使用历史 ETH-USD 日线比较三种策略。
+- `/api/release` 的 `researchProcurement` 应为 `base-sepolia-usdc-v1`。
+- 此页面仅运行模拟。真实测试网结算由独立的 `npm run smoke:x402` 执行。

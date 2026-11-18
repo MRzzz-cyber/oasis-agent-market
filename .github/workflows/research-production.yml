@@ -1,0 +1,58 @@
+name: Verify research procurement deployment
+on:
+  push:
+    branches: ["refactor/simple-base-mvp"]
+    paths:
+      - "apps/frontend/research*"
+      - "apps/frontend/worker.js"
+      - ".github/workflows/research-production.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-endpoints:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Oasis after Cloudflare rollout
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { setTimeout as delay } from 'node:timers/promises';
+          const origin = 'https://oasistrade.app';
+          const version = 'base-sepolia-usdc-v1';
+          let lastError;
+          for (let attempt = 0; attempt < 24; attempt++) {
+            try {
+              const get = async pathname => {
+                const response = await fetch(origin + pathname, { signal: AbortSignal.timeout(12000) });
+                assert.equal(response.status, 200, pathname);
+                return response;
+              };
+              const release = await (await get('/api/release')).json();
+              assert.equal(release.researchProcurement, version);
+              assert.match(await (await get('/')).text(), /id="research-procurement-link"/);
+              assert.match(await (await get('/research.html')).text(), /<title>Oasis 研究采购<\/title>/);
+              const demo = await (await get('/api/research/demo')).json();
+              assert.equal(demo.mode, 'simulation');
+              assert.equal(demo.network, 'eip155:84532');
+              assert.equal(demo.asset, 'USDC');
+              assert.equal(demo.scenarios.purchase.selectedProvider, 'atlas');
+              assert.equal(demo.scenarios.decline.selectedProvider, null);
+              assert.equal(demo.scenarios.policyBlock.evaluations[0].reason, 'quote_mismatch');
+              const replay = await (await get('/api/research/replay')).json();
+              assert.deepEqual(Object.keys(replay.strategies), ['noBuy', 'buyAll', 'oasis']);
+              assert.ok(replay.cases > 100);
+              console.log(JSON.stringify({ origin, version, historicalWindows: replay.cases }));
+              process.exit(0);
+            } catch (error) {
+              lastError = error;
+              console.log('Rollout check', attempt + 1, error.message);
+              if (attempt < 23) await delay(20000);
+            }
+          }
+          throw lastError;
+          JS
