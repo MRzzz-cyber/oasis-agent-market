@@ -27,6 +27,15 @@ direction using data available at the decision time. The replay reports accuracy
 purchase count, USDC spend and a modeled utility. The provider scores and the
 USDC reward for a correct prediction are simulation assumptions.
 
+## Base Sepolia payment smoke test
+
+Install the isolated smoke runner with `npm install --prefix apps/x402-smoke`.
+Set `OASIS_TESTNET_PAYER_KEY` and `OASIS_TESTNET_PAY_TO` in the local environment
+or ignored root `.env`. Use a dedicated payer with at least 0.01 Base Sepolia USDC
+and a distinct testnet recipient. Run `npm --prefix apps/x402-smoke start` on Node 22.
+The runner makes one x402 v2 purchase and checks the resulting ERC-20 receipt.
+Each manual invocation can make one new payment.
+
 ## Architecture
 
 | Area | Choice |

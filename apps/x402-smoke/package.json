@@ -1,0 +1,16 @@
+{
+  "name": "oasis-x402-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=../../.env smoke.mjs"
+  },
+  "dependencies": {
+    "@x402/core": "2.25.0",
+    "@x402/evm": "2.25.0",
+    "viem": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
