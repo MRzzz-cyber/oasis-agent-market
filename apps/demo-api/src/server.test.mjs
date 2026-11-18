@@ -20,7 +20,7 @@ test("demo API serves frontend and runs the local agent loop in mock mode", asyn
     assert.equal(runResponse.status, 200);
     assert.equal(result.finalDecision, "NO_TRADE");
     assert.equal(
-      result.budget.spentAtomic,
+      Number(result.budget.spentAtomic),
       result.budget.charges.reduce((sum, charge) => sum + Number(charge.amountAtomic), 0)
     );
     assert.equal(result.budget.spentAtomic > 20000, true);

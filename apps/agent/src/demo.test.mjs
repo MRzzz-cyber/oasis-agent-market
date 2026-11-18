@@ -21,7 +21,7 @@ test("single agent demo charges quoted paid agents inside the user budget bounda
 
     assert.equal(result.finalDecision, "NO_TRADE");
     assert.equal(
-      result.budget.spentAtomic,
+      Number(result.budget.spentAtomic),
       result.budget.charges.reduce((sum, charge) => sum + Number(charge.amountAtomic), 0)
     );
     assert.equal(result.budget.spentAtomic > 20000, true);

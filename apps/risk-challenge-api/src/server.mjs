@@ -82,6 +82,39 @@ function normalizeTier(value) {
   return ["standard", "deep"].includes(value) ? value : "standard";
 }
 
+function buildRiskChallenge({ asset, setup, confidence, locale }) {
+  const isZh = locale === "zh-CN";
+  const blockingReasons = [];
+
+  if (setup === "BREAKOUT") {
+    blockingReasons.push(isZh ? "突破在模拟执行前需要更强的成交量确认" : "breakout needs stronger volume confirmation before simulated execution");
+  }
+
+  if (confidence < 0.65) {
+    blockingReasons.push(isZh ? "初始置信度低于委员会执行阈值" : "initial confidence is below the committee execution threshold");
+  }
+
+  return {
+    verdict: blockingReasons.length > 0 ? "block" : "pass",
+    riskLevel: blockingReasons.length > 0 ? "high" : "medium",
+    blockingReasons,
+    stressScenarios: isZh
+      ? [
+          `${asset} 突破失败并回到前一区间`,
+          "信号出现后流动性变薄，滑点上升",
+          "相关主流资产转弱，动量确认失效"
+        ]
+      : [
+          `${asset} rejects the breakout level and returns to the prior range`,
+          "liquidity thins after the signal and slippage rises",
+          "correlated majors weaken and invalidate momentum confirmation"
+        ],
+    counterArgument: blockingReasons.length > 0
+      ? isZh ? `${asset} ${setup} 证据还不够稳健，不应增加敞口。` : `${asset} ${setup} evidence is not robust enough to increase exposure.`
+      : isZh ? `${asset} ${setup} 只能在严格失效条件下进行模拟。` : `${asset} ${setup} can proceed only as a simulation with tight invalidation.`
+  };
+}
+
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8"

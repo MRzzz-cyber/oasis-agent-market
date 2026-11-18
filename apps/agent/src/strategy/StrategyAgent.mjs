@@ -79,8 +79,8 @@ export class StrategyAgent {
       maxPaidAgentCallAtomic,
       allowedPaidAgents,
       paidAgentBudgetsAtomic: {
-        "market-signal": Math.floor(sessionBudgetAtomic * 0.6),
-        "risk-challenge": Math.floor(sessionBudgetAtomic * 0.3)
+        "market-signal": Number(BigInt(sessionBudgetAtomic) * 6n / 10n),
+        "risk-challenge": Number(BigInt(sessionBudgetAtomic) * 3n / 10n)
       },
       autoPayEnabled: true,
       allowance: {
@@ -103,8 +103,8 @@ export class StrategyAgent {
       maxPaymentPerCallAtomic: maxPaidAgentCallAtomic,
       allowedServices: allowedPaidAgents,
       serviceBudgetsAtomic: {
-        "market-signal": Math.floor(sessionBudgetAtomic * 0.6),
-        "risk-challenge": Math.floor(sessionBudgetAtomic * 0.3)
+        "market-signal": Number(BigInt(sessionBudgetAtomic) * 6n / 10n),
+        "risk-challenge": Number(BigInt(sessionBudgetAtomic) * 3n / 10n)
       },
       executionMode: intent.executionMode === "simulation" ? "simulation" : "simulation",
       riskRules: [
@@ -455,7 +455,7 @@ export class StrategyAgent {
       quoteId: result.quote.quoteId,
       agent: result.quote.agent,
       reasoningTier: result.quote.reasoningTier,
-      amountAtomic: Number(result.quote.quotedAtomic),
+      amountAtomic: String(result.quote.quotedAtomic),
       payment: result.payment,
       charge: result.charge
     });
@@ -493,7 +493,7 @@ export class StrategyAgent {
       budget: {
         spentAtomic: state.ledger.spentAtomic,
         spentUsdc: atomicToUsdc(state.ledger.spentAtomic),
-        remainingUsdc: atomicToUsdc(normalizedPolicy.sessionBudgetAtomic - state.ledger.spentAtomic),
+        remainingUsdc: atomicToUsdc(BigInt(normalizedPolicy.sessionBudgetAtomic) - BigInt(state.ledger.spentAtomic)),
         sessionBudgetAtomic: normalizedPolicy.sessionBudgetAtomic,
         sessionBudgetUsdc: atomicToUsdc(normalizedPolicy.sessionBudgetAtomic),
         maxPaidAgentCallAtomic: normalizedPolicy.maxPaidAgentCallAtomic,
@@ -561,8 +561,8 @@ function parseStrategyIntent(message, { locale = "zh-CN" } = {}) {
   const timeframe = upper.match(/\b(15M|30M|1H|4H|1D|1W)\b/)?.[1]?.toLowerCase() ?? inferTimeframe(text);
   const strategyType = inferStrategyType(text);
   const riskPreference = inferRiskPreference(text);
-  const budgetUsdc = extractBudgetUsdc(text, ["总预算", "预算", "最多花", "daily", "budget"]) ?? 0.2;
-  const maxPaymentUsdc = extractBudgetUsdc(text, ["单次", "单项", "每次", "per call"], { allowGeneric: false }) ?? Math.min(0.05, budgetUsdc);
+  const budgetUsdc = extractBudgetUsdc(text, ["总预算", "预算", "最多花", "daily", "budget"]) ?? "0.2";
+  const maxPaymentUsdc = extractBudgetUsdc(text, ["单次", "单项", "每次", "per call"], { allowGeneric: false }) ?? (usdcToAtomic(budgetUsdc) <= 50000 ? budgetUsdc : "0.05");
   const executionMode = /真实|live|mainnet|实盘/i.test(text) ? "requires_manual_approval" : "simulation";
   const missingFields = [];
 
@@ -836,13 +836,13 @@ function extractBudgetUsdc(text, keywords, { allowGeneric = true } = {}) {
     if (index < 0) continue;
     const nearby = text.slice(index, index + 48);
     const amount = nearby.match(/(\d+(?:\.\d+)?)\s*USDC/i)?.[1] ?? nearby.match(/(\d+(?:\.\d+)?)/)?.[1];
-    if (amount) return Number(amount);
+    if (amount) return amount;
   }
 
   if (!allowGeneric) return null;
 
   const generic = text.match(/(\d+(?:\.\d+)?)\s*USDC/i)?.[1];
-  return generic ? Number(generic) : null;
+  return generic ?? null;
 }
 
 function buildClarifyingQuestions(missingFields, { locale = "zh-CN" } = {}) {

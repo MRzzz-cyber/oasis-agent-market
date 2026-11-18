@@ -15,7 +15,7 @@
 | Frontend | 现有 Vanilla HTML/CSS/JS | 暂不迁移 React/Next |
 | Agent | 现有 StrategyAgent 状态机 | LangGraph / 多套编排器 |
 | LLM | 统一 Provider Adapter，按需启用 OpenAI/Claude/Gemini/DeepSeek | 复杂模型路由平台 |
-| Payment | x402 v2 + @x402/core + @x402/evm + @x402/fetch | 手写 402 headers |
+| Payment | x402 v2 + @x402/core + @x402/evm | 手写 402 headers |
 | EVM | viem | ethers 与 viem 并存 |
 | Network | Base Sepolia（eip155:84532） | 多链并行 |
 | Asset | Circle USDC（6 decimals） | 自定义测试 Token |
@@ -52,9 +52,9 @@
 
 - [x] 建立 Base Sepolia 网络与 USDC 常量。
 - [x] 建立无浮点金额换算与基础支付校验。
-- [ ] 接入官方 x402 v2 EVM client。
+- [x] 独立测试脚本接入官方 x402 v2 EVM SDK。
 - [ ] 完成预算预留、幂等和结算对账。
-- [ ] 将 Market/Risk 服务接入 x402 v2。
+- [x] Market/Risk 策略服务使用 Base Sepolia USDC 模拟报价和结算。
 - [ ] 通过 Base Sepolia 测试网端到端付款。
 
 ## 官方依据

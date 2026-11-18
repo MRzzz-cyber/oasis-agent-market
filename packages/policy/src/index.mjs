@@ -45,12 +45,12 @@ export function createBudgetLedger(policy) {
 
   return {
     policyId: normalized.id,
-    spentAtomic: 0,
+    spentAtomic: "0",
     reservations: [],
     pending: [],
     charges: [],
-    allowanceSpentAtomic: normalized.allowance.spentAtomic,
-    escrowSpentAtomic: 0,
+    allowanceSpentAtomic: String(normalized.allowance.spentAtomic),
+    escrowSpentAtomic: "0",
     escrowCharges: [],
     accounts: {
       ownerAccountId: normalized.allowance.ownerAccountId,
@@ -175,15 +175,16 @@ export function checkPaymentAllowed({ policy, ledger, paymentRequirement, servic
 }
 
 export function recordAgentCharge({ ledger, quoteId, service, agent, reasoningTier, amountAtomic, transactionId, usage, pricingModel }) {
-  ledger.spentAtomic += amountAtomic;
-  ledger.allowanceSpentAtomic = Number(ledger.allowanceSpentAtomic ?? 0) + amountAtomic;
-  ledger.escrowSpentAtomic = Number(ledger.escrowSpentAtomic ?? 0) + amountAtomic;
+  const charged = BigInt(amountAtomic);
+  ledger.spentAtomic = String(BigInt(ledger.spentAtomic) + charged);
+  ledger.allowanceSpentAtomic = String(BigInt(ledger.allowanceSpentAtomic) + charged);
+  ledger.escrowSpentAtomic = String(BigInt(ledger.escrowSpentAtomic) + charged);
   const charge = {
     quoteId,
     service,
     agent,
     reasoningTier,
-    amountAtomic,
+    amountAtomic: String(charged),
     usage,
     pricingModel,
     transactionId,
@@ -194,7 +195,7 @@ export function recordAgentCharge({ ledger, quoteId, service, agent, reasoningTi
   ledger.reservations.push({
     requestId: quoteId,
     service,
-    amountAtomic,
+    amountAtomic: String(charged),
     transactionId
   });
   return charge;
