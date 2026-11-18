@@ -17,7 +17,7 @@ MVP target: Base Sepolia + USDC + x402 v2. Agent payments are policy-controlled;
 
 ## Research procurement preview
 
-Start the demo server, then open `/research/demo` to compare three simulated
+Start the demo server, then open `/research.html` to compare three simulated
 providers and inspect the buy, decline and blocked-quote scenarios. Quotes use
 Base Sepolia USDC atomic units. The simulator does not sign or settle payments.
 
