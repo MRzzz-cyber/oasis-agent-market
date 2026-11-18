@@ -1,3 +1,5 @@
+import {crosschainFunding} from './crosschain-ui.js';
+import {bridgeJournal} from './crosschain-core.js';
 import {bindMarketTitle} from './market-language.js';
 import {POLYGON,PUSD,address,display,predictionJournal} from './polymarket-purchase-core.js';
 import {executePurchase,reconcilePurchase} from './polymarket-purchase-engine.js';
@@ -12,8 +14,8 @@ export function polymarketPurchase({market,outcome,getWallet,pickWallet,createSe
  const label=el('label','本次最多支付');label.htmlFor=input.id;const amountField=el('div',null,'purchase-amount-field');amountField.append(input,el('span','pUSD'));amount.append(label,amountField);
  const presets=el('div',null,'purchase-presets');for(const value of ['5','10','25']){const b=el('button',value+' pUSD');b.type='button';b.dataset.budget=value;b.onclick=()=>{if(busy)return;input.value=value;invalidate();};presets.append(b);}amount.append(presets);root.append(amount);
  const balance=el('p','连接后查看 Polymarket 可用余额','purchase-balance'),facts=el('dl',null,'purchase-facts'),details=el('details',null,'purchase-details'),extra=el('dl');details.append(el('summary','账户与费用详情'),extra,el('small','首次连接会创建或恢复由当前钱包控制的 Polymarket 交易账户；Oasis 钱包地址保持不变。'));
- const funding=el('div'),status=el('p','正在检查交易服务…','purchase-status'),actions=el('div',null,'purchase-actions'),receipt=el('div',null,'purchase-receipt');status.setAttribute('role','status');status.setAttribute('aria-live','polite');root.append(balance,facts,funding,details,actions,status,receipt);
- let wallet=getWallet(),session=null,quote=null,busy=false,enabled=false,generation=0,closed=false,record=null,wrongChain=false;
+ const funding=el('div'),status=el('p','正在检查交易服务…','purchase-status'),actions=el('div',null,'purchase-actions'),receipt=el('div',null,'purchase-receipt');status.setAttribute('role','status');status.setAttribute('aria-live','polite');const bridgeHost=el('div',null,'purchase-bridge-host'),bridgeCSS=el('link');bridgeCSS.rel='stylesheet';bridgeCSS.href='/crosschain.css?v=1';root.append(bridgeCSS,balance,facts,bridgeHost,funding,details,actions,status,receipt);
+ let wallet=getWallet(),session=null,quote=null,busy=false,enabled=false,generation=0,closed=false,record=null,wrongChain=false,bridgeView=null,bridgeBusy=false;
  const current=()=>!closed&&root.isConnected&&getWallet()===wallet;
  function button(parent,title,fn){const b=el('button',title);b.type='button';b.onclick=()=>run(fn);parent.append(b);return b;}
  function journal(){return wallet?predictionJournal(storage,wallet.address):null;}
@@ -24,11 +26,12 @@ export function polymarketPurchase({market,outcome,getWallet,pickWallet,createSe
   if(record.matchedShares)receipt.append(el('p','平台报告买入 '+record.matchedShares+' 份'));
  }
  function paint(){
-  input.disabled=busy;presets.querySelectorAll('button').forEach(b=>{b.disabled=busy;b.setAttribute('aria-pressed',String(b.dataset.budget===input.value));});actions.replaceChildren();
+  const bridgeHold=wallet&&bridgeJournal(storage,wallet.address).load()?.terminal===false;
+  input.disabled=busy||bridgeBusy||bridgeHold;presets.querySelectorAll('button').forEach(b=>{b.disabled=busy||bridgeBusy||bridgeHold;b.setAttribute('aria-pressed',String(b.dataset.budget===input.value));});actions.replaceChildren();
   let hold=false;try{hold=held();paintReceipt();}catch(e){status.textContent=e.message;hold=true;}
   const insufficient=!!quote&&BigInt(quote.balanceAtomic)<BigInt(quote.budgetAtomic),fresh=quote&&Date.now()<quote.expiresAt;
   [...steps.children].forEach((n,i)=>{n.classList.toggle('active',i===(hold||fresh&&!insufficient?2:session?1:0));if(n.classList.contains('active'))n.setAttribute('aria-current','step');else n.removeAttribute('aria-current');});
-  const title=!enabled?'交易服务准备中':!wallet?'连接钱包，准备买入':wrongChain?'切换至 Polygon 并查看价格':hold?'核对原交易':!session?'连接并查看价格':!fresh?'查看最新价格':insufficient?'等待 pUSD 到账':'确认买入 · 最多 '+display(quote.budgetAtomic)+' pUSD';
+  const title=bridgeHold?'跨链资金待核对':!enabled?'交易服务准备中':!wallet?'连接钱包，准备买入':wrongChain?'切换至 Polygon 并查看价格':hold?'核对原交易':!session?'连接并查看价格':!fresh?'查看最新价格':insufficient?'等待 pUSD 到账':'确认买入 · 最多 '+display(quote.budgetAtomic)+' pUSD';
   const main=button(actions,busy?'正在处理，请查看钱包或回执…':title,async()=>{
    if(!wallet){pickWallet();return;}
    if(wrongChain){await wallet.provider.request({method:'wallet_switchEthereumChain',params:[{chainId:POLYGON}]});if(!current())return;wrongChain=false;}
@@ -37,7 +40,7 @@ export function polymarketPurchase({market,outcome,getWallet,pickWallet,createSe
    if(!quote||Date.now()>=quote.expiresAt){await preview();return;}
    if(BigInt(quote.balanceAtomic)<BigInt(quote.budgetAtomic))return;
    record=await executePurchase({quote,session,wallet,getWallet,storage,locks,onStage:r=>{if(current()){record=r;status.textContent=r.message;paintReceipt();}},waitMs:15000});quote=null;paintReceipt();status.textContent=record?.message||'请核对原订单';
-  });main.className='purchase-primary';main.disabled=busy||!enabled||insufficient&&!hold&&!wrongChain&&fresh;
+  });main.className='purchase-primary';main.disabled=busy||bridgeBusy||bridgeHold||!enabled||insufficient&&!hold&&!wrongChain&&fresh;
   if(session&&!hold&&!insufficient)button(actions,'刷新价格与余额',preview).disabled=busy;
   
  }
@@ -58,26 +61,28 @@ export function polymarketPurchase({market,outcome,getWallet,pickWallet,createSe
   fields(extra,[['网络','Polygon · 137'],['手续费预留',display(q.feeReserveAtomic)+' pUSD（已含在支付上限内）'],['交易账户',short(session.identity.wallet)],['网络费','平台 Relayer 代付']]);
   const insufficient=BigInt(q.balanceAtomic)<BigInt(q.budgetAtomic);
   status.textContent=insufficient?'充值到账后刷新，重新核对价格，再确认买入。':q.approvalNeeded?'先确认本次金额授权，再签名买入。未能全部成交则取消，不挂单。':'核对价格与份额后，在钱包签名确认。未能全部成交则取消，不挂单。';
-  if(insufficient)paintFunding(q);paint();
+  if(insufficient)paintFunding(q);else{bridgeView?.dispose?.();bridgeView=null;bridgeHost.replaceChildren();}paint();
  }
+ function mountBridge(maker,shortfallAtomic){if(bridgeView)return;bridgeView=crosschainFunding({wallet,getWallet,getSession:()=>session,maker,shortfallAtomic,storage,locks,onBusy:value=>{bridgeBusy=value;if(!value&&current())wallet.provider.request({method:'eth_chainId'}).then(chain=>{if(current()){wrongChain=chain!==POLYGON;paint();}}).catch(()=>{});paint();},onContinue:()=>run(async()=>{if(await wallet.provider.request({method:'eth_chainId'})!==POLYGON)await wallet.provider.request({method:'wallet_switchEthereumChain',params:[{chainId:POLYGON}]});if(!current())return;wrongChain=false;if(!session)await connect();await preview();})});bridgeHost.replaceChildren(bridgeView);}
  function paintFunding(q){
   const box=el('section',null,'prediction-funding'),maker=address(session.identity.wallet),difference=BigInt(q.budgetAtomic)-BigInt(q.balanceAtomic);
+  mountBridge(maker,difference.toString());
   box.append(el('span','准备交易资金','prediction-eyebrow'),el('strong','还差 '+display(difference)+' pUSD'),el('p','转入 Polygon pUSD，到帐后继续这笔买入。'));
   const receive=el('details',null,'purchase-receive');receive.append(el('summary','查看充值地址与收款码'),el('small','仅接收 Polygon pUSD · 此地址为当前钱包控制的 Polymarket 交易账户'),el('code',maker));
   button(receive,'复制交易账户地址',async()=>{if(!current()||address(session.identity.wallet)!==maker)throw Error('交易账户已变化');await navigator.clipboard.writeText(maker);status.textContent='已复制 · 请核对 Polygon 与 pUSD 资产';});
   const canvas=el('canvas');canvas.hidden=true;canvas.setAttribute('aria-label','Polygon pUSD 交易账户收款码');
   button(receive,'显示收款码',async()=>{if(!current())return;const {drawReceiveQr}=await import('./vendor/privy/deposit-qr.js');await drawReceiveQr(canvas,'ethereum:'+PUSD+'@137/transfer?address='+maker);if(current())canvas.hidden=false;});
-  receive.append(canvas,el('small','不支持直接转入 Arbitrum USDC；当前不会自动跨链或兑换。'));box.append(receive);button(box,'已充值，刷新余额',preview);funding.replaceChildren(box);
+  receive.append(canvas,el('small','此收款码仅接收 Polygon pUSD；其他网络 USDC 请使用上方跨链充值。'));box.append(receive);button(box,'已充值，刷新余额',preview);funding.replaceChildren(box);
  }
  function invalidate(){generation++;quote=null;facts.replaceChildren();funding.replaceChildren();status.textContent='金额已变化，请查看最新价格。';paint();}
  input.oninput=invalidate;
  async function updateWallet(){
-  generation++;wallet=getWallet();session=null;quote=null;facts.replaceChildren();funding.replaceChildren();extra.replaceChildren();balance.textContent='连接后查看 Polymarket 可用余额';wrongChain=false;
-  if(wallet){const candidate=wallet;wrongChain=await wallet.provider.request({method:'eth_chainId'})!==POLYGON;if(getWallet()!==candidate||closed)return;record=journal().load();}
+  generation++;bridgeView?.dispose?.();bridgeView=null;bridgeHost.replaceChildren();wallet=getWallet();session=null;quote=null;facts.replaceChildren();funding.replaceChildren();extra.replaceChildren();balance.textContent='连接后查看 Polymarket 可用余额';wrongChain=false;
+  if(wallet){const candidate=wallet;wrongChain=await wallet.provider.request({method:'eth_chainId'})!==POLYGON;if(getWallet()!==candidate||closed)return;record=journal().load();const pending=bridgeJournal(storage,wallet.address).load();if(pending?.terminal===false)mountBridge(pending.quote.maker,pending.quote.amountAtomic);}
   status.textContent=record?.terminal===false?'发现原交易，请连接同一钱包后核对。':'首次连接需创建或恢复 Polymarket 交易账户，原 Oasis 钱包地址保持不变。';paint();
  }
  async function initialize(){try{const r=await fetch('/api/predictions/trading-status',{cache:'no-store',signal:AbortSignal.timeout(10000)}),p=await r.json();if(closed)return;enabled=r.ok&&p.enabled===true;if(!enabled){status.textContent='平台交易服务正在准备，当前仍可查看盘口。';paint();return;}await updateWallet();}catch(error){if(!closed){status.textContent=error.message||'交易服务暂不可用';paint();}}}
  const changed=()=>{if(!closed&&!busy&&getWallet()!==wallet)updateWallet().catch(e=>{status.textContent=e.message;});};window.addEventListener('oasis:funds-updated',changed);
  queueMicrotask(initialize);const timer=setInterval(()=>{if(!busy&&quote&&Date.now()>=quote.expiresAt)paint();},1000);
- root.canLeave=()=>!busy;root.dispose=()=>{closed=true;generation++;clearInterval(timer);window.removeEventListener('oasis:funds-updated',changed);};return root;
+ root.canLeave=()=>!busy&&!bridgeBusy;root.dispose=()=>{closed=true;bridgeView?.dispose?.();generation++;clearInterval(timer);window.removeEventListener('oasis:funds-updated',changed);};return root;
 }

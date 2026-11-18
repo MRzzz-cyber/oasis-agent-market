@@ -1,3 +1,4 @@
+import {SOURCES,checkBridgeTx,bridgeRead,checkBridgeQuote} from './crosschain-core.js';
 import {POLYGON,canonical,checkAuth,checkBatch,checkOrder} from './polymarket-purchase-core.js';
 import {approvalPacket,address as mainnetAddress,text} from './mainnet-order-core.js';
 import {USDC_CONTRACTS} from './mainnet-wallet.js';
@@ -9,7 +10,7 @@ export function publishAccountWallet(choice){active=choice;if(typeof window!=='u
 export function clearAccountWallet(){const previous=active;active=null;if(previous&&typeof window!=='undefined')window.dispatchEvent(new CustomEvent('oasis:account-wallet-cleared',{detail:previous}));}
 export function matchesWalletIdentity(user,subject){return user?.linkedAccounts?.some(a=>a.type==='custom_auth'&&a.customUserId===subject)===true;}
 export function guardWalletProvider(raw,{address,subject,isCurrent,getSession,signTypedData}){
- let armedAgent=null,armedFunding=null,armedDeposit=null,armedSwap=null,armedPrediction=null;
+ let armedAgent=null,armedFunding=null,armedDeposit=null,armedSwap=null,armedPrediction=null,armedBridge=null;
  const reads=new Set(['eth_accounts','eth_requestAccounts','eth_chainId','net_version','eth_getBalance','eth_call','eth_getCode','eth_estimateGas','eth_gasPrice','eth_getTransactionReceipt','eth_getTransactionByHash','eth_getBlockByNumber']);
  function checkedDeposit(tx){if(typeof tx?.data!=='string'||!/^0xa9059cbb[0-9a-f]{128}$/i.test(tx.data))throw Error('入金交易无效');const amount=text(BigInt('0x'+tx.data.slice(-64))*100n),expected=depositTransaction(address,amount);if(JSON.stringify(tx)!==JSON.stringify(expected))throw Error('只允许当前钱包向固定 Arbitrum 桥转入已预览的 USDC');return expected;}
  function routerRead(tx){return tx?.to?.toLowerCase()===ROUTER&&tx.from?.toLowerCase()===address.toLowerCase()&&tx.value==='0x0'&&/^0xac9650d8[0-9a-f]+$/i.test(tx.data)&&Object.keys(tx).every(k=>['from','to','value','data'].includes(k));}
@@ -24,21 +25,23 @@ export function guardWalletProvider(raw,{address,subject,isCurrent,getSession,si
  }
  async function session(){const user=await getSession();if(!isCurrent()||!user?.active||'oasis:google:'+user.id!==subject)throw Error('登录账户已变化，请重新连接账号钱包');}
  return {
+  async armCrosschainTransfer(quote,attestation){checkBridgeQuote(quote);if(!isCurrent()||quote.owner!==address.toLowerCase())throw Error('跨链钱包不匹配');await session();const r=await fetch('/api/predictions/bridge/verify',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({quote,attestation})});const p=await r.json();if(!r.ok||p.verified!==true)throw Error(p.error||'跨链预览核对失败');if(!isCurrent())throw Error('跨链钱包会话已变化');armedBridge=structuredClone(quote);},
   armPredictionSignature(typed,context){if(!isCurrent())throw Error('账号钱包会话已失效');if(context.kind==='auth')checkAuth(typed,address);else if(context.identity?.signer?.toLowerCase()!==address.toLowerCase())throw Error('平台签名钱包不匹配');else if(context.kind==='approval')checkBatch(typed,context.quote,context.identity.wallet);else if(context.kind==='order')checkOrder(typed,context.quote,context.identity);else throw Error('平台签名类型无效');armedPrediction={typed:canonical(typed),context};},
-  armArbitrumSwap(tx,q,kind){if(!isCurrent()||q?.user!==address.toLowerCase())throw Error('账号钱包会话或兑换账户不匹配');armedSwap={tx:JSON.stringify(checkTransaction(tx,q,kind)),quote:structuredClone(q),kind};},
+  armArbitrumSwap(tx,q,kind){if(!isCurrent()||q?.user!==address.toLowerCase())throw Error('账号钱包会话或兑换账户不匹配');armedBridge=null;armedSwap={tx:JSON.stringify(checkTransaction(tx,q,kind)),quote:structuredClone(q),kind};},
   armMainnetAgent(agent){if(!isCurrent())throw Error('会话已失效');armedAgent=mainnetAddress(agent);},
   armMainnetFunding(packet){
    if(!isCurrent())throw Error('会话已失效');const a=packet?.action,kind=a?.type==='withdraw3'?'withdraw':a?.type==='userSetAbstraction'?'standardize':a?.type==='usdClassTransfer'&&typeof a.toPerp==='boolean'?(a.toPerp?'toPerp':'toSpot'):null;
    const expected=fundingPacket(kind,address,a?.amount||'',a?.signatureChainId,packet?.nonce);
    if(JSON.stringify(expected)!==JSON.stringify(packet))throw Error('资金签名必须与本次预览完全一致');armedFunding={packet:JSON.stringify(expected.typed),chain:a.signatureChainId,nonce:packet.nonce};
   },
-  armMainnetDeposit(tx){if(!isCurrent())throw Error('会话已失效');armedDeposit={tx:JSON.stringify(checkedDeposit(tx)),until:Date.now()+60000};},
+  armMainnetDeposit(tx){if(!isCurrent())throw Error('会话已失效');armedBridge=null;armedDeposit={tx:JSON.stringify(checkedDeposit(tx)),until:Date.now()+60000};},
   async request(packet){
    if(!isCurrent())throw Error('账号钱包会话已失效，请重新登录');
    if(packet.method==='wallet_switchEthereumChain'){
-    if(![ARBITRUM,POLYGON].some(chain=>JSON.stringify(packet.params)===JSON.stringify([{chainId:chain}])))throw Error('仅允许切换至已支持的交易网络');await session();return raw.request(packet);
+    if(![ARBITRUM,POLYGON,...Object.values(SOURCES).map(s=>s.chain)].some(chain=>JSON.stringify(packet.params)===JSON.stringify([{chainId:chain}])))throw Error('仅允许切换至已支持的交易网络');await session();return raw.request(packet);
    }
    if(packet.method==='eth_sendTransaction'){
+    if(armedBridge){const q=armedBridge;armedBridge=null;if(packet.params?.length!==1||await raw.request({method:'eth_chainId'})!==SOURCES[q.sourceChain].chain)throw Error('跨链网络已变化');checkBridgeTx(packet.params[0],q);await session();return raw.request(packet);}
     if(armedSwap){const intent=armedSwap;armedSwap=null;if(packet.params?.length!==1||JSON.stringify(checkTransaction(packet.params[0],intent.quote,intent.kind))!==intent.tx||await raw.request({method:'eth_chainId'})!==ARBITRUM)throw Error('兑换交易未匹配本次预览或网络已变化');await session();return raw.request(packet);}
     const approved=armedDeposit;armedDeposit=null;
     if(!approved||Date.now()>=approved.until||packet.params?.length!==1||JSON.stringify(checkedDeposit(packet.params[0]))!==approved.tx||await raw.request({method:'eth_chainId'})!==ARBITRUM)throw Error('交易未由本次预览准备或网络已变化');await session();return raw.request(packet);
@@ -53,9 +56,10 @@ export function guardWalletProvider(raw,{address,subject,isCurrent,getSession,si
    if(packet.method==='eth_getBalance'&&(packet.params?.[0]?.toLowerCase()!==address.toLowerCase()||packet.params?.[1]!=='latest'))throw Error('只允许读取当前钱包余额');
    if(packet.method==='eth_call'){
     const chain=await raw.request({method:'eth_chainId'}),contract=USDC_CONTRACTS[Number(BigInt(chain))],call=packet.params?.[0],balance=contract&&call?.to?.toLowerCase()===contract&&call?.data?.toLowerCase()==='0x70a08231'+address.slice(2).toLowerCase().padStart(64,'0')&&Object.keys(call).every(k=>['to','data'].includes(k));
-    if(packet.params?.length!==2||packet.params[1]!=='latest'||!balance&&!(chain===ARBITRUM&&swapRead(call)))throw Error('只允许当前钱包余额及固定兑换合约的只读查询');
+    if(packet.params?.length!==2||packet.params[1]!=='latest'||!balance&&!(chain===ARBITRUM&&swapRead(call))&&!(armedBridge&&chain===SOURCES[armedBridge.sourceChain].chain&&bridgeRead(call,armedBridge)))throw Error('只允许当前钱包余额及固定兑换合约的只读查询');
    }
    if(packet.method==='eth_getCode'&&(packet.params?.length!==2||![BRIDGE,USDC,WETH,ROUTER,QUOTER,FACTORY].includes(packet.params[0]?.toLowerCase())||packet.params[1]!=='latest'||await raw.request({method:'eth_chainId'})!==ARBITRUM))throw Error('只允许核对固定 Arbitrum 合约');
+   if(packet.method==='eth_estimateGas'&&armedBridge){checkBridgeQuote(armedBridge);if(packet.params?.length!==1||await raw.request({method:'eth_chainId'})!==SOURCES[armedBridge.sourceChain].chain)throw Error('跨链估算网络不匹配');checkBridgeTx(packet.params[0],armedBridge);return raw.request(packet);}
    if(packet.method==='eth_estimateGas'){if(packet.params?.length!==1||await raw.request({method:'eth_chainId'})!==ARBITRUM)throw Error('网络费估算网络无效');if(!routerRead(packet.params[0])&&!approvalRead(packet.params[0]))checkedDeposit(packet.params[0]);}
    if(['eth_getTransactionReceipt','eth_getTransactionByHash'].includes(packet.method)&&(packet.params?.length!==1||!/^0x[0-9a-f]{64}$/i.test(packet.params[0])||await raw.request({method:'eth_chainId'})!==ARBITRUM))throw Error('仅核对 Arbitrum 交易');
    if(packet.method==='eth_getBlockByNumber'&&(JSON.stringify(packet.params)!==JSON.stringify(['latest',false])||await raw.request({method:'eth_chainId'})!==ARBITRUM))throw Error('仅允许读取 Arbitrum 最新区块时间');

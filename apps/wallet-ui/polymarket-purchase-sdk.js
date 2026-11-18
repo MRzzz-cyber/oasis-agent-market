@@ -68,6 +68,7 @@ export async function purchaseSession(wallet,{getWallet,fetchImpl=fetch,onPrepar
  }
  return {
   identity:json(client.account),
+  bridgeProof(){if(closed||!proof)throw Error('平台连接已过期，请重新连接');return json(proof);},
   observe(fn){onPrepared=fn;onAcknowledged=fn;},
   async preview(args){await ensure();const market=await client.fetchMarket({id:args.marketId},{retries:0}),assetId=market.version==='v2'?market.outcomes?.[args.outcome]?.positionId:market.outcomes?.[args.outcome]?.tokenId;
    const [book,info]=await Promise.all([client.fetchOrderBook({assetId},{retries:0}),fetchMarketInfo(client,{conditionId:market.conditionId},{retries:0})]);

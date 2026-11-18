@@ -1,0 +1,55 @@
+name: Prediction crosschain funding acceptance
+on:
+  push:
+    branches: [feat/prediction-crosschain-funding]
+permissions:
+  contents: read
+concurrency:
+  group: crosschain-funding
+  cancel-in-progress: true
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Regression and bridge policy tests
+        run: |
+          node --check apps/frontend/crosschain-ui.js
+          node --check apps/frontend/polymarket-purchase.js
+          if npm test > "$RUNNER_TEMP/bridge-tests.txt" 2>&1; then tail -n 12 "$RUNNER_TEMP/bridge-tests.txt"; else rg -A 24 'not ok|error:|failureType:' "$RUNNER_TEMP/bridge-tests.txt"; exit 1; fi
+      - name: Build wallet and Worker
+        run: |
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild';await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Desktop mobile and purchase regression fixtures
+        run: |
+          failures=0
+          node scripts/check-crosschain-ui.mjs || failures=1
+          node scripts/check-polymarket-purchase-ui.mjs || failures=1
+          node scripts/check-prediction-conversation.mjs || failures=1
+          node scripts/check-bilingual-ui.mjs || failures=1
+          exit $failures
+      - name: Public supported assets and estimate only
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import {bridgeJSON,supportedSource,quoteBody} from './apps/frontend/crosschain-service.js';
+          for(const chain of ['42161','8453','10']){const a=await supportedSource(chain,fetch);console.log('LIVE supported source',chain,a.token.symbol,a.minCheckoutUsd);}
+          const q=await bridgeJSON('/quote',{body:quoteBody('0x17ec161f126e82a8ba337f4022d574dbeafef575','0x17ec161f126e82a8ba337f4022d574dbeafef575','42161','12')});assert.ok(BigInt(q.estToTokenBaseUnit)>0n);console.log('LIVE estimated output',q.estToTokenBaseUnit,'pUSD atomic; no account registration or transfer');
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crosschain-fixtures
+          path: |
+            ${{ runner.temp }}/crosschain-ui/*.png
+            ${{ runner.temp }}/bridge-tests.txt
+          if-no-files-found: ignore

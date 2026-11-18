@@ -1,0 +1,29 @@
+name: Crosschain runtime and production
+on:
+  push:
+    branches: [feat/prediction-crosschain-funding, refactor/simple-base-mvp]
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm install --prefix "$RUNNER_TEMP/bridge-worker" --no-audit --no-fund miniflare@4
+      - run: node scripts/check-crosschain-worker.mjs
+  production:
+    if: github.ref == 'refs/heads/refactor/simple-base-mvp'
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-crosschain-production.mjs
