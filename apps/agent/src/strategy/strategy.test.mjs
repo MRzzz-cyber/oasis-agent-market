@@ -43,10 +43,10 @@ test("payment guard blocks unplanned or overpriced paid agent calls", () => {
   const ledger = createBudgetLedger(defaultUserPolicy);
   const paymentRequirement = {
     scheme: "exact",
-    network: "hedera:testnet",
-    asset: "0.0.0",
+    network: "eip155:84532",
+    asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     amount: "3000000",
-    payTo: "0.0.2002",
+    payTo: "0x0000000000000000000000000000000000000001",
     extra: {
       requestId: "market_test"
     }
@@ -68,7 +68,7 @@ test("payment guard blocks unplanned or overpriced paid agent calls", () => {
     service: "market-signal",
     plannedCall: {
       service: "market-signal",
-      maxWillingToPayTinybar: 1_000_000
+      maxWillingToPayAtomic: 10000
     }
   });
   assert.equal(overpriced.allowed, false);
@@ -187,10 +187,10 @@ test("tool planner prices paid agents by requested workload", () => {
 
   assert.equal(simpleMarket.reasoningTier, "basic");
   assert.equal(simpleRisk.reasoningTier, "standard");
-  assert.equal(complexMarket.quotedTinybar > simpleMarket.quotedTinybar, true);
+  assert.equal(complexMarket.quotedAtomic > simpleMarket.quotedAtomic, true);
   assert.equal(complexMarket.usage.timeframes > simpleMarket.usage.timeframes, true);
   assert.equal(complexRisk.reasoningTier, "deep");
-  assert.equal(complexRisk.quotedTinybar > simpleRisk.quotedTinybar, true);
+  assert.equal(complexRisk.quotedAtomic > simpleRisk.quotedAtomic, true);
   assert.equal(complexRisk.usage.stressScenarios > simpleRisk.usage.stressScenarios, true);
 });
 

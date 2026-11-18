@@ -1,14 +1,19 @@
+import { planResearch } from "./ResearchPlanner.mjs";
 import { assertToolPlan } from "./schemas.mjs";
 import { normalizeUserPolicy } from "../../../../packages/policy/src/index.mjs";
 import { quotePaidAgentCall } from "../../../../packages/shared/src/pricing.mjs";
 
 export class ToolPlanner {
+  static planResearch(input) {
+    return planResearch(input);
+  }
+
   plan({ policy, hypothesis, marketContext, memory, intent, userMessage, locale = "zh-CN" }) {
     const isZh = locale === "zh-CN";
     const normalizedPolicy = normalizeUserPolicy(policy);
     const demand = analyzeDemand({ intent: intent ?? normalizedPolicy.strategyIntent, userMessage });
     const toolCalls = [];
-    const remainingTinybar = normalizedPolicy.sessionBudgetTinybar;
+    const remainingAtomic = normalizedPolicy.sessionBudgetAtomic;
 
     if (normalizedPolicy.allowedPaidAgents.includes("market-signal")) {
       const reasoningTier = selectMarketReasoningTier({ hypothesis, marketContext, demand });
@@ -21,14 +26,14 @@ export class ToolPlanner {
         service: "market-signal",
         agent: "Market Agent",
         reasoningTier,
-        quotedTinybar: quote.quotedTinybar,
+        quotedAtomic: quote.quotedAtomic,
         usage: quote.usage,
         pricingModel: quote.pricingModel,
         priority: "high",
         reason: isZh
           ? `Market Agent 会在最终决策前验证价格行为、成交量和波动率。用量：${quote.usage.candles} 根K线、${quote.usage.indicators} 个指标、${quote.usage.timeframes} 个周期。`
           : `Market Agent can validate price action, volume, and volatility before a final decision. Usage: ${quote.usage.candles} candles, ${quote.usage.indicators} indicators, ${quote.usage.timeframes} timeframe(s).`,
-        maxWillingToPayTinybar: Math.min(quote.quotedTinybar, normalizedPolicy.maxPaidAgentCallTinybar, remainingTinybar),
+        maxWillingToPayAtomic: Math.min(quote.quotedAtomic, normalizedPolicy.maxPaidAgentCallAtomic, remainingAtomic),
         required: true
       });
     }
@@ -44,14 +49,14 @@ export class ToolPlanner {
         service: "risk-challenge",
         agent: "Risk Agent",
         reasoningTier,
-        quotedTinybar: quote.quotedTinybar,
+        quotedAtomic: quote.quotedAtomic,
         usage: quote.usage,
         pricingModel: quote.pricingModel,
         priority: "high",
         reason: isZh
           ? `Risk Agent 会在模拟执行前进行对抗式下行风险复核。用量：${quote.usage.stressScenarios} 个压力场景、${quote.usage.checks} 项检查、${quote.usage.riskFactors} 个风险因子。`
           : `Risk Agent should run an adversarial downside review before simulated execution. Usage: ${quote.usage.stressScenarios} stress scenarios, ${quote.usage.checks} checks, ${quote.usage.riskFactors} risk factors.`,
-        maxWillingToPayTinybar: Math.min(quote.quotedTinybar, normalizedPolicy.maxPaidAgentCallTinybar, remainingTinybar),
+        maxWillingToPayAtomic: Math.min(quote.quotedAtomic, normalizedPolicy.maxPaidAgentCallAtomic, remainingAtomic),
         required: true
       });
     }

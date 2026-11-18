@@ -1,6 +1,8 @@
-import { createAgentPaymentPayload, getHederaConfig } from "../../../../packages/hedera/src/index.mjs";
+import { BASE_SEPOLIA, USDC } from "../../../../packages/evm/src/config.mjs";
+import { SIMULATION_HEADER, SIMULATION_RECIPIENT } from "../../../../packages/evm/src/simulation.mjs";
 import { recordAgentCharge } from "../../../../packages/policy/src/index.mjs";
-import { buildX402PaymentRequired, createRequestId, encodePaymentHeader, tinybarToHbar } from "../../../../packages/shared/src/index.mjs";
+import { atomicToUsdc } from "../../../../packages/shared/src/index.mjs";
+import { checkResearchQuote } from "../../../../packages/policy/src/research-purchase.mjs";
 import { quotePaidAgentCall } from "../../../../packages/shared/src/pricing.mjs";
 
 export class X402PaidToolClient {
@@ -59,57 +61,65 @@ export class X402PaidToolClient {
 
   async callPaidAgent({ service, serviceBaseUrl, resourcePath, policy, ledger, plannedCall, extractResult }) {
     const endpoint = `${serviceBaseUrl}${resourcePath}`;
-    const quote = createAgentQuote({ service, plannedCall });
-    const paymentRequired = buildPaymentRequiredFromQuote({ quote });
-    const requirement = paymentRequired.accepts[0];
-    const policyCheck = this.guard.checkBeforeAgentCharge({
-      policy,
-      ledger,
-      agentQuote: quote,
-      service,
-      plannedCall
-    });
-
-    if (!policyCheck.allowed) {
+    const initial = await this.fetch(endpoint, { redirect: "error", signal: AbortSignal.timeout(10000) });
+    if (initial.status !== 402) throw new Error("Expected a research quote");
+    const paymentRequired = await initial.json();
+    const requirement = paymentRequired.quote;
+    const quote = createAgentQuote({ service, plannedCall, id: requirement?.id });
+    const policyCheck = this.guard.checkBeforeAgentCharge({ policy, ledger, agentQuote: quote, service, plannedCall });
+    const offer = {
+      provider: service, resource: resourcePath, amount: String(quote.quotedAtomic), payTo: SIMULATION_RECIPIENT,
+      expiresAt: requirement?.expiresAt
+    };
+    const now = Date.now();
+    const authorization = requirement && paymentRequired.mode === "simulation" &&
+      typeof requirement.id === "string" && requirement.expiresAt <= now + 60_000 &&
+      checkResearchQuote({
+        quote: requirement, offer, now,
+        policy: {
+          providers: policy.allowedPaidAgents,
+          perPurchase: policy.maxPaidAgentCallAtomic,
+          remaining: policyCheck.remainingAtomic
+        }
+      });
+    if (!policyCheck.allowed || !authorization?.allowed) {
       return {
-        status: "blocked",
-        service,
-        paidAgent: paidAgentName(service),
-        quote,
-        requirement,
-        paymentRequired,
-        policyCheck,
-        result: null,
-        payment: null
+        status: "blocked", service, paidAgent: paidAgentName(service),
+        quote, requirement, paymentRequired,
+        policyCheck: { ...policyCheck, allowed: false, reasons: [...policyCheck.reasons, ...(authorization?.allowed ? [] : [authorization?.reason ?? "invalid_quote"])] },
+        result: null, payment: null
       };
     }
 
-    const paymentPayload = await createAgentPaymentPayload({
-      requestId: requirement.extra.requestId,
-      paymentRequirement: requirement,
-      policyId: policy.id,
-      payerAccountId: policy.allowance?.ownerAccountId,
-      spenderAccountId: policy.allowance?.spenderAccountId
-    });
-
-    const paidResponse = await this.fetch(endpoint, {
-      headers: {
-        "X-PAYMENT": encodePaymentHeader(paymentPayload)
+    const pending = { service, requestId: quote.quoteId, amountAtomic: String(quote.quotedAtomic) };
+    ledger.pending.push(pending);
+    let paidResult;
+    try {
+      const paidResponse = await this.fetch(endpoint, {
+        headers: { [SIMULATION_HEADER]: requirement.id },
+        redirect: "error",
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!paidResponse.ok) throw new Error("Simulated service call failed: " + paidResponse.status);
+      paidResult = await paidResponse.json();
+      const payment = paidResult.payment;
+      if (payment?.mode !== "simulation" || payment.network !== BASE_SEPOLIA.network ||
+          payment.asset !== USDC.address || payment.amount !== requirement.amount ||
+          payment.transactionId !== "simulation-" + requirement.id) {
+        throw new Error("Invalid simulation receipt");
       }
-    });
-    const paidResult = await paidResponse.json();
-
-    if (!paidResponse.ok) {
-      throw new Error(`Paid service call failed: ${paidResponse.status} ${JSON.stringify(paidResult)}`);
+    } finally {
+      ledger.pending.splice(ledger.pending.indexOf(pending), 1);
     }
 
+    const paymentPayload = { mode: "simulation", payer: "local-session", facilitatorUrl: "local simulator" };
     const charge = recordAgentCharge({
       ledger,
       quoteId: quote.quoteId,
       service,
       agent: quote.agent,
       reasoningTier: quote.reasoningTier,
-      amountTinybar: quote.quotedTinybar,
+      amountAtomic: quote.quotedAtomic,
       usage: quote.usage,
       pricingModel: quote.pricingModel,
       transactionId: paidResult.payment.transactionId
@@ -130,12 +140,12 @@ export class X402PaidToolClient {
       charge,
       ...extracted,
       result: extracted.result,
-      priceHbar: tinybarToHbar(requirement.amount)
+      priceUsdc: atomicToUsdc(requirement.amount)
     };
   }
 }
 
-function createAgentQuote({ service, plannedCall }) {
+function createAgentQuote({ service, plannedCall, id }) {
   const usageQuote = quotePaidAgentCall({
     service,
     reasoningTier: plannedCall.reasoningTier,
@@ -143,32 +153,17 @@ function createAgentQuote({ service, plannedCall }) {
   });
 
   return {
-    quoteId: createRequestId(service.replace(/-/g, "_")),
+    quoteId: id,
     service,
     agent: plannedCall.agent ?? paidAgentName(service),
     reasoningTier: plannedCall.reasoningTier,
-    quotedTinybar: usageQuote.quotedTinybar,
+    quotedAtomic: usageQuote.quotedAtomic,
     usage: usageQuote.usage,
     pricingModel: usageQuote.pricingModel,
     network: usageQuote.network,
     asset: usageQuote.asset,
     reason: plannedCall.reason
   };
-}
-
-function buildPaymentRequiredFromQuote({ quote }) {
-  const config = getHederaConfig();
-  if (!config.serviceAccountId) {
-    throw new Error("Missing required Hedera service receiver account: HEDERA_OASIS_MERCHANT_ACCOUNT_ID");
-  }
-
-  return buildX402PaymentRequired({
-    requestId: quote.quoteId,
-    service: quote.service,
-    receiverAccountId: config.serviceAccountId,
-    priceTinybar: quote.quotedTinybar,
-    network: quote.network
-  });
 }
 
 function paidAgentName(service) {

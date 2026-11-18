@@ -42,9 +42,10 @@ The token address must be checked against Circle's official contract list before
 
 ## Implementation status
 
-The repository currently contains a Base Sepolia/USDC configuration and integer amount helper in packages/evm. The full x402 EVM client/server and payment settlement path are not yet implemented.
+The web and strategy flows use simulated Base Sepolia USDC checkout. Each quote is short-lived, resource-bound and consumed once. The strategy ledger reserves the quoted amount before redemption and keeps local audit records.
 
-The old Hedera/Blocky402 payment flow remains in packages/hedera only to keep the hackathon demo and regression tests available during migration.
+The isolated smoke runner uses the official SDK for an actual Base Sepolia x402 purchase and verifies the USDC transfer receipt. It requires a funded test wallet and a distinct testnet recipient. The regular web service has no signer.
+
 
 ## Official references
 

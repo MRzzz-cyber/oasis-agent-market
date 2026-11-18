@@ -23,10 +23,10 @@ const els = {
   authorizeBudgetButton: document.querySelector("#authorizeBudgetButton"),
   escrowStatus: document.querySelector("#escrowStatus"),
   escrowSummary: document.querySelector("#escrowSummary"),
-  checkHederaButton: document.querySelector("#checkHederaButton"),
-  hederaStatusBadge: document.querySelector("#hederaStatusBadge"),
-  hederaStatusSummary: document.querySelector("#hederaStatusSummary"),
-  hederaStatusGrid: document.querySelector("#hederaStatusGrid"),
+  checkPaymentButton: document.querySelector("#checkPaymentButton"),
+  paymentStatusBadge: document.querySelector("#paymentStatusBadge"),
+  paymentStatusSummary: document.querySelector("#paymentStatusSummary"),
+  paymentStatusGrid: document.querySelector("#paymentStatusGrid"),
   payerBalanceValue: document.querySelector("#payerBalanceValue"),
   paymentRailValue: document.querySelector("#paymentRailValue"),
   auditReadinessValue: document.querySelector("#auditReadinessValue"),
@@ -83,9 +83,9 @@ const state = {
     status: "not_authorized",
     sessionId: null,
     payerAccountId: "local-session",
-    authorizedBudgetTinybar: 0,
-    availableBalanceTinybar: 0,
-    spentTinybar: 0,
+    authorizedBudgetAtomic: 0,
+    availableBalanceAtomic: 0,
+    spentAtomic: 0,
     fundingReference: null,
     authorizedAt: null
   },
@@ -107,7 +107,7 @@ const PAGES = [
 const PREFERENCE_STORAGE_KEY = "oasis.preferences";
 const DEFAULT_PREFERENCES = {
   language: "zh-CN",
-  unit: "hbar",
+  unit: "usdc",
   density: "comfortable",
   startPage: "home",
   motion: true,
@@ -139,8 +139,8 @@ const UI_COPY = {
     labels: {
       assetInput: "资产",
       timeframeInput: "周期",
-      budgetInput: "每次策略分析预算 HBAR",
-      perCallInput: "单次付费 Agent 上限 HBAR",
+      budgetInput: "每次策略分析预算 USDC",
+      perCallInput: "单次付费 Agent 上限 USDC",
       riskInput: "风险偏好",
       executionInput: "执行模式",
       preferenceLanguageInput: "界面语言",
@@ -151,35 +151,29 @@ const UI_COPY = {
       modelInput: "模型名"
     },
     paymentReadinessTitle: "支付能力",
-    paymentReadinessBody: "确认 Agent 是否具备在预算边界内自动购买服务的能力，包括用户测试币余额、Hedera testnet 支付通道和 HCS 审计记录。",
+    paymentReadinessBody: "检查 Base Sepolia USDC 模拟采购和本地审计状态。",
     payerBalanceTitle: "用户测试币余额",
     payerBalanceBody: "用于 Agent 在预算边界内支付 Market/Risk 服务。",
     paymentRailTitle: "支付通道",
-    paymentRailBody: "Hedera testnet / HBAR，经由 Blocky402 结算。",
+    paymentRailBody: "Base Sepolia / USDC，策略购买为模拟模式。",
     auditReadinessTitle: "审计记录",
-    auditReadinessBody: "决策摘要写入 Hedera Consensus Service。",
+    auditReadinessBody: "决策摘要记录在本地会话。",
     paymentReadinessHint: "这不是用户设置项，只展示当前支付运行环境。",
-    hederaStatusUnchecked: "未检查",
-    hederaStatusChecking: "检查中",
-    hederaStatusReady: "可运行",
-    hederaStatusNeedsSetup: "需配置",
-    hederaStatusHelp: "检查用户测试币余额、Hedera testnet 支付通道、Blocky402 和 HCS 审计状态。",
-    hederaStatusOk: (mode, network) => `${mode} / ${network} 已检查。`,
-    hederaStatusMissing: (items) => `缺少配置：${items}`,
-    checkHedera: "刷新支付状态",
-    hcsReady: "HCS topic 已就绪",
-    hcsMissing: "HCS topic 未配置",
-    hcsMirrorReady: "Mirror Node 能读取该 topic",
-    hcsMirrorFailed: (error) => `Mirror Node 未确认该 topic：${error}`,
-    blockyReady: (feePayer) => `Blocky402 支持 Hedera exact，feePayer ${feePayer}`,
-    blockyFailed: (error) => `Blocky402 检查失败：${error}`,
-    accountBalance: (role, account, balance) => `${role} ${account}：${balance} HBAR`,
+    paymentStatusUnchecked: "未检查",
+    paymentStatusChecking: "检查中",
+    paymentStatusReady: "可运行",
+    paymentStatusNeedsSetup: "需配置",
+    paymentStatusHelp: "检查 Base Sepolia USDC 模拟采购和本地审计状态。",
+    paymentStatusOk: (mode, network) => `${mode} / ${network} 已检查。`,
+    paymentStatusMissing: (items) => `缺少配置：${items}`,
+    checkPayment: "刷新支付状态",
+    accountBalance: (role, account, balance) => `${role} ${account}：${balance} USDC`,
     accountBalanceUnknown: (role, account) => `${role} ${account}：未查询余额`,
-    payerBalance: (balance) => `${balance} HBAR`,
+    payerBalance: (balance) => `${balance} USDC`,
     payerBalanceUnknown: "未查询",
-    paymentRailReady: "Blocky402 可结算",
+    paymentRailReady: "模拟支付可用",
     paymentRailPending: "待检查",
-    auditReady: "HCS 已连接",
+    auditReady: "本地审计可用",
     auditPending: "未配置",
     switches: {
       autoPay: "在预算边界内自动扣费",
@@ -196,7 +190,7 @@ const UI_COPY = {
     planAuthorizationPending: "等待预算授权",
     planAuthorizationPendingBody: "请先在 Policy 页授权预算边界。",
     planAuthorizationReady: "预算边界已授权",
-    planAuthorizationReadyBody: (budget, perCall) => `Agent 可在 ${budget} HBAR 总预算、${perCall} HBAR 单次上限内自动购买付费服务。`,
+    planAuthorizationReadyBody: (budget, perCall) => `Agent 可在 ${budget} USDC 总预算、${perCall} USDC 单次上限内自动购买付费服务。`,
     preferencesTitle: "个性化设置",
     preferencesBody: "这些偏好只保存在当前浏览器，不会改变你的交易 policy、钱包授权或 Agent 决策流程。",
     savePreferences: "保存设置",
@@ -226,14 +220,14 @@ const UI_COPY = {
     ,
     runningTitle: "运行中",
     runningReason: "Strategy Agent 正在授权预算边界内执行策略。",
-    policyBudgetText: (budget, perCall) => `每次策略预算 ${budget} HBAR，单次付费 Agent 上限 ${perCall} HBAR`,
+    policyBudgetText: (budget, perCall) => `每次策略预算 ${budget} USDC，单次付费 Agent 上限 ${perCall} USDC`,
     noPaidCall: "Strategy Agent 认为当前不需要调用付费平台 Agent。",
     finalDecisionBuy: "模拟买入",
     finalDecisionHold: "保持观察",
     finalDecisionNoTrade: "不交易",
     evidenceSynthesized: "证据已合成",
-    budgetSpent: (spent, remaining) => `已使用 ${spent} HBAR，剩余 ${remaining} HBAR`,
-    authorizedSession: (sessionId, hbar) => `预算边界 ${sessionId} 已设置为 ${hbar} HBAR。`,
+    budgetSpent: (spent, remaining) => `已使用 ${spent} USDC，剩余 ${remaining} USDC`,
+    authorizedSession: (sessionId, usdc) => `预算边界 ${sessionId} 已设置为 ${usdc} USDC。`,
     escrowAuthorizing: "正在设置本次预算边界...",
     invalidBudget: "预算边界必须大于 0。",
     analyzingIntent: "Strategy Agent 正在解析用户目标",
@@ -243,24 +237,24 @@ const UI_COPY = {
     paymentCompleted: (tx) => `支付完成，交易 ${tx}`,
     marketSignalDelivered: "市场信号已返回",
     committeeWaiting: "等待运行结果。",
-    approvePayment: (agent, amount) => `${agent} 报价在预算边界内，自动扣费 ${amount} HBAR`,
+    approvePayment: (agent, amount) => `${agent} 报价在预算边界内，自动扣费 ${amount} USDC`,
     rejectPayment: (agent, reasons) => `${agent} 报价超出预算边界：${reasons}`,
-    maxFee: (agent, amount) => `${agent}，最高费用 ${amount} HBAR`,
+    maxFee: (agent, amount) => `${agent}，最高费用 ${amount} USDC`,
     quote: (agent, price, network, asset) => `${agent} 报价 ${price}，${network} / ${asset}`,
     policyPassed: (remaining) => `policy 预算边界通过，剩余 ${remaining}`,
-    paymentSigned: (payer, spender, facilitator) => `payer ${payer} / spender ${spender ?? "n/a"} 已生成 X-PAYMENT，经由 ${facilitator}`,
+    paymentSigned: (payer, spender, facilitator) => `payer ${payer} / spender ${spender ?? "n/a"} 已授权模拟采购，经由 ${facilitator}`,
     signalReturned: "信号返回",
     flowQuotePending: "等待付费 Agent 返回报价",
     flowPolicyAllowed: (remaining) => `允许自动支付，余额剩余 ${remaining}`,
     flowPolicyRejected: (reasons) => `拒绝自动支付：${reasons}`,
     flowPolicyPending: "预算、单次上限和 Agent 权限待检查",
     flowSignedPending: "等待生成授权扣费 payload",
-    flowSettlePending: "等待 Blocky402 / Hedera testnet 结算",
+    flowSettlePending: "等待模拟结算",
     flowDeliveredPending: "等待付费 Agent 返回证据",
     runFailed: "运行失败",
     auditNotRecorded: "尚未记录",
-    auditFailed: (error) => `决策已完成，HCS 审计写入失败：${error}`,
-    agentCallQuote: (agent, amount, tier) => `${agent}，${tier ?? "standard"} 推理报价 ${amount} HBAR`,
+    auditFailed: (error) => `决策已完成，本地审计写入失败：${error}`,
+    agentCallQuote: (agent, amount, tier) => `${agent}，${tier ?? "standard"} 推理报价 ${amount} USDC`,
     simulationBlocked: "模拟执行被阻止。",
     simulatedPnl: (side, quantity, asset, price, pnl) => `${side} ${quantity} ${asset} @ ${price}，模拟 PnL ${pnl} USD。`
   },
@@ -288,8 +282,8 @@ const UI_COPY = {
     labels: {
       assetInput: "Asset",
       timeframeInput: "Timeframe",
-      budgetInput: "Budget per strategy run HBAR",
-      perCallInput: "Max paid Agent call HBAR",
+      budgetInput: "Budget per strategy run USDC",
+      perCallInput: "Max paid Agent call USDC",
       riskInput: "Risk preference",
       executionInput: "Execution mode",
       preferenceLanguageInput: "Interface language",
@@ -300,35 +294,29 @@ const UI_COPY = {
       modelInput: "Model name"
     },
     paymentReadinessTitle: "Payment readiness",
-    paymentReadinessBody: "Check whether the Agent can buy services inside the budget boundary, including user testnet HBAR balance, Hedera testnet payment rail, and HCS audit records.",
+    paymentReadinessBody: "Check Base Sepolia USDC simulation and local audit readiness.",
     payerBalanceTitle: "User testnet balance",
     payerBalanceBody: "Used by the Agent to pay Market/Risk services inside the budget boundary.",
     paymentRailTitle: "Payment rail",
-    paymentRailBody: "Hedera testnet / HBAR, settled through Blocky402.",
+    paymentRailBody: "Base Sepolia / USDC in simulation mode.",
     auditReadinessTitle: "Audit records",
-    auditReadinessBody: "Decision summaries are written to Hedera Consensus Service.",
+    auditReadinessBody: "Decision summaries are recorded in the local session.",
     paymentReadinessHint: "This is read-only runtime status, not a user setting.",
-    hederaStatusUnchecked: "Unchecked",
-    hederaStatusChecking: "Checking",
-    hederaStatusReady: "Ready",
-    hederaStatusNeedsSetup: "Needs setup",
-    hederaStatusHelp: "Check user testnet HBAR balance, Hedera testnet payment rail, Blocky402, and HCS audit readiness.",
-    hederaStatusOk: (mode, network) => `${mode} / ${network} checked.`,
-    hederaStatusMissing: (items) => `Missing config: ${items}`,
-    checkHedera: "Refresh payment status",
-    hcsReady: "HCS topic is ready",
-    hcsMissing: "HCS topic is not configured",
-    hcsMirrorReady: "Mirror Node can read this topic",
-    hcsMirrorFailed: (error) => `Mirror Node did not confirm this topic: ${error}`,
-    blockyReady: (feePayer) => `Blocky402 supports Hedera exact, feePayer ${feePayer}`,
-    blockyFailed: (error) => `Blocky402 check failed: ${error}`,
-    accountBalance: (role, account, balance) => `${role} ${account}: ${balance} HBAR`,
+    paymentStatusUnchecked: "Unchecked",
+    paymentStatusChecking: "Checking",
+    paymentStatusReady: "Ready",
+    paymentStatusNeedsSetup: "Needs setup",
+    paymentStatusHelp: "Check Base Sepolia USDC simulation and local audit readiness.",
+    paymentStatusOk: (mode, network) => `${mode} / ${network} checked.`,
+    paymentStatusMissing: (items) => `Missing config: ${items}`,
+    checkPayment: "Refresh payment status",
+    accountBalance: (role, account, balance) => `${role} ${account}: ${balance} USDC`,
     accountBalanceUnknown: (role, account) => `${role} ${account}: balance not checked`,
-    payerBalance: (balance) => `${balance} HBAR`,
+    payerBalance: (balance) => `${balance} USDC`,
     payerBalanceUnknown: "Not checked",
-    paymentRailReady: "Blocky402 ready",
+    paymentRailReady: "Simulation ready",
     paymentRailPending: "Pending check",
-    auditReady: "HCS connected",
+    auditReady: "Local audit available",
     auditPending: "Not configured",
     switches: {
       autoPay: "Auto-charge inside the budget boundary",
@@ -345,7 +333,7 @@ const UI_COPY = {
     planAuthorizationPending: "Waiting for budget authorization",
     planAuthorizationPendingBody: "Authorize the budget boundary on the Policy page first.",
     planAuthorizationReady: "Budget boundary authorized",
-    planAuthorizationReadyBody: (budget, perCall) => `Agent can automatically buy paid services within ${budget} HBAR total budget and ${perCall} HBAR per-call limit.`,
+    planAuthorizationReadyBody: (budget, perCall) => `Agent can automatically buy paid services within ${budget} USDC total budget and ${perCall} USDC per-call limit.`,
     preferencesTitle: "Personal settings",
     preferencesBody: "These preferences stay in this browser. They do not change your trading policy, budget authorization, or Agent decision flow.",
     savePreferences: "Save settings",
@@ -375,14 +363,14 @@ const UI_COPY = {
     ,
     runningTitle: "Running",
     runningReason: "Strategy Agent is executing inside the authorized budget boundary.",
-    policyBudgetText: (budget, perCall) => `Strategy budget ${budget} HBAR, max paid Agent call ${perCall} HBAR`,
+    policyBudgetText: (budget, perCall) => `Strategy budget ${budget} USDC, max paid Agent call ${perCall} USDC`,
     noPaidCall: "Strategy Agent does not need any paid platform Agent call for this plan.",
     finalDecisionBuy: "Simulated buy",
     finalDecisionHold: "Hold",
     finalDecisionNoTrade: "No trade",
     evidenceSynthesized: "Evidence synthesized",
-    budgetSpent: (spent, remaining) => `Used ${spent} HBAR, remaining ${remaining} HBAR`,
-    authorizedSession: (sessionId, hbar) => `Budget boundary ${sessionId} set to ${hbar} HBAR.`,
+    budgetSpent: (spent, remaining) => `Used ${spent} USDC, remaining ${remaining} USDC`,
+    authorizedSession: (sessionId, usdc) => `Budget boundary ${sessionId} set to ${usdc} USDC.`,
     escrowAuthorizing: "Setting this budget boundary...",
     invalidBudget: "Budget boundary must be greater than 0.",
     analyzingIntent: "Strategy Agent is parsing the user goal",
@@ -392,24 +380,24 @@ const UI_COPY = {
     paymentCompleted: (tx) => `Payment settled, tx ${tx}`,
     marketSignalDelivered: "Market signal returned",
     committeeWaiting: "Waiting for run result.",
-    approvePayment: (agent, amount) => `${agent} quote fits the budget boundary; charged ${amount} HBAR`,
+    approvePayment: (agent, amount) => `${agent} quote fits the budget boundary; charged ${amount} USDC`,
     rejectPayment: (agent, reasons) => `${agent} quote exceeds the budget boundary: ${reasons}`,
-    maxFee: (agent, amount) => `${agent}, max fee ${amount} HBAR`,
+    maxFee: (agent, amount) => `${agent}, max fee ${amount} USDC`,
     quote: (agent, price, network, asset) => `${agent} quoted ${price} on ${network} / ${asset}`,
     policyPassed: (remaining) => `policy budget boundary passed, remaining ${remaining}`,
-    paymentSigned: (payer, spender, facilitator) => `payer ${payer} / spender ${spender ?? "n/a"} generated X-PAYMENT via ${facilitator}`,
+    paymentSigned: (payer, spender, facilitator) => `payer ${payer} / spender ${spender ?? "n/a"} authorized a simulated purchase via ${facilitator}`,
     signalReturned: "Signal returned",
     flowQuotePending: "Waiting for paid Agent quote",
     flowPolicyAllowed: (remaining) => `Auto-pay allowed, remaining balance ${remaining}`,
     flowPolicyRejected: (reasons) => `Auto-pay rejected: ${reasons}`,
     flowPolicyPending: "Budget, per-call limit, and Agent permission are pending checks",
     flowSignedPending: "Waiting to generate payment authorization payload",
-    flowSettlePending: "Waiting for Blocky402 / Hedera testnet settlement",
+    flowSettlePending: "Waiting for simulated settlement",
     flowDeliveredPending: "Waiting for paid Agent evidence",
     runFailed: "Run failed",
     auditNotRecorded: "Not recorded",
-    auditFailed: (error) => `Decision completed, but HCS audit failed: ${error}`,
-    agentCallQuote: (agent, amount, tier) => `${agent}, ${tier ?? "standard"} reasoning quote ${amount} HBAR`,
+    auditFailed: (error) => `Decision completed, but local audit failed: ${error}`,
+    agentCallQuote: (agent, amount, tier) => `${agent}, ${tier ?? "standard"} reasoning quote ${amount} USDC`,
     simulationBlocked: "Simulation was blocked.",
     simulatedPnl: (side, quantity, asset, price, pnl) => `${side} ${quantity} ${asset} @ ${price}, simulated PnL ${pnl} USD.`
   }
@@ -426,7 +414,7 @@ const DEFAULT_MODELS = {
 els.analyzeButton.addEventListener("click", analyzeIntent);
 els.runButton.addEventListener("click", runStrategy);
 els.authorizeBudgetButton.addEventListener("click", authorizeBudgetBoundary);
-els.checkHederaButton.addEventListener("click", checkHederaStatus);
+els.checkPaymentButton.addEventListener("click", checkPaymentStatus);
 els.homeStartButton.addEventListener("click", () => showPage("setup"));
 els.homePolicyButton.addEventListener("click", () => showPage("settings"));
 els.savePreferencesButton.addEventListener("click", savePreferences);
@@ -472,8 +460,8 @@ applyPreferences(preferences);
 showPage(preferences.rememberStartPage ? preferences.startPage : "home");
 
 async function authorizeBudgetBoundary() {
-  const budgetHbar = Number(els.budgetInput.value);
-  if (!Number.isFinite(budgetHbar) || budgetHbar <= 0) {
+  const budgetUsdc = Number(els.budgetInput.value);
+  if (!Number.isFinite(budgetUsdc) || budgetUsdc <= 0) {
     els.escrowStatus.textContent = currentCopy().budgetBoundaryPending;
     els.escrowSummary.textContent = currentCopy().invalidBudget;
     return;
@@ -484,7 +472,7 @@ async function authorizeBudgetBoundary() {
 
   try {
     state.sessionEscrow = await postJson("/billing/session/authorize", {
-      sessionBudgetTinybar: hbarToTinybar(budgetHbar)
+      sessionBudgetAtomic: usdcToAtomic(budgetUsdc)
     });
     state.policy = buildPolicyFromControls();
     renderPolicy(state.policy);
@@ -664,7 +652,7 @@ function describePreferences(preferences) {
   const isEnglish = preferences.language === "en-US";
   const language = isEnglish ? "English" : "简体中文";
   const density = preferences.density === "compact" ? (isEnglish ? "compact" : "紧凑") : (isEnglish ? "comfortable" : "舒适");
-  const unit = preferences.unit === "tinybar" ? "Tinybar" : preferences.unit === "usd" ? "USD 估算" : "HBAR";
+  const unit = preferences.unit === "atomic" ? "Atomic" : preferences.unit === "usd" ? "USD 估算" : "USDC";
   const start = PAGES.find((page) => page.id === preferences.startPage)?.label ?? "Home";
   if (isEnglish) {
     return `Language ${language}, amount ${unit}, density ${density}, default start page ${start}.`;
@@ -714,10 +702,10 @@ function renderLocalizedCopy(language) {
   readinessCards[2].querySelector("span").textContent = copy.auditReadinessTitle;
   readinessCards[2].querySelector("p").textContent = copy.auditReadinessBody;
   els.paymentReadinessHint.textContent = copy.paymentReadinessHint;
-  els.checkHederaButton.textContent = copy.checkHedera;
-  if (!els.hederaStatusGrid.children.length) {
-    els.hederaStatusBadge.textContent = copy.hederaStatusUnchecked;
-    els.hederaStatusSummary.textContent = copy.hederaStatusHelp;
+  els.checkPaymentButton.textContent = copy.checkPayment;
+  if (!els.paymentStatusGrid.children.length) {
+    els.paymentStatusBadge.textContent = copy.paymentStatusUnchecked;
+    els.paymentStatusSummary.textContent = copy.paymentStatusHelp;
   }
   setCheckRowText(els.autoPayInput, copy.switches.autoPay);
   setCheckRowText(els.allowMarketInput, copy.switches.allowMarket);
@@ -780,8 +768,8 @@ function setCheckRowText(input, text) {
 function renderPolicy(policy) {
   els.policyStatus.textContent = "DRAFT";
   els.budgetText.textContent = currentCopy().policyBudgetText(
-    tinybarToHbar(policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar),
-    tinybarToHbar(policy.maxPaidAgentCallTinybar ?? policy.maxPaymentPerCallTinybar)
+    atomicToUsdc(policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic),
+    atomicToUsdc(policy.maxPaidAgentCallAtomic ?? policy.maxPaymentPerCallAtomic)
   );
   els.budgetFill.style.transform = "scaleX(0)";
 }
@@ -791,9 +779,9 @@ function resetBudgetAuthorization() {
     ...state.sessionEscrow,
     status: "not_authorized",
     sessionId: null,
-    authorizedBudgetTinybar: 0,
-    availableBalanceTinybar: 0,
-    spentTinybar: 0,
+    authorizedBudgetAtomic: 0,
+    availableBalanceAtomic: 0,
+    spentAtomic: 0,
     fundingReference: null,
     authorizedAt: null
   };
@@ -802,121 +790,54 @@ function resetBudgetAuthorization() {
 function hasBudgetAuthorization(policy = buildPolicyFromControls()) {
   return policy.autoPayEnabled === true
     && policy.sessionEscrow?.status === "authorized"
-    && Number(policy.sessionEscrow?.availableBalanceTinybar ?? 0) > 0;
+    && Number(policy.sessionEscrow?.availableBalanceAtomic ?? 0) > 0;
 }
 
 function renderBudgetAuthorization() {
   const copy = currentCopy();
   const policy = buildPolicyFromControls();
   const authorized = hasBudgetAuthorization(policy);
-  const budgetHbar = tinybarToHbar(policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar);
-  const perCallHbar = tinybarToHbar(policy.maxPaidAgentCallTinybar ?? policy.maxPaymentPerCallTinybar);
+  const budgetUsdc = atomicToUsdc(policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic);
+  const perCallUsdc = atomicToUsdc(policy.maxPaidAgentCallAtomic ?? policy.maxPaymentPerCallAtomic);
 
   els.escrowStatus.textContent = authorized ? copy.budgetBoundaryAuthorized : copy.budgetBoundaryPending;
   els.escrowSummary.textContent = authorized
-    ? copy.authorizedSession(policy.sessionEscrow.sessionId, budgetHbar)
+    ? copy.authorizedSession(policy.sessionEscrow.sessionId, budgetUsdc)
     : copy.budgetBoundaryHelp;
   els.authorizeBudgetButton.textContent = authorized ? copy.reauthorizeBudget : copy.authorizeBudget;
   els.planAuthorizationStatus.textContent = authorized ? copy.planAuthorizationReady : copy.planAuthorizationPending;
   els.planAuthorizationSummary.textContent = authorized
-    ? copy.planAuthorizationReadyBody(budgetHbar, perCallHbar)
+    ? copy.planAuthorizationReadyBody(budgetUsdc, perCallUsdc)
     : copy.planAuthorizationPendingBody;
 }
 
-async function checkHederaStatus() {
+async function checkPaymentStatus() {
   const copy = currentCopy();
-  els.hederaStatusBadge.textContent = copy.hederaStatusChecking;
-  els.hederaStatusSummary.textContent = copy.hederaStatusHelp;
-  els.hederaStatusGrid.innerHTML = "";
+  els.paymentStatusBadge.textContent = copy.paymentStatusChecking;
+  els.paymentStatusSummary.textContent = copy.paymentStatusHelp;
+  els.paymentStatusGrid.innerHTML = "";
   els.payerBalanceValue.textContent = copy.payerBalanceUnknown;
   els.paymentRailValue.textContent = copy.paymentRailPending;
   els.auditReadinessValue.textContent = copy.auditPending;
 
   try {
-    const status = await getJson("/hedera/status");
-    renderHederaStatus(status);
+    const status = await getJson("/payments/status");
+    renderPaymentStatus(status);
   } catch (error) {
-    els.hederaStatusBadge.textContent = copy.hederaStatusNeedsSetup;
-    els.hederaStatusSummary.textContent = error.message;
+    els.paymentStatusBadge.textContent = copy.paymentStatusNeedsSetup;
+    els.paymentStatusSummary.textContent = error.message;
     showError(error);
   }
 }
 
-function renderHederaStatus(status) {
+function renderPaymentStatus(status) {
   const copy = currentCopy();
-  els.hederaStatusBadge.textContent = status.ready ? copy.hederaStatusReady : copy.hederaStatusNeedsSetup;
-  els.hederaStatusSummary.textContent = status.missing?.length
-    ? copy.hederaStatusMissing(status.missing.join(", "))
-    : copy.hederaStatusOk(status.mode, status.network);
-  els.hederaStatusGrid.innerHTML = "";
-
-  const payerAccount = (status.accounts ?? []).find((account) => account.role === "payer");
-  const payerBalance = Number.isFinite(payerAccount?.balanceHbar)
-    ? Number(payerAccount.balanceHbar).toLocaleString("en-US", { maximumFractionDigits: 8 })
-    : null;
-  els.payerBalanceValue.textContent = payerBalance
-    ? copy.payerBalance(payerBalance)
-    : copy.payerBalanceUnknown;
-  els.paymentRailValue.textContent = status.blocky402?.ok
-    ? copy.paymentRailReady
-    : copy.paymentRailPending;
-  els.auditReadinessValue.textContent = status.hcs?.ready
-    ? copy.auditReady
-    : copy.auditPending;
-
-  for (const account of status.accounts ?? []) {
-    const balance = Number.isFinite(account.balanceHbar)
-      ? Number(account.balanceHbar).toLocaleString("en-US", { maximumFractionDigits: 8 })
-      : null;
-    renderHederaStatusItem({
-      title: formatAccountRole(account.role),
-      body: balance
-        ? copy.accountBalance(account.role, account.accountId, balance)
-        : copy.accountBalanceUnknown(account.role, account.accountId),
-      href: account.hashscanUrl,
-      ok: account.ok ?? true
-    });
-  }
-
-  renderHederaStatusItem({
-    title: "HCS",
-    body: status.hcs?.topicId
-      ? `${status.hcs.topicId} · ${status.hcs.ready ? copy.hcsReady : copy.hcsMissing}`
-      : copy.hcsMissing,
-    href: status.hcs?.hashscanUrl,
-    ok: Boolean(status.hcs?.ready)
-  });
-
-  if (status.hcs?.mirrorNode?.checked) {
-    renderHederaStatusItem({
-      title: "Mirror Node",
-      body: status.hcs.mirrorNode.ok
-        ? copy.hcsMirrorReady
-        : copy.hcsMirrorFailed(status.hcs.mirrorNode.error ?? "unknown"),
-      ok: Boolean(status.hcs.mirrorNode.ok)
-    });
-  }
-
-  renderHederaStatusItem({
-    title: "Blocky402",
-    body: status.blocky402?.ok
-      ? copy.blockyReady(status.blocky402.feePayer)
-      : copy.blockyFailed(status.blocky402?.error ?? "not checked"),
-    ok: Boolean(status.blocky402?.ok)
-  });
-}
-
-function renderHederaStatusItem({ title, body, href, ok }) {
-  const item = document.createElement("article");
-  item.className = `hedera-status-item ${ok ? "is-ok" : "is-warn"}`;
-  const bodyHtml = href
-    ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(body)}</a>`
-    : escapeHtml(body);
-  item.innerHTML = `
-    <strong>${escapeHtml(title)}</strong>
-    <p>${bodyHtml}</p>
-  `;
-  els.hederaStatusGrid.append(item);
+  els.paymentStatusBadge.textContent = status.ready ? copy.paymentStatusReady : copy.paymentStatusNeedsSetup;
+  els.paymentStatusSummary.textContent = copy.paymentStatusOk(status.mode, status.network);
+  els.paymentStatusGrid.replaceChildren();
+  els.payerBalanceValue.textContent = copy.payerBalanceUnknown;
+  els.paymentRailValue.textContent = copy.paymentRailReady;
+  els.auditReadinessValue.textContent = copy.auditReady;
 }
 
 function formatAccountRole(role) {
@@ -972,7 +893,7 @@ async function typeAssistantMessage(item, text) {
 function formatStrategyChatResponse({ strategyDraft, plan }) {
   const calls = plan.agentPlan.plannedToolCalls;
   const evidencePlan = calls.length > 0
-    ? calls.map((call) => `- ${call.agent ?? call.service}: ${tinybarToHbar(call.quotedPriceTinybar)} HBAR`).join("\n")
+    ? calls.map((call) => `- ${call.agent ?? call.service}: ${atomicToUsdc(call.quotedPriceAtomic)} USDC`).join("\n")
     : `- ${currentCopy().noPaidCall}`;
   const entries = strategyDraft.entryConditions.map((item) => `- ${item}`).join("\n");
   const risks = strategyDraft.riskControls.map((item) => `- ${item}`).join("\n");
@@ -1016,7 +937,7 @@ function renderPlan(plan) {
         <strong>${escapeHtml(call.agent ?? call.service)}</strong>
         <p>${escapeHtml(call.reason)}</p>
       </div>
-      <span>${tinybarToHbar(call.quotedPriceTinybar)} HBAR</span>
+      <span>${atomicToUsdc(call.quotedPriceAtomic)} USDC</span>
     `;
     els.paymentList.append(item);
   }
@@ -1027,7 +948,7 @@ function renderPlan(plan) {
 
   renderPaymentFlow("planned", {
     serviceCount: calls.length,
-    totalQuotedTinybar: calls.reduce((sum, call) => sum + Number(call.quotedPriceTinybar ?? 0), 0)
+    totalQuotedAtomic: calls.reduce((sum, call) => sum + Number(call.quotedPriceAtomic ?? 0), 0)
   });
 }
 
@@ -1057,10 +978,10 @@ async function renderRuntime(result) {
     els.executionLane.textContent = `${result.executionResult.status}: ${result.executionProposal?.action ?? "NO ACTION"}`;
   }
 
-  const sessionBudget = Math.max(1, Number(result.policy.sessionBudgetTinybar ?? result.policy.dailyBudgetTinybar));
-  const spentRatio = Math.min(1, Math.max(0, result.budget.spentTinybar / sessionBudget));
+  const sessionBudget = Math.max(1, Number(result.policy.sessionBudgetAtomic ?? result.policy.dailyBudgetAtomic));
+  const spentRatio = Math.min(1, Math.max(0, result.budget.spentAtomic / sessionBudget));
   els.budgetFill.style.transform = `scaleX(${spentRatio})`;
-  els.budgetText.textContent = currentCopy().budgetSpent(result.budget.spentHbar, result.budget.remainingHbar);
+  els.budgetText.textContent = currentCopy().budgetSpent(result.budget.spentUsdc, result.budget.remainingUsdc);
 }
 
 function getModelConfig() {
@@ -1141,10 +1062,10 @@ function describeTranscriptEntry(entry) {
   if (entry.message) return entry.message;
   if (entry.summary) return entry.summary;
   if (entry.reason) return entry.reason;
-  if (entry.action === "approve_agent_charge") return currentCopy().approvePayment(entry.paidAgent ?? entry.service, tinybarToHbar(entry.amountTinybar));
+  if (entry.action === "approve_agent_charge") return currentCopy().approvePayment(entry.paidAgent ?? entry.service, atomicToUsdc(entry.amountAtomic));
   if (entry.action === "reject_agent_charge") return currentCopy().rejectPayment(entry.paidAgent ?? entry.service, entry.reasons?.join("; "));
   if (entry.blockingReasons?.length) return entry.blockingReasons.join("；");
-  if (entry.service) return currentCopy().maxFee(entry.paidAgent ?? entry.service, tinybarToHbar(entry.maxFeeTinybar ?? 0));
+  if (entry.service) return currentCopy().maxFee(entry.paidAgent ?? entry.service, atomicToUsdc(entry.maxFeeAtomic ?? 0));
   return JSON.stringify(entry);
 }
 
@@ -1165,9 +1086,7 @@ function describeTimelineEvent(event) {
   if (event.step === "signal_delivered") return event.signal.summary ?? currentCopy().signalReturned;
   if (event.step === "llm_fallback") return `${event.provider} failed, continued with ${event.fallback}: ${event.reason}`;
   if (event.step === "run_error") return event.message ?? currentCopy().runFailed;
-  if (event.step === "audit_recorded") return event.audit.transactionId
-    ? `HCS ${event.audit.hcsTopicId}, tx ${event.audit.transactionId}`
-    : event.audit.messageHash;
+  if (event.step === "audit_recorded") return event.audit.messageHash;
   if (event.stateStep) return summarizeOutput(event.output);
   return JSON.stringify(event);
 }
@@ -1183,17 +1102,7 @@ function renderAuditRecord(audit) {
     return;
   }
 
-  const label = audit.transactionId
-    ? `HCS ${audit.hcsTopicId} / ${audit.messageHash}`
-    : audit.messageHash;
-  const url = audit.transactionHashscanUrl ?? audit.hashscanUrl;
-
-  if (!url) {
-    els.auditHash.textContent = label;
-    return;
-  }
-
-  els.auditHash.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`;
+  els.auditHash.textContent = audit.messageHash;
 }
 
 function summarizeOutput(output) {
@@ -1209,15 +1118,15 @@ function summarizeOutput(output) {
 function applyPolicyToControls(policy) {
   els.assetInput.value = policy.targetAsset;
   els.timeframeInput.value = policy.strategyIntent?.timeframe ?? "4h";
-  els.budgetInput.value = tinybarToHbar(policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar);
-  els.perCallInput.value = tinybarToHbar(policy.maxPaidAgentCallTinybar ?? policy.maxPaymentPerCallTinybar);
+  els.budgetInput.value = atomicToUsdc(policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic);
+  els.perCallInput.value = atomicToUsdc(policy.maxPaidAgentCallAtomic ?? policy.maxPaymentPerCallAtomic);
   state.sessionEscrow = state.sessionEscrow.status === "authorized" ? state.sessionEscrow : {
     status: "not_authorized",
     sessionId: null,
     payerAccountId: "local-session",
-    authorizedBudgetTinybar: 0,
-    availableBalanceTinybar: 0,
-    spentTinybar: 0,
+    authorizedBudgetAtomic: 0,
+    availableBalanceAtomic: 0,
+    spentAtomic: 0,
     fundingReference: null,
     authorizedAt: null
   };
@@ -1229,8 +1138,8 @@ function applyPolicyToControls(policy) {
 }
 
 function buildPolicyFromControls() {
-  const sessionBudgetTinybar = hbarToTinybar(Number(els.budgetInput.value));
-  const maxPaidAgentCallTinybar = hbarToTinybar(Number(els.perCallInput.value));
+  const sessionBudgetAtomic = usdcToAtomic(Number(els.budgetInput.value));
+  const maxPaidAgentCallAtomic = usdcToAtomic(Number(els.perCallInput.value));
   const allowedPaidAgents = [];
   if (els.allowMarketInput.checked) allowedPaidAgents.push("market-signal");
   if (els.allowRiskInput.checked) allowedPaidAgents.push("risk-challenge");
@@ -1239,42 +1148,42 @@ function buildPolicyFromControls() {
     asset: els.assetInput.value.trim().toUpperCase(),
     timeframe: els.timeframeInput.value,
     riskPreference: els.riskInput.value,
-    dailyResearchBudgetTinybar: sessionBudgetTinybar,
-    sessionBudgetTinybar,
-    maxPaymentPerCallTinybar: maxPaidAgentCallTinybar,
-    maxPaidAgentCallTinybar,
+    dailyResearchBudgetAtomic: sessionBudgetAtomic,
+    sessionBudgetAtomic,
+    maxPaymentPerCallAtomic: maxPaidAgentCallAtomic,
+    maxPaidAgentCallAtomic,
     executionMode: els.executionInput.value
   };
 
   return {
     id: `policy_${intent.asset.toLowerCase()}_${intent.timeframe}_${intent.riskPreference}`,
     targetAsset: intent.asset,
-    sessionBudgetTinybar,
-    maxPaidAgentCallTinybar,
+    sessionBudgetAtomic,
+    maxPaidAgentCallAtomic,
     allowedPaidAgents,
-    paidAgentBudgetsTinybar: {
-      "market-signal": Math.floor(sessionBudgetTinybar * 0.6),
-      "risk-challenge": Math.floor(sessionBudgetTinybar * 0.3)
+    paidAgentBudgetsAtomic: {
+      "market-signal": Math.floor(sessionBudgetAtomic * 0.6),
+      "risk-challenge": Math.floor(sessionBudgetAtomic * 0.3)
     },
     autoPayEnabled: els.autoPayInput.checked,
     allowance: {
       ownerAccountId: "local-session",
       spenderAccountId: "platform-billing",
       merchantAccountId: "platform-billing",
-      allowanceTinybar: sessionBudgetTinybar,
-      spentTinybar: 0
+      allowanceAtomic: sessionBudgetAtomic,
+      spentAtomic: 0
     },
     sessionEscrow: {
       ...state.sessionEscrow,
       payerAccountId: "local-session",
-      authorizedBudgetTinybar: hbarToTinybar(Number(els.budgetInput.value))
+      authorizedBudgetAtomic: usdcToAtomic(Number(els.budgetInput.value))
     },
-    dailyBudgetTinybar: sessionBudgetTinybar,
-    maxPaymentPerCallTinybar: maxPaidAgentCallTinybar,
+    dailyBudgetAtomic: sessionBudgetAtomic,
+    maxPaymentPerCallAtomic: maxPaidAgentCallAtomic,
     allowedServices: allowedPaidAgents,
-    serviceBudgetsTinybar: {
-      "market-signal": Math.floor(sessionBudgetTinybar * 0.6),
-      "risk-challenge": Math.floor(sessionBudgetTinybar * 0.3)
+    serviceBudgetsAtomic: {
+      "market-signal": Math.floor(sessionBudgetAtomic * 0.6),
+      "risk-challenge": Math.floor(sessionBudgetAtomic * 0.3)
     },
     executionMode: "simulation",
     riskRules: [
@@ -1324,14 +1233,14 @@ function renderPaymentFlow(stage, details = {}) {
     },
     {
       id: "signed",
-      label: "x402 charge",
+      label: "Simulated charge",
       text: details.payer
         ? `${details.mode ?? "mock"} payer ${details.payer} / spender ${details.spender ?? "n/a"}`
         : copy.flowSignedPending
     },
     {
       id: "settled",
-      label: "Hedera settle",
+      label: "Simulated settlement",
       text: details.transactionId
         ? `tx ${details.transactionId}`
         : copy.flowSettlePending
@@ -1425,7 +1334,7 @@ function renderList(target, values) {
 
 function describeAgentCall(call) {
   if (!call) return currentCopy().notPlanned;
-  return currentCopy().agentCallQuote(call.agent ?? call.service, tinybarToHbar(call.quotedPriceTinybar));
+  return currentCopy().agentCallQuote(call.agent ?? call.service, atomicToUsdc(call.quotedPriceAtomic));
 }
 
 function describeExecutionResult(result) {
@@ -1437,12 +1346,17 @@ function describeExecutionResult(result) {
   return currentCopy().simulatedPnl(order.side, order.quantity, order.asset, order.fillPriceUsd, report.simulatedPnlUsd);
 }
 
-function hbarToTinybar(value) {
-  return Math.round(Number(value) * 100_000_000);
+function usdcToAtomic(value) {
+  const text = String(value).trim();
+  if (!/^\d+(\.\d{1,6})?$/.test(text)) throw new RangeError("USDC supports up to six decimal places");
+  const [whole, fraction = ""] = text.split(".");
+  const amount = Number(BigInt(whole) * 1000000n + BigInt(fraction.padEnd(6, "0")));
+  if (!Number.isSafeInteger(amount)) throw new RangeError("USDC amount exceeds the demo limit");
+  return amount;
 }
 
-function tinybarToHbar(value) {
-  return Number(value) / 100_000_000;
+function atomicToUsdc(value) {
+  return Number(value) / 1_000_000;
 }
 
 function escapeHtml(value) {

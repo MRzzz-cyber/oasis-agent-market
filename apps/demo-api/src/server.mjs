@@ -1,9 +1,13 @@
 import http from "node:http";
+import { fetchHistoricalCandles, replayResearch } from "../../agent/src/strategy/ResearchReplay.mjs";
+import { ToolPlanner } from "../../agent/src/strategy/ToolPlanner.mjs";
+import { runResearchDemo } from "../../agent/src/strategy/ResearchPlanner.mjs";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequestId } from "../../../packages/shared/src/index.mjs";
-import { fetchAuditMessages, getHederaRuntimeStatus } from "../../../packages/hedera/src/index.mjs";
+import { fetchAuditMessages } from "../../../packages/evm/src/audit.mjs";
+import { BASE_SEPOLIA, USDC } from "../../../packages/evm/src/config.mjs";
 import { runSingleAgentDemo } from "../../agent/src/demo.mjs";
 import { StrategyAgent } from "../../agent/src/strategy/StrategyAgent.mjs";
 import { createDefaultReasoner } from "../../agent/src/strategy/LLMReasoner.mjs";
@@ -23,6 +27,16 @@ export async function createDemoApiServer({ port = 4173, host = "127.0.0.1" } = 
     try {
       const url = new URL(request.url, `http://${request.headers.host}`);
 
+      if (request.method === "GET" && url.pathname === "/research/replay") {
+        sendJson(response, 200, replayResearch(await fetchHistoricalCandles()));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/research/demo") {
+        sendJson(response, 200, runResearchDemo(ToolPlanner.planResearch));
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/health") {
         sendJson(response, 200, { ok: true, service: "oasis-demo-api" });
         return;
@@ -30,17 +44,15 @@ export async function createDemoApiServer({ port = 4173, host = "127.0.0.1" } = 
 
       if (request.method === "GET" && url.pathname === "/audit/messages") {
         const result = await fetchAuditMessages({
-          topicId: url.searchParams.get("topicId") || undefined,
           limit: url.searchParams.get("limit") || undefined,
-          order: url.searchParams.get("order") || undefined,
-          minTimestamp: url.searchParams.get("minTimestamp") || undefined
+          order: url.searchParams.get("order") || undefined
         });
         sendJson(response, 200, result);
         return;
       }
 
-      if (request.method === "GET" && url.pathname === "/hedera/status") {
-        const status = await getHederaRuntimeStatus();
+      if (request.method === "GET" && url.pathname === "/payments/status") {
+        const status = { mode: "simulation", network: BASE_SEPOLIA.network, asset: USDC.symbol, ready: true };
         sendJson(response, 200, status);
         return;
       }
@@ -129,9 +141,9 @@ export async function createDemoApiServer({ port = 4173, host = "127.0.0.1" } = 
 
       if (request.method === "POST" && url.pathname === "/billing/session/authorize") {
         const body = await readJsonBody(request);
-        const sessionBudgetTinybar = Number(body.sessionBudgetTinybar);
+        const sessionBudgetAtomic = Number(body.sessionBudgetAtomic);
 
-        if (!Number.isFinite(sessionBudgetTinybar) || sessionBudgetTinybar <= 0) {
+        if (!Number.isSafeInteger(sessionBudgetAtomic) || sessionBudgetAtomic <= 0) {
           sendJson(response, 400, {
             error: "invalid_session_budget",
             message: "Session budget must be greater than zero."
@@ -143,9 +155,9 @@ export async function createDemoApiServer({ port = 4173, host = "127.0.0.1" } = 
           status: "authorized",
           sessionId: createRequestId("escrow_session"),
           payerAccountId: "local-session",
-          authorizedBudgetTinybar: sessionBudgetTinybar,
-          availableBalanceTinybar: sessionBudgetTinybar,
-          spentTinybar: 0,
+          authorizedBudgetAtomic: sessionBudgetAtomic,
+          availableBalanceAtomic: sessionBudgetAtomic,
+          spentAtomic: 0,
           fundingReference: `local://session-budget/${Date.now()}`,
           authorizedAt: new Date().toISOString()
         });
@@ -219,21 +231,21 @@ function validateBudgetAuthorization({ policy }) {
     return { allowed: false, reasons };
   }
 
-  const sessionBudgetTinybar = Number(policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar);
-  const maxPaidAgentCallTinybar = Number(policy.maxPaidAgentCallTinybar ?? policy.maxPaymentPerCallTinybar);
+  const sessionBudgetAtomic = Number(policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic);
+  const maxPaidAgentCallAtomic = Number(policy.maxPaidAgentCallAtomic ?? policy.maxPaymentPerCallAtomic);
   const escrow = policy.sessionEscrow ?? {};
-  const authorizedBudgetTinybar = Number(escrow.authorizedBudgetTinybar ?? 0);
-  const availableBalanceTinybar = Number(escrow.availableBalanceTinybar ?? 0);
+  const authorizedBudgetAtomic = Number(escrow.authorizedBudgetAtomic ?? 0);
+  const availableBalanceAtomic = Number(escrow.availableBalanceAtomic ?? 0);
 
   if (policy.autoPayEnabled !== true) reasons.push("auto-pay must be enabled for delegated budget spending");
   if (escrow.status !== "authorized") reasons.push("session budget boundary is not authorized");
   if (!escrow.sessionId) reasons.push("session budget authorization is missing a sessionId");
-  if (!Number.isFinite(sessionBudgetTinybar) || sessionBudgetTinybar <= 0) reasons.push("session budget must be greater than zero");
-  if (!Number.isFinite(maxPaidAgentCallTinybar) || maxPaidAgentCallTinybar <= 0) reasons.push("per-agent call limit must be greater than zero");
-  if (!Number.isFinite(authorizedBudgetTinybar) || authorizedBudgetTinybar < sessionBudgetTinybar) {
+  if (!Number.isSafeInteger(sessionBudgetAtomic) || sessionBudgetAtomic <= 0) reasons.push("session budget must be greater than zero");
+  if (!Number.isSafeInteger(maxPaidAgentCallAtomic) || maxPaidAgentCallAtomic <= 0) reasons.push("per-agent call limit must be greater than zero");
+  if (!Number.isSafeInteger(authorizedBudgetAtomic) || authorizedBudgetAtomic < sessionBudgetAtomic) {
     reasons.push("authorized budget is lower than the submitted policy budget");
   }
-  if (!Number.isFinite(availableBalanceTinybar) || availableBalanceTinybar <= 0) {
+  if (!Number.isSafeInteger(availableBalanceAtomic) || availableBalanceAtomic <= 0) {
     reasons.push("authorized session budget has no available balance");
   }
   return {

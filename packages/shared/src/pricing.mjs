@@ -1,7 +1,9 @@
+import { BASE_SEPOLIA, USDC } from "../../evm/src/config.mjs";
+
 export const PAID_AGENT_PRICING = Object.freeze({
   "market-signal": {
-    asset: "0.0.0",
-    network: "hedera:testnet",
+    asset: USDC.address,
+    network: BASE_SEPOLIA.network,
     tiers: {
       basic: {
         depth: "fast confirmation",
@@ -17,15 +19,15 @@ export const PAID_AGENT_PRICING = Object.freeze({
       }
     },
     formula: {
-      baseTinybar: 400_000,
-      perCandleTinybar: 10_000,
-      perIndicatorTinybar: 150_000,
-      perTimeframeTinybar: 250_000
+      baseAtomic: 4000,
+      perCandleAtomic: 100,
+      perIndicatorAtomic: 1500,
+      perTimeframeAtomic: 2500
     }
   },
   "risk-challenge": {
-    asset: "0.0.0",
-    network: "hedera:testnet",
+    asset: USDC.address,
+    network: BASE_SEPOLIA.network,
     tiers: {
       standard: {
         depth: "adversarial downside review",
@@ -37,10 +39,10 @@ export const PAID_AGENT_PRICING = Object.freeze({
       }
     },
     formula: {
-      baseTinybar: 500_000,
-      perStressScenarioTinybar: 350_000,
-      perCheckTinybar: 120_000,
-      perRiskFactorTinybar: 150_000
+      baseAtomic: 5000,
+      perStressScenarioAtomic: 3500,
+      perCheckAtomic: 1200,
+      perRiskFactorAtomic: 1500
     }
   }
 });
@@ -53,12 +55,12 @@ export function quotePaidAgentCall({ service, reasoningTier = "standard", usage 
 
   const tier = pricing.tiers[reasoningTier] ? reasoningTier : defaultTierFor(service);
   const normalizedUsage = normalizeUsage({ service, reasoningTier: tier, usage });
-  const quotedTinybar = calculateUsagePriceTinybar({ service, usage: normalizedUsage });
+  const quotedAtomic = calculateUsagePriceAtomic({ service, usage: normalizedUsage });
 
   return {
     service,
     reasoningTier: tier,
-    quotedTinybar,
+    quotedAtomic,
     usage: normalizedUsage,
     pricingModel: pricingModelName(service),
     depth: pricing.tiers[tier].depth,
@@ -75,7 +77,7 @@ export function listPaidAgentQuotes() {
         const quote = quotePaidAgentCall({ service, reasoningTier });
         return {
           tier: reasoningTier,
-          priceTinybar: quote.quotedTinybar,
+          priceAtomic: quote.quotedAtomic,
           depth: quote.depth,
           usage: quote.usage,
           pricingModel: quote.pricingModel
@@ -141,25 +143,25 @@ export function usageFromSearchParams({ service, reasoningTier, searchParams }) 
   return normalizeUsage({ service, reasoningTier });
 }
 
-function calculateUsagePriceTinybar({ service, usage }) {
+function calculateUsagePriceAtomic({ service, usage }) {
   const pricing = PAID_AGENT_PRICING[service];
   const formula = pricing.formula;
 
   if (service === "market-signal") {
-    return formula.baseTinybar
-      + usage.candles * formula.perCandleTinybar
-      + usage.indicators * formula.perIndicatorTinybar
-      + usage.timeframes * formula.perTimeframeTinybar;
+    return formula.baseAtomic
+      + usage.candles * formula.perCandleAtomic
+      + usage.indicators * formula.perIndicatorAtomic
+      + usage.timeframes * formula.perTimeframeAtomic;
   }
 
   if (service === "risk-challenge") {
-    return formula.baseTinybar
-      + usage.stressScenarios * formula.perStressScenarioTinybar
-      + usage.checks * formula.perCheckTinybar
-      + usage.riskFactors * formula.perRiskFactorTinybar;
+    return formula.baseAtomic
+      + usage.stressScenarios * formula.perStressScenarioAtomic
+      + usage.checks * formula.perCheckAtomic
+      + usage.riskFactors * formula.perRiskFactorAtomic;
   }
 
-  return formula.baseTinybar;
+  return formula.baseAtomic;
 }
 
 function defaultTierFor(service) {
@@ -173,6 +175,7 @@ function pricingModelName(service) {
 }
 
 function clampInteger(value, fallback, min, max) {
+  if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, Math.round(parsed)));

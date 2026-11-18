@@ -15,6 +15,27 @@ MVP target: Base Sepolia + USDC + x402 v2. Agent payments are policy-controlled;
 7. Risk Engine reviews the proposal.
 8. User confirms; Oasis creates a simulated order only.
 
+## Research procurement preview
+
+Start the demo server, then open `/research.html` to compare three simulated
+providers and inspect the buy, decline and blocked-quote scenarios. Quotes use
+Base Sepolia USDC atomic units. The simulator does not sign or settle payments.
+
+Open `/research/replay` to fetch and replay Coinbase Exchange ETH-USD daily candles
+from January through June 2025. All three strategies predict the same next-day
+direction using data available at the decision time. The replay reports accuracy,
+purchase count, USDC spend and a modeled utility. The provider scores and the
+USDC reward for a correct prediction are simulation assumptions.
+
+## Base Sepolia payment smoke test
+
+Install the isolated smoke runner with `npm install --prefix apps/x402-smoke`.
+Set `OASIS_TESTNET_PAYER_KEY` and `OASIS_TESTNET_PAY_TO` in the local environment
+or ignored root `.env`. Use a dedicated payer with at least 0.01 Base Sepolia USDC
+and a distinct testnet recipient. Run `npm --prefix apps/x402-smoke start` on Node 22.
+The runner makes one x402 v2 purchase and checks the resulting ERC-20 receipt.
+Each manual invocation can make one new payment.
+
 ## Architecture
 
 | Area | Choice |
@@ -46,7 +67,6 @@ packages/
   evm/                   Base Sepolia and USDC primitives (new)
   policy/                Deterministic budget and permission checks
   shared/                Shared utilities and pricing
-  hedera/                Legacy hackathon adapter; migration only
 docs/
   technical-stack.md     Technology decisions and boundaries
   roadmap.md             MVP milestones and acceptance criteria
@@ -54,34 +74,20 @@ docs/
   payment-flow.md        Current/target payment flow
 ```
 
-## Quick start (current legacy demo)
+## Quick start
 
-The currently runnable end-to-end demo still uses the original Hedera adapter. The Base Sepolia payment migration is in progress and must not be mistaken for a completed integration.
+Run `pnpm install --frozen-lockfile`, then `pnpm demo:web`.
+Open http://127.0.0.1:4173 for the strategy workspace or
+http://127.0.0.1:4173/research.html for the procurement demo.
 
-```bash
-pnpm install
-HEDERA_PAYMENT_MODE=mock OASIS_MARKET_DATA_MODE=fixture OASIS_LLM_MODE=rule pnpm demo:web
-```
-
-Run tests:
-
-```bash
-pnpm test
-```
+Run `pnpm test` to validate the strategy, policy, simulations, and replay.
 
 ## Configuration
 
-Copy .env.example to .env. Do not commit private keys, seed phrases, API keys or funded wallet credentials.
-
-The Base Sepolia variables are target configuration; they are not yet consumed by the legacy payment runtime.
-
-## Development status
-
-- Existing Agent runtime, model adapters, market/risk agents and simulation flow are retained.
-- Base Sepolia / USDC integer amount primitives are added under packages/evm.
-- Full x402 EVM payment integration, policy migration and end-to-end testnet payment are still pending.
-
-See Technical Stack (docs/technical-stack.md) and Roadmap (docs/roadmap.md).
+Copy .env.example to .env for the isolated payment smoke test.
+Strategy and procurement demos use simulated Base Sepolia USDC payments and local audit records.
+The smoke runner uses the official x402 v2 SDK and a dedicated, funded Base Sepolia test wallet.
+An actual testnet settlement must be confirmed separately.
 
 ## License
 

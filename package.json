@@ -3,10 +3,6 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "dependencies": {
-    "@hiero-ledger/sdk": "2.85.0",
-    "@x402/hedera": "^2.25.0"
-  },
   "scripts": {
     "dev": "node apps/demo-api/src/server.mjs",
     "start": "node apps/demo-api/src/server.mjs",
@@ -14,13 +10,11 @@
     "demo:web": "node apps/demo-api/src/server.mjs",
     "demo:service": "node apps/market-signal-api/src/server.mjs",
     "demo:risk-service": "node apps/risk-challenge-api/src/server.mjs",
-    "demo:check-real": "node apps/agent/src/check-real-config.mjs",
-    "demo:create-hcs-topic": "node apps/agent/src/create-hcs-topic.mjs",
-    "demo:real-payment": "node apps/agent/src/real-payment-smoke.mjs",
+    "demo:real-payment": "npm --prefix apps/x402-smoke start",
     "test": "node --test",
     "test:watch": "node --test --watch"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

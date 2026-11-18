@@ -1,37 +1,40 @@
+import { BASE_SEPOLIA, USDC } from "../../evm/src/config.mjs";
+import { SIMULATION_RECIPIENT } from "../../evm/src/simulation.mjs";
+
 export const defaultUserPolicy = Object.freeze({
   id: "policy_demo_v1",
   targetAsset: "ETH",
-  sessionBudgetTinybar: 20_000_000,
-  maxPaidAgentCallTinybar: 5_000_000,
+  sessionBudgetAtomic: 200000,
+  maxPaidAgentCallAtomic: 50000,
   allowedPaidAgents: ["market-signal", "risk-challenge"],
-  paidAgentBudgetsTinybar: {
-    "market-signal": 12_000_000,
-    "risk-challenge": 6_000_000
+  paidAgentBudgetsAtomic: {
+    "market-signal": 120000,
+    "risk-challenge": 60000
   },
   autoPayEnabled: true,
   allowance: {
-    ownerAccountId: "0.0.1001",
-    spenderAccountId: "0.0.3003",
-    merchantAccountId: "0.0.2002",
-    allowanceTinybar: 20_000_000,
-    spentTinybar: 0
+    ownerAccountId: "local-session",
+    spenderAccountId: "simulation-policy",
+    merchantAccountId: SIMULATION_RECIPIENT,
+    allowanceAtomic: 200000,
+    spentAtomic: 0
   },
   sessionEscrow: {
     status: "authorized",
     sessionId: "demo_session_policy_demo_v1",
-    payerAccountId: "0.0.1001",
-    authorizedBudgetTinybar: 20_000_000,
-    availableBalanceTinybar: 20_000_000,
-    spentTinybar: 0,
+    payerAccountId: "local-session",
+    authorizedBudgetAtomic: 200000,
+    availableBalanceAtomic: 200000,
+    spentAtomic: 0,
     fundingReference: "local://session-budget",
     authorizedAt: null
   },
-  dailyBudgetTinybar: 20_000_000,
-  maxPaymentPerCallTinybar: 5_000_000,
+  dailyBudgetAtomic: 200000,
+  maxPaymentPerCallAtomic: 50000,
   allowedServices: ["market-signal", "risk-challenge"],
-  serviceBudgetsTinybar: {
-    "market-signal": 12_000_000,
-    "risk-challenge": 6_000_000
+  serviceBudgetsAtomic: {
+    "market-signal": 120000,
+    "risk-challenge": 60000
   },
   executionMode: "simulation",
   riskRules: ["paid_agent_calls_must_stay_within_user_policy"]
@@ -42,11 +45,12 @@ export function createBudgetLedger(policy) {
 
   return {
     policyId: normalized.id,
-    spentTinybar: 0,
+    spentAtomic: "0",
     reservations: [],
+    pending: [],
     charges: [],
-    allowanceSpentTinybar: normalized.allowance.spentTinybar,
-    escrowSpentTinybar: 0,
+    allowanceSpentAtomic: String(normalized.allowance.spentAtomic),
+    escrowSpentAtomic: "0",
     escrowCharges: [],
     accounts: {
       ownerAccountId: normalized.allowance.ownerAccountId,
@@ -58,9 +62,15 @@ export function createBudgetLedger(policy) {
 
 export function checkAgentQuoteAllowed({ policy, ledger, agentQuote, service }) {
   const normalized = normalizeUserPolicy(policy);
-  const requestedTinybar = Number(agentQuote.quotedTinybar ?? agentQuote.amount);
-  const remainingTinybar = normalized.sessionBudgetTinybar - ledger.spentTinybar;
+  const requestedAtomic = Number(agentQuote.quotedAtomic ?? agentQuote.amount);
+  const pending = ledger.pending ?? [];
+  const remainingAtomic = normalized.sessionBudgetAtomic - Number(ledger.spentAtomic) -
+    pending.reduce((sum, item) => sum + Number(item.amountAtomic), 0);
   const reasons = [];
+
+  if (!Number.isSafeInteger(requestedAtomic) || requestedAtomic <= 0 || !Number.isSafeInteger(remainingAtomic)) {
+    reasons.push("invalid USDC amount or budget");
+  }
 
   if (!normalized.autoPayEnabled) {
     reasons.push("automatic paid agent billing is disabled by user policy");
@@ -70,31 +80,31 @@ export function checkAgentQuoteAllowed({ policy, ledger, agentQuote, service }) 
     reasons.push(`paid agent ${service} is not allowed`);
   }
 
-  if (requestedTinybar > normalized.maxPaidAgentCallTinybar) {
-    reasons.push(`quote ${requestedTinybar} tinybar exceeds per-agent call limit ${normalized.maxPaidAgentCallTinybar}`);
+  if (requestedAtomic > normalized.maxPaidAgentCallAtomic) {
+    reasons.push(`quote ${requestedAtomic} USDC atomic units exceeds per-agent call limit ${normalized.maxPaidAgentCallAtomic}`);
   }
 
-  if (requestedTinybar > remainingTinybar) {
-    reasons.push(`quote ${requestedTinybar} tinybar exceeds remaining budget ${remainingTinybar}`);
+  if (requestedAtomic > remainingAtomic) {
+    reasons.push(`quote ${requestedAtomic} USDC atomic units exceeds remaining budget ${remainingAtomic}`);
   }
 
-  const paidAgentBudgetTinybar = normalized.paidAgentBudgetsTinybar?.[service];
-  if (Number.isInteger(paidAgentBudgetTinybar)) {
-    const serviceSpentTinybar = ledger.reservations
+  const paidAgentBudgetAtomic = normalized.paidAgentBudgetsAtomic?.[service];
+  if (Number.isInteger(paidAgentBudgetAtomic)) {
+    const serviceSpentAtomic = [...ledger.reservations, ...pending]
       .filter((reservation) => reservation.service === service)
-      .reduce((sum, reservation) => sum + Number(reservation.amountTinybar), 0);
-    const serviceRemainingTinybar = paidAgentBudgetTinybar - serviceSpentTinybar;
+      .reduce((sum, reservation) => sum + Number(reservation.amountAtomic), 0);
+    const serviceRemainingAtomic = paidAgentBudgetAtomic - serviceSpentAtomic;
 
-    if (requestedTinybar > serviceRemainingTinybar) {
-      reasons.push(`quote ${requestedTinybar} tinybar exceeds ${service} paid agent budget remaining ${serviceRemainingTinybar}`);
+    if (requestedAtomic > serviceRemainingAtomic) {
+      reasons.push(`quote ${requestedAtomic} USDC atomic units exceeds ${service} paid agent budget remaining ${serviceRemainingAtomic}`);
     }
   }
 
-  if (agentQuote.network && agentQuote.network !== "hedera:testnet") {
+  if (agentQuote.network !== BASE_SEPOLIA.network) {
     reasons.push(`network ${agentQuote.network} is not allowed for this MVP`);
   }
 
-  if (agentQuote.asset && agentQuote.asset !== "0.0.0") {
+  if (agentQuote.asset !== USDC.address) {
     reasons.push(`asset ${agentQuote.asset} is not allowed for this MVP`);
   }
 
@@ -105,12 +115,12 @@ export function checkAgentQuoteAllowed({ policy, ledger, agentQuote, service }) 
     agent: agentQuote.agent,
     reasoningTier: agentQuote.reasoningTier,
     quoteId: agentQuote.quoteId,
-    requestedTinybar,
-    remainingTinybar,
+    requestedAtomic,
+    remainingAtomic,
     budgetBoundary: {
-      sessionBudgetTinybar: normalized.sessionBudgetTinybar,
-      maxPaidAgentCallTinybar: normalized.maxPaidAgentCallTinybar,
-      paidAgentBudgetTinybar: paidAgentBudgetTinybar ?? null,
+      sessionBudgetAtomic: normalized.sessionBudgetAtomic,
+      maxPaidAgentCallAtomic: normalized.maxPaidAgentCallAtomic,
+      paidAgentBudgetAtomic: paidAgentBudgetAtomic ?? null,
       allowedPaidAgents: normalized.allowedPaidAgents
     }
   };
@@ -125,24 +135,24 @@ export function checkPaymentAllowed({ policy, ledger, paymentRequirement, servic
     agentQuote: {
       agent: service,
       service,
-      quotedTinybar: Number(paymentRequirement.amount),
+      quotedAtomic: Number(paymentRequirement.amount),
       network: paymentRequirement.network,
       asset: paymentRequirement.asset,
       quoteId: paymentRequirement.extra?.requestId
     }
   });
-  const requestedTinybar = quoteDecision.requestedTinybar;
-  const allowanceRemainingTinybar = normalized.allowance.allowanceTinybar
-    - Number(normalized.allowance.spentTinybar ?? 0)
-    - Number(ledger.allowanceSpentTinybar ?? 0);
-  const escrowRemainingTinybar = Number(normalized.sessionEscrow.availableBalanceTinybar ?? 0)
-    - Number(ledger.escrowSpentTinybar ?? 0);
+  const requestedAtomic = quoteDecision.requestedAtomic;
+  const allowanceRemainingAtomic = normalized.allowance.allowanceAtomic
+    - Number(normalized.allowance.spentAtomic ?? 0)
+    - Number(ledger.allowanceSpentAtomic ?? 0);
+  const escrowRemainingAtomic = Number(normalized.sessionEscrow.availableBalanceAtomic ?? 0)
+    - Number(ledger.escrowSpentAtomic ?? 0);
   if (normalized.sessionEscrow.status !== "authorized") {
     quoteDecision.reasons.push("session budget escrow is not authorized");
   }
 
-  if (requestedTinybar > escrowRemainingTinybar) {
-    quoteDecision.reasons.push(`price ${requestedTinybar} tinybar exceeds remaining session escrow balance ${escrowRemainingTinybar}`);
+  if (requestedAtomic > escrowRemainingAtomic) {
+    quoteDecision.reasons.push(`price ${requestedAtomic} USDC atomic units exceeds remaining session escrow balance ${escrowRemainingAtomic}`);
   }
 
   if (normalized.allowance.merchantAccountId && paymentRequirement.payTo !== normalized.allowance.merchantAccountId) {
@@ -152,9 +162,9 @@ export function checkPaymentAllowed({ policy, ledger, paymentRequirement, servic
   return {
     ...quoteDecision,
     allowed: quoteDecision.reasons.length === 0,
-    requestedTinybar,
-    allowanceRemainingTinybar,
-    escrowRemainingTinybar,
+    requestedAtomic,
+    allowanceRemainingAtomic,
+    escrowRemainingAtomic,
     sessionId: normalized.sessionEscrow.sessionId,
     accounts: {
       ownerAccountId: normalized.allowance.ownerAccountId,
@@ -164,16 +174,17 @@ export function checkPaymentAllowed({ policy, ledger, paymentRequirement, servic
   };
 }
 
-export function recordAgentCharge({ ledger, quoteId, service, agent, reasoningTier, amountTinybar, transactionId, usage, pricingModel }) {
-  ledger.spentTinybar += amountTinybar;
-  ledger.allowanceSpentTinybar = Number(ledger.allowanceSpentTinybar ?? 0) + amountTinybar;
-  ledger.escrowSpentTinybar = Number(ledger.escrowSpentTinybar ?? 0) + amountTinybar;
+export function recordAgentCharge({ ledger, quoteId, service, agent, reasoningTier, amountAtomic, transactionId, usage, pricingModel }) {
+  const charged = BigInt(amountAtomic);
+  ledger.spentAtomic = String(BigInt(ledger.spentAtomic) + charged);
+  ledger.allowanceSpentAtomic = String(BigInt(ledger.allowanceSpentAtomic) + charged);
+  ledger.escrowSpentAtomic = String(BigInt(ledger.escrowSpentAtomic) + charged);
   const charge = {
     quoteId,
     service,
     agent,
     reasoningTier,
-    amountTinybar,
+    amountAtomic: String(charged),
     usage,
     pricingModel,
     transactionId,
@@ -184,21 +195,21 @@ export function recordAgentCharge({ ledger, quoteId, service, agent, reasoningTi
   ledger.reservations.push({
     requestId: quoteId,
     service,
-    amountTinybar,
+    amountAtomic: String(charged),
     transactionId
   });
   return charge;
 }
 
 export function normalizeUserPolicy(policy = defaultUserPolicy) {
-  const sessionBudgetTinybar = policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar ?? defaultUserPolicy.sessionBudgetTinybar;
-  const maxPaidAgentCallTinybar = policy.maxPaidAgentCallTinybar
-    ?? policy.maxPaymentPerCallTinybar
-    ?? defaultUserPolicy.maxPaidAgentCallTinybar;
+  const sessionBudgetAtomic = policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic ?? defaultUserPolicy.sessionBudgetAtomic;
+  const maxPaidAgentCallAtomic = policy.maxPaidAgentCallAtomic
+    ?? policy.maxPaymentPerCallAtomic
+    ?? defaultUserPolicy.maxPaidAgentCallAtomic;
   const allowedPaidAgents = policy.allowedPaidAgents ?? policy.allowedServices ?? defaultUserPolicy.allowedPaidAgents;
-  const paidAgentBudgetsTinybar = policy.paidAgentBudgetsTinybar
-    ?? policy.serviceBudgetsTinybar
-    ?? defaultUserPolicy.paidAgentBudgetsTinybar;
+  const paidAgentBudgetsAtomic = policy.paidAgentBudgetsAtomic
+    ?? policy.serviceBudgetsAtomic
+    ?? defaultUserPolicy.paidAgentBudgetsAtomic;
   const allowance = {
     ...defaultUserPolicy.allowance,
     ...(policy.allowance ?? {})
@@ -209,25 +220,25 @@ export function normalizeUserPolicy(policy = defaultUserPolicy) {
     payerAccountId: policy.sessionEscrow?.payerAccountId
       ?? allowance.ownerAccountId
       ?? defaultUserPolicy.sessionEscrow.payerAccountId,
-    authorizedBudgetTinybar: policy.sessionEscrow?.authorizedBudgetTinybar
-      ?? sessionBudgetTinybar,
-    availableBalanceTinybar: policy.sessionEscrow?.availableBalanceTinybar
-      ?? policy.sessionEscrow?.authorizedBudgetTinybar
-      ?? sessionBudgetTinybar
+    authorizedBudgetAtomic: policy.sessionEscrow?.authorizedBudgetAtomic
+      ?? sessionBudgetAtomic,
+    availableBalanceAtomic: policy.sessionEscrow?.availableBalanceAtomic
+      ?? policy.sessionEscrow?.authorizedBudgetAtomic
+      ?? sessionBudgetAtomic
   };
 
   return {
     ...policy,
-    sessionBudgetTinybar,
-    maxPaidAgentCallTinybar,
+    sessionBudgetAtomic,
+    maxPaidAgentCallAtomic,
     allowedPaidAgents,
-    paidAgentBudgetsTinybar,
+    paidAgentBudgetsAtomic,
     autoPayEnabled: policy.autoPayEnabled ?? true,
     allowance,
     sessionEscrow,
-    dailyBudgetTinybar: sessionBudgetTinybar,
-    maxPaymentPerCallTinybar: maxPaidAgentCallTinybar,
+    dailyBudgetAtomic: sessionBudgetAtomic,
+    maxPaymentPerCallAtomic: maxPaidAgentCallAtomic,
     allowedServices: allowedPaidAgents,
-    serviceBudgetsTinybar: paidAgentBudgetsTinybar
+    serviceBudgetsAtomic: paidAgentBudgetsAtomic
   };
 }

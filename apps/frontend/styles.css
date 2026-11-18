@@ -764,7 +764,7 @@ textarea::placeholder {
   border-top: 1px solid var(--soft);
 }
 
-.hedera-status-card {
+.payment-status-card {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 14px;
@@ -774,27 +774,27 @@ textarea::placeholder {
   border-top: 1px solid var(--soft);
 }
 
-.hedera-status-card span {
+.payment-status-card span {
   color: #59615c;
   font-size: 12px;
   font-weight: 850;
 }
 
-.hedera-status-card strong {
+.payment-status-card strong {
   display: block;
   margin-top: 5px;
   color: var(--green);
   font-size: 14px;
 }
 
-.hedera-status-card p {
+.payment-status-card p {
   margin-top: 6px;
   color: #5b635e;
   font-size: 13px;
   line-height: 1.35;
 }
 
-.hedera-status-grid {
+.payment-status-grid {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -802,18 +802,18 @@ textarea::placeholder {
   align-content: start;
 }
 
-.hedera-status-item {
+.payment-status-item {
   border: 1px solid var(--soft);
   padding: 10px;
   background: #fbfaf6;
   min-height: 72px;
 }
 
-.hedera-status-item.is-warn strong {
+.payment-status-item.is-warn strong {
   color: #a64d1f;
 }
 
-.hedera-status-item a {
+.payment-status-item a {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -890,7 +890,7 @@ textarea::placeholder {
   border-top: 1px solid var(--soft);
 }
 
-.technical-detail .hedera-status-grid {
+.technical-detail .payment-status-grid {
   margin-top: 14px;
 }
 
@@ -1410,8 +1410,8 @@ li {
   .policy-grid,
   .list-columns,
   .policy-switches,
-  .hedera-status-card,
-  .hedera-status-grid,
+  .payment-status-card,
+  .payment-status-grid,
   .payment-readiness-grid,
   .payment-readiness-actions,
   .preferences-grid,

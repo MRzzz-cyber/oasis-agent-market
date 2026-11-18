@@ -397,7 +397,6 @@ function toCoinGeckoId(asset) {
     BTC: "bitcoin",
     ETH: "ethereum",
     SOL: "solana",
-    HBAR: "hedera-hashgraph",
     LINK: "chainlink",
     AVAX: "avalanche-2",
     BNB: "binancecoin",

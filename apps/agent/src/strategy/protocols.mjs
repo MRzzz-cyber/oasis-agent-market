@@ -7,10 +7,10 @@ export function createResearchRequest({ state, toolCall }) {
     asset: state.asset,
     hypothesis: state.hypothesis,
     reasoningTier: toolCall.reasoningTier,
-    quotedTinybar: toolCall.quotedTinybar,
+    quotedAtomic: toolCall.quotedAtomic,
     usage: toolCall.usage,
     pricingModel: toolCall.pricingModel,
-    maxFeeTinybar: toolCall.maxWillingToPayTinybar,
+    maxFeeAtomic: toolCall.maxWillingToPayAtomic,
     reason: toolCall.reason,
     requiredBeforeExecution: toolCall.required
   };
@@ -26,10 +26,10 @@ export function createRiskChallengeRequest({ state, toolCall }) {
     hypothesis: state.hypothesis,
     evidence: state.evidence,
     reasoningTier: toolCall.reasoningTier,
-    quotedTinybar: toolCall.quotedTinybar,
+    quotedAtomic: toolCall.quotedAtomic,
     usage: toolCall.usage,
     pricingModel: toolCall.pricingModel,
-    maxFeeTinybar: toolCall.maxWillingToPayTinybar,
+    maxFeeAtomic: toolCall.maxWillingToPayAtomic,
     reason: toolCall.reason,
     requiredBeforeExecution: true
   };

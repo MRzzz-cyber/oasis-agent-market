@@ -68,11 +68,11 @@
         <input id="timeframeInput" type="hidden" value="4h" />
         <div class="policy-grid">
           <label>
-            每次策略分析预算 HBAR
+            每次策略分析预算 USDC
             <input id="budgetInput" type="number" min="0" step="0.01" value="0.2" />
           </label>
           <label>
-            单次付费 Agent 上限 HBAR
+            单次付费 Agent 上限 USDC
             <input id="perCallInput" type="number" min="0" step="0.01" value="0.05" />
           </label>
           <label>
@@ -120,7 +120,7 @@
             <span>允许 Risk Agent 付费调用</span>
           </label>
         </div>
-        <div class="hedera-status-card">
+        <div class="payment-status-card">
           <div>
             <span>Budget Boundary</span>
             <strong id="escrowStatus">未授权</strong>
@@ -135,11 +135,11 @@
         <section class="payment-readiness-panel">
           <div class="panel-title">
             <span>PAYMENT READINESS</span>
-            <strong id="hederaStatusBadge">未检查</strong>
+            <strong id="paymentStatusBadge">未检查</strong>
           </div>
           <div class="payment-readiness-head">
             <h1>支付能力</h1>
-            <p id="hederaStatusSummary">确认 Agent 是否具备在预算边界内自动购买服务的能力，包括用户测试币余额、Hedera testnet 支付通道和 HCS 审计记录。</p>
+            <p id="paymentStatusSummary">检查 Base Sepolia USDC 模拟采购和本地审计状态。</p>
           </div>
           <div class="payment-readiness-grid">
             <article class="payment-readiness-card">
@@ -150,16 +150,16 @@
             <article class="payment-readiness-card">
               <span>支付通道</span>
               <strong id="paymentRailValue">未检查</strong>
-              <p>Hedera testnet / HBAR，经由 Blocky402 结算。</p>
+              <p>Base Sepolia / USDC，策略购买为模拟模式。</p>
             </article>
             <article class="payment-readiness-card">
               <span>审计记录</span>
               <strong id="auditReadinessValue">未检查</strong>
-              <p>决策摘要写入 Hedera Consensus Service。</p>
+              <p>决策摘要记录在本地会话。</p>
             </article>
           </div>
           <div class="payment-readiness-actions">
-            <button class="secondary-button" id="checkHederaButton" type="button">刷新支付状态</button>
+            <button class="secondary-button" id="checkPaymentButton" type="button">刷新支付状态</button>
             <span id="paymentReadinessHint">这不是用户设置项，只展示当前支付运行环境。</span>
           </div>
           <div class="technical-detail">
@@ -167,7 +167,7 @@
               <span>TECHNICAL DETAILS</span>
               <strong>READ ONLY</strong>
             </div>
-            <div class="hedera-status-grid" id="hederaStatusGrid"></div>
+            <div class="payment-status-grid" id="paymentStatusGrid"></div>
           </div>
         </section>
       </div>
@@ -193,8 +193,8 @@
             <label>
               金额显示
               <select id="preferenceUnitInput">
-                <option value="hbar" selected>HBAR</option>
-                <option value="tinybar">Tinybar</option>
+                <option value="usdc" selected>USDC</option>
+                <option value="atomic">Atomic</option>
                 <option value="usd">USD 估算</option>
               </select>
             </label>
@@ -298,7 +298,7 @@
           <strong id="paymentStatus">NO PLAN</strong>
         </div>
         <div id="paymentList" class="payment-list"></div>
-        <ol id="x402Flow" class="x402-flow" aria-label="x402 Hedera payment flow"></ol>
+        <ol id="x402Flow" class="x402-flow" aria-label="Simulated USDC payment flow"></ol>
         <div class="budget-meter" aria-label="Budget meter">
           <div id="budgetFill"></div>
         </div>

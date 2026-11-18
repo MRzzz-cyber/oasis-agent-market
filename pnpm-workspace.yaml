@@ -1,9 +1,4 @@
 packages:
   - apps/*
+  - '!apps/x402-smoke'
   - packages/*
-
-allowBuilds:
-  protobufjs: true
-
-onlyBuiltDependencies:
-  - protobufjs

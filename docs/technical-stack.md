@@ -1,6 +1,5 @@
 # Oasis 技术选型（MVP）
 
-> 当前目标架构。Base Sepolia 支付适配器尚未接入完整 x402 客户端/服务端；旧 Hedera Demo 暂时保留用于回归。
 
 ## 决策原则
 
@@ -16,7 +15,7 @@
 | Frontend | 现有 Vanilla HTML/CSS/JS | 暂不迁移 React/Next |
 | Agent | 现有 StrategyAgent 状态机 | LangGraph / 多套编排器 |
 | LLM | 统一 Provider Adapter，按需启用 OpenAI/Claude/Gemini/DeepSeek | 复杂模型路由平台 |
-| Payment | x402 v2 + @x402/core + @x402/evm + @x402/fetch | 手写 402 headers |
+| Payment | x402 v2 + @x402/core + @x402/evm | 手写 402 headers |
 | EVM | viem | ethers 与 viem 并存 |
 | Network | Base Sepolia（eip155:84532） | 多链并行 |
 | Asset | Circle USDC（6 decimals） | 自定义测试 Token |
@@ -33,7 +32,6 @@
 - packages/policy：唯一支付授权决策入口。
 - packages/evm：Base 网络、USDC 单位和 EVM/x402 支付适配。
 - packages/shared：通用 ID、时间、价格和共享结构。
-- packages/hedera：旧黑客松实现；迁移完成后归档，不再作为新流程依赖。
 
 ## 支付安全规则
 
@@ -54,12 +52,10 @@
 
 - [x] 建立 Base Sepolia 网络与 USDC 常量。
 - [x] 建立无浮点金额换算与基础支付校验。
-- [ ] 接入官方 x402 v2 EVM client。
-- [ ] 将 Policy Engine 从 tinybar/HBAR 迁移为 USDC atomic units。
+- [x] 独立测试脚本接入官方 x402 v2 EVM SDK。
 - [ ] 完成预算预留、幂等和结算对账。
-- [ ] 将 Market/Risk 服务接入 x402 v2。
+- [x] Market/Risk 策略服务使用 Base Sepolia USDC 模拟报价和结算。
 - [ ] 通过 Base Sepolia 测试网端到端付款。
-- [ ] 移除 Hedera 运行时依赖和过时配置。
 
 ## 官方依据
 

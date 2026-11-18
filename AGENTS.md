@@ -23,7 +23,6 @@ Oasis is a budget-bounded AI agent that purchases approved data/research service
 - packages/policy/: deterministic permission and budget engine.
 - packages/evm/: Base Sepolia, USDC and x402 EVM payment adapter.
 - packages/shared/: shared utilities and pricing.
-- packages/hedera/: legacy hackathon implementation. Do not add new product features here.
 
 ## Non-negotiable product and security rules
 
@@ -36,7 +35,6 @@ Oasis is a budget-bounded AI agent that purchases approved data/research service
 7. Fail closed on missing policy, invalid quote, unsupported network/token or facilitator errors.
 8. Keep all trading execution simulation-only. No mainnet and no real exchange orders.
 9. Do not claim Base payment is implemented until a Base Sepolia end-to-end test passes.
-10. Preserve old Hedera tests until the migration is complete.
 
 ## Workflow
 

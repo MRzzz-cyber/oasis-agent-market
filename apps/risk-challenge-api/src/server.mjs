@@ -1,22 +1,11 @@
 import http from "node:http";
-import { buildX402PaymentRequired, createRequestId, decodePaymentHeader } from "../../../packages/shared/src/index.mjs";
-import {
-  fetchBlocky402SupportedRequirements,
-  getHederaConfig,
-  settlePaymentForResource
-} from "../../../packages/hedera/src/index.mjs";
+import { makeSimulationCheckout } from "../../../packages/evm/src/simulation.mjs";
 import { quotePaidAgentCall, usageFromSearchParams } from "../../../packages/shared/src/pricing.mjs";
 
 const SERVICE_NAME = "risk-challenge";
 
 export async function createRiskChallengeServer({ port = 4022, host = "127.0.0.1" } = {}) {
-  const config = getHederaConfig();
-  const supported = await fetchBlocky402SupportedRequirements({
-    service: SERVICE_NAME,
-    amountTinybar: quotePaidAgentCall({ service: SERVICE_NAME, reasoningTier: "standard" }).quotedTinybar,
-    description: `${SERVICE_NAME} pay-per-request result`
-  });
-  const pendingRequirements = new Map();
+  const checkout = makeSimulationCheckout(SERVICE_NAME);
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -39,45 +28,19 @@ export async function createRiskChallengeServer({ port = 4022, host = "127.0.0.1
       const reasoningTier = normalizeTier(url.searchParams.get("tier"));
       const usage = usageFromSearchParams({ service: SERVICE_NAME, reasoningTier, searchParams: url.searchParams });
       const quote = quotePaidAgentCall({ service: SERVICE_NAME, reasoningTier, usage });
-      const priceTinybar = quote.quotedTinybar;
-      const paymentHeader = request.headers["x-payment"];
-
-      if (!paymentHeader) {
-        const requestId = createRequestId("risk");
-        const paymentRequired = buildX402PaymentRequired({
-          requestId,
-          service: SERVICE_NAME,
-          receiverAccountId: config.serviceAccountId,
-          priceTinybar,
-          network: "hedera:testnet",
-          feePayer: supported?.feePayer
-        });
-        pendingRequirements.set(requestId, paymentRequired.accepts[0]);
-        response.setHeader("X-PAYMENT-REQUIRED", "true");
-        sendJson(response, 402, paymentRequired);
+      const priceAtomic = quote.quotedAtomic;
+      const checkoutResult = checkout.request({ request, resource: url.pathname + url.search, amount: priceAtomic });
+      if (!checkoutResult.payment) {
+        sendJson(response, checkoutResult.status, checkoutResult.body);
         return;
       }
-
-      const paymentPayload = decodePaymentHeader(paymentHeader);
-      const expectedRequirement = pendingRequirements.get(paymentPayload.requestId)
-        ?? expectedRequirementFromPaymentPayload({ paymentPayload, service: SERVICE_NAME, config, priceTinybar });
-
-      if (!expectedRequirement) {
-        sendJson(response, 402, {
-          error: "unknown_payment_request",
-          message: "Payment request has expired or was not issued by this service."
-        });
-        return;
-      }
-
-      const settlement = await settlePaymentForResource({ paymentPayload, expectedRequirement });
-      pendingRequirements.delete(paymentPayload.requestId);
+      const settlement = checkoutResult.payment;
 
       sendJson(response, 200, {
         service: SERVICE_NAME,
         asset,
         reasoningTier,
-        priceTinybar,
+        priceAtomic,
         usage,
         pricingModel: quote.pricingModel,
         payment: settlement,
@@ -117,22 +80,6 @@ export async function closeRiskChallengeServer(server) {
 
 function normalizeTier(value) {
   return ["standard", "deep"].includes(value) ? value : "standard";
-}
-
-function expectedRequirementFromPaymentPayload({ paymentPayload, service, config, priceTinybar }) {
-  const accepted = paymentPayload.paymentPayload?.accepted ?? paymentPayload.accepted;
-  if (accepted) return accepted;
-
-  if (Number(paymentPayload.amount) !== priceTinybar) return null;
-  if (paymentPayload.payTo !== config.serviceAccountId) return null;
-
-  return buildX402PaymentRequired({
-    requestId: paymentPayload.requestId,
-    service,
-    receiverAccountId: config.serviceAccountId,
-    priceTinybar,
-    network: "hedera:testnet"
-  }).accepts[0];
 }
 
 function buildRiskChallenge({ asset, setup, confidence, locale }) {
