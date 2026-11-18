@@ -1,3 +1,4 @@
+import {readPredictionJSON,predictionSnapshotCache} from './prediction-read.js';
 import {relatedScore,discoveryQuery,matchAssessment,marketTopic} from './prediction-discovery.js';
 import {estimateDepth,sharesInput} from './prediction-core.js';
 const KALSHI='https://api.elections.kalshi.com/trade-api/v2';
@@ -11,7 +12,7 @@ const idPattern=/^[a-zA-Z0-9_-]{1,180}$/;
 class ProviderDataError extends Error {constructor(code,status=null){super(code);this.code=code;this.status=status;}}
 export function publicMarketFetch(fetchImpl){return async(input,init)=>{const result=await fetchImpl(input,{...init,redirect:'manual'});if(result.status>=300&&result.status<400)throw new ProviderDataError('redirect');return result;};}
 async function publicClient(fetchImpl){const {createPublicClient}=await import('@polymarket/client');return createPublicClient({fetch:publicMarketFetch(fetchImpl)});}
-async function json(url,fetchImpl){const r=await publicMarketFetch(fetchImpl)(url,{headers:{accept:'application/json',...(String(url).startsWith('https://gamma-api.polymarket.com/')?{'accept-encoding':'gzip'}:{})},signal:AbortSignal.timeout(4000)});if(!r.ok)throw new ProviderDataError('http',r.status);try{return await r.json();}catch(error){if(['TimeoutError','AbortError'].includes(error?.name))throw error;throw new ProviderDataError('format');}}
+async function json(url,fetchImpl){return readPredictionJSON(url,{fetchImpl,timeoutMs:4000,retryInvalidJSON:false,headers:String(url).startsWith('https://gamma-api.polymarket.com/')?{'accept-encoding':'gzip'}:{}});}
 function safePrice(value){if(value==null||value==='')return null;const v=Number(value);return Number.isFinite(v)&&v>0&&v<1?String(value):null;}
 function activePoly(m){return m?.state?.closed!==true&&m?.state?.archived!==true&&m?.state?.active!==false&&m?.state?.acceptingOrders===true;}
 export function normalizePolymarket(m){if(!idPattern.test(String(m?.id||''))||!activePoly(m))return null;return {provider:'polymarket',id:String(m.id),question:text(m.question,400),description:text(m.description,8000),endDate:m.state.endDate||null,resolutionSource:text(m.resolution?.source,1000),volume:text(String(m.metrics?.volume24hr??''),40),volumeLabel:'24 小时成交量',currency:'平台抵押资产',network:'Polygon · 资产需按市场协议核验',chainId:137,protocol:m.version||'unknown',outcomes:['yes','no'].map(key=>({key,label:text(m.outcomes?.[key]?.label,100)||key.toUpperCase(),price:safePrice(m.outcomes?.[key]?.price)})),url:m.slug?'https://polymarket.com/event/'+encodeURIComponent(m.slug):'https://polymarket.com',execution:{enabled:false,reason:'选择结果后可在交易卡片核对网络、价格及买入条件'}};}
@@ -23,7 +24,32 @@ function providerFailure(error){
  const message={timeout:'平台响应超时，请重试',redirect:'平台接口地址异常，请稍后重试',rate_limit:'平台请求过于频繁，请稍后重试',http:'平台接口暂不可用'+(Number.isInteger(status)?'（HTTP '+status+'）':''),format:'平台返回的数据格式异常，请稍后重试',connection:'平台连接失败，请重试'}[code];
  return {error:message,errorCode:code,...(Number.isInteger(status)&&status>=400&&status<=599?{upstreamStatus:status}:{})};
 }
-export async function searchPredictions(query,{fetchImpl=fetch,client,legacyProviders=false}={}){if(typeof query!=='string'||!query.trim()||query.length>120)throw Error('请输入 1–120 字的事件关键词');query=query.trim();const tasks=[async()=>searchPoly(query,client||await publicClient(fetchImpl))];if(legacyProviders)tasks.push(()=>searchKalshi(query,fetchImpl));const result=await Promise.allSettled(tasks.map(task=>task()));return {query,at:new Date().toISOString(),executionEnabled:false,scope:legacyProviders?'legacy-research':'polymarket-only',providers:result.map((r,i)=>r.status==='fulfilled'?r.value:{provider:i?'kalshi':'polymarket',markets:[],...providerFailure(r.reason),coverage:'本次未获取到数据',partial:true})};}
+const publicSnapshots=predictionSnapshotCache();
+async function searchPolyPublic(query,fetchImpl,now){
+ const payload=await json('https://gamma-api.polymarket.com/public-search?'+new URLSearchParams({q:query,limit_per_type:'6',events_status:'active',keep_closed_markets:'0',search_profiles:'false',search_tags:'false',optimized:'true'}),fetchImpl);
+ if(!payload||!Array.isArray(payload.events))throw new ProviderDataError('format');
+ const markets=[],seen=new Set();
+ for(const event of payload.events){
+  if(!event||event.closed||event.archived||event.active===false||!Array.isArray(event.markets))continue;
+  for(const raw of event.markets){
+   if(!raw||raw.enableOrderBook===false||raw.bestAsk!=null&&!(Number(raw.bestAsk)>0&&Number(raw.bestAsk)<1))continue;
+   const m=normalizeDiscoveryMarket(raw,event);
+   if(m&&Number.isFinite(Date.parse(m.endDate))&&Date.parse(m.endDate)>now&&!seen.has(m.id)){seen.add(m.id);markets.push(m);if(markets.length===12)break;}
+  }
+  if(markets.length===12)break;
+ }
+ return {provider:'polymarket',markets,coverage:'关键词搜索首批事件中的开放二元盘口；不是全站结果',partial:payload.pagination?.hasMore===true||markets.length===12};
+}
+export async function searchPredictions(query,{fetchImpl=fetch,client,legacyProviders=false,now=Date.now(),cache=fetchImpl===fetch&&!client?publicSnapshots:null}={}){
+ if(typeof query!=='string'||!query.trim()||query.length>120)throw Error('请输入 1–120 字的事件关键词');query=query.trim();
+ const load=async()=>{
+  const tasks=[()=>client?searchPoly(query,client):searchPolyPublic(query,fetchImpl,now)];if(legacyProviders)tasks.push(()=>searchKalshi(query,fetchImpl));
+  const result=await Promise.allSettled(tasks.map(task=>task()));
+  return {query,at:new Date(now).toISOString(),executionEnabled:false,scope:legacyProviders?'legacy-research':'polymarket-only',providers:result.map((r,i)=>r.status==='fulfilled'?r.value:{provider:i?'kalshi':'polymarket',markets:[],...providerFailure(r.reason),coverage:'本次未获取到数据',partial:true})};
+ };
+ const payload=cache?await cache.read((legacyProviders?'legacy:':'search:')+query.toLowerCase(),load,{now:()=>now,usable:p=>p.providers.some(v=>!v.error)}):await load();
+ return {...payload,query};
+}
 export async function predictionQuote({provider,id,outcome,shares},{fetchImpl=fetch,client}={}){
  if(!['polymarket','kalshi'].includes(provider)||!idPattern.test(id||'')||!['yes','no'].includes(outcome))throw Error('请选择有效的市场和结果');sharesInput(shares);
  let market,levels,minimum='0',sourceTime=null;
@@ -36,7 +62,8 @@ function complement(value){const s=String(value);if(!/^0\.\d{1,6}$/.test(s))thro
 
 const GAMMA='https://gamma-api.polymarket.com';
 export function normalizeDiscoveryMarket(raw,event={}){
- const parse=v=>{try{return Array.isArray(v)?v:JSON.parse(v);}catch{return [];}};
+ if(!raw||typeof raw!=='object')return null;
+ const parse=v=>{try{const p=Array.isArray(v)?v:JSON.parse(v);return Array.isArray(p)?p:[];}catch{return [];}};
  const labels=parse(raw.outcomes),prices=parse(raw.outcomePrices);
  if(labels.length!==2||String(labels[0]).toLowerCase()!=='yes'||String(labels[1]).toLowerCase()!=='no')return null;
  const market=normalizePolymarket({id:raw.id,question:raw.question,description:raw.description,slug:event.slug||raw.slug,version:raw.version,
@@ -44,19 +71,21 @@ export function normalizeDiscoveryMarket(raw,event={}){
   metrics:{volume24hr:raw.volume24hr},outcomes:{yes:{label:labels[0],price:prices[0]},no:{label:labels[1],price:prices[1]}},resolution:{source:raw.resolutionSource}});
  return market?{...market,eventTitle:text(event.title,400),eventId:String(event.id||raw.id),topic:marketTopic([event.title,raw.question,...(Array.isArray(event.tags)?event.tags.map(t=>t.label):[])].join(' '))}:null;
 }
-let discoveryCache=null,discoveryAt=0;
-export async function discoverPredictions({fetchImpl=fetch,now=Date.now()}={}){
- if(fetchImpl===fetch&&discoveryCache&&now-discoveryAt<45000)return discoveryCache;
+export async function discoverPredictions({fetchImpl=fetch,now=Date.now(),cache=fetchImpl===fetch?publicSnapshots:null}={}){
+ const load=()=>loadDiscovery(fetchImpl,now);
+ return cache?cache.read('feed',load,{now:()=>now}):load();
+}
+async function loadDiscovery(fetchImpl,now){
  const events=await json(GAMMA+'/events?'+new URLSearchParams({active:'true',closed:'false',archived:'false',order:'volume24hr',ascending:'false',limit:'100'}),fetchImpl);
  if(!Array.isArray(events))throw new ProviderDataError('format');
  const markets=[],seen=new Set();
- for(const event of events){if(event.closed||event.archived||event.active===false)continue;
-  const candidates=(event.markets||[]).filter(raw=>Number(raw.bestAsk)>0&&Number(raw.bestAsk)<1&&raw.enableOrderBook!==false&&!/:.*\bO\/U\b/i.test(raw.question||'')).map(raw=>normalizeDiscoveryMarket(raw,event)).filter(m=>m&&Number.isFinite(Date.parse(m.endDate))&&Date.parse(m.endDate)>now).sort((a,b)=>Number(b.volume||0)-Number(a.volume||0));
+ for(const event of events){if(!event||event.closed||event.archived||event.active===false)continue;
+  const candidates=(Array.isArray(event.markets)?event.markets:[]).filter(raw=>raw&&Number(raw.bestAsk)>0&&Number(raw.bestAsk)<1&&raw.enableOrderBook!==false&&!/:.*\bO\/U\b/i.test(raw.question||'')).map(raw=>normalizeDiscoveryMarket(raw,event)).filter(m=>m&&Number.isFinite(Date.parse(m.endDate))&&Date.parse(m.endDate)>now).sort((a,b)=>Number(b.volume||0)-Number(a.volume||0));
   const m=candidates[0];if(m&&!seen.has(m.id)){seen.add(m.id);markets.push(m);}
  }
  const groups=new Map();for(const m of markets){const group=groups.get(m.topic)||[];if(group.length<6)group.push(m);groups.set(m.topic,group);}const diverse=[];for(let i=0;i<6;i++)for(const group of groups.values())if(group[i])diverse.push(group[i]);
  const payload={version:'prediction-discovery-v1',at:new Date(now).toISOString(),refreshAfterSeconds:60,source:'Polymarket',coverage:'按 24 小时活跃度读取前 100 个事件，每事件一个开放二元盘口，排除已到期、无卖价及球员大小分盘口；不是全站或投资推荐',markets:diverse.slice(0,24)};
- if(fetchImpl===fetch){discoveryCache=payload;discoveryAt=now;}return payload;
+ return payload;
 }
 async function kalshiRelated(source,fetchImpl){
  const query=discoveryQuery(source);
