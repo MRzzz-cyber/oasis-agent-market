@@ -1,5 +1,6 @@
 import http from "node:http";
 import { fetchHistoricalCandles, replayResearch } from "../../agent/src/strategy/ResearchReplay.mjs";
+import { ToolPlanner } from "../../agent/src/strategy/ToolPlanner.mjs";
 import { runResearchDemo } from "../../agent/src/strategy/ResearchPlanner.mjs";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
@@ -31,7 +32,7 @@ export async function createDemoApiServer({ port = 4173, host = "127.0.0.1" } = 
       }
 
       if (request.method === "GET" && url.pathname === "/research/demo") {
-        sendJson(response, 200, runResearchDemo());
+        sendJson(response, 200, runResearchDemo(ToolPlanner.planResearch));
         return;
       }
 

@@ -1,4 +1,5 @@
-import { demoPolicy, makeResearchOffers, planResearch, providers } from "./ResearchPlanner.mjs";
+import { demoPolicy, makeResearchOffers, providers } from "./ResearchPlanner.mjs";
+import { ToolPlanner } from "./ToolPlanner.mjs";
 
 const start = "2025-01-01T00:00:00Z";
 const end = "2025-07-01T00:00:00Z";
@@ -46,7 +47,7 @@ export function replayResearch(candles) {
       prediction: Math.sign(close - ordered[index - provider.window].close)
     }));
     const certaintyBps = 5000 + Math.min(4500, Math.round(Math.abs(change) * 60000));
-    const { selectedProvider } = planResearch({
+    const { selectedProvider } = ToolPlanner.planResearch({
       certaintyBps, decisionStake, quotes: offers, offers, policy: demoPolicy, now
     });
     const selected = estimates.find(provider => provider.id === selectedProvider);

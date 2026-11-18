@@ -67,11 +67,11 @@ export function planResearch({ certaintyBps, decisionStake, quotes, offers, poli
   return { selectedProvider: best?.provider ?? null, evaluations };
 }
 
-export function runResearchDemo() {
+export function runResearchDemo(planner = planResearch) {
   const now = Date.now();
   const offers = makeResearchOffers(now);
   const invalidQuote = { ...offers[2], payTo: offers[0].payTo };
-  const evaluate = (certaintyBps, quotes) => planResearch({
+  const evaluate = (certaintyBps, quotes) => planner({
     certaintyBps, decisionStake: "300000", quotes, offers, policy: demoPolicy, now
   });
   return {

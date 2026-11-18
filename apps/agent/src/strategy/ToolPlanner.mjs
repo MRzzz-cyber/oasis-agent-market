@@ -1,8 +1,13 @@
+import { planResearch } from "./ResearchPlanner.mjs";
 import { assertToolPlan } from "./schemas.mjs";
 import { normalizeUserPolicy } from "../../../../packages/policy/src/index.mjs";
 import { quotePaidAgentCall } from "../../../../packages/shared/src/pricing.mjs";
 
 export class ToolPlanner {
+  static planResearch(input) {
+    return planResearch(input);
+  }
+
   plan({ policy, hypothesis, marketContext, memory, intent, userMessage, locale = "zh-CN" }) {
     const isZh = locale === "zh-CN";
     const normalizedPolicy = normalizeUserPolicy(policy);
