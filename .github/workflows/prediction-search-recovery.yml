@@ -1,7 +1,7 @@
 name: Prediction search recovery
 on:
   push:
-    branches: [fix/prediction-search-resilience, refactor/simple-base-mvp]
+    branches: [fix/prediction-search-resilience, feat/oasis-assistant-home, refactor/simple-base-mvp]
 permissions:
   contents: read
 jobs:
