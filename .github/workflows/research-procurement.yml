@@ -16,7 +16,14 @@ jobs:
       - run: npm exec --yes --package=pnpm@10 -- pnpm install --frozen-lockfile
       - run: npm test
       - run: npm install --prefix apps/x402-smoke
-      - run: node --check apps/x402-smoke/smoke.mjs
+      - run: node --check apps/frontend/research.js
+      - name: Load x402 SDK and check the wallet guard
+        run: |
+          if output=$(npm --prefix apps/x402-smoke start 2>&1); then
+            echo "Unexpected smoke start without a test wallet"
+            exit 1
+          fi
+          printf '%s\n' "$output" | grep -F "Configure OASIS_TESTNET_PAYER_KEY and OASIS_TESTNET_PAY_TO"
       - name: Replay Coinbase historical data
         run: |
           node --input-type=module -e 'import { fetchHistoricalCandles, replayResearch } from "./apps/agent/src/strategy/ResearchReplay.mjs"; console.log(JSON.stringify(replayResearch(await fetchHistoricalCandles()), null, 2));'
