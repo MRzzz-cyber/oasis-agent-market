@@ -995,6 +995,8 @@ export const chromeLabels={
 Object.assign(messages,{
   "Oasis · 把你的判断变成行动": "Oasis · Put your view into action",
   "发现与对话": "Discover & chat",
+  "整理可复盘的策略草案": "Draft a reviewable strategy",
+  "明确触发、风险与退出规则": "Define triggers, risks and exit rules",
   "读懂行情，制定你的交易计划": "Understand the market. Plan your trade.",
   "查看趋势与风险，整理可复盘的策略。涉及真实交易时，先核对报价、金额和费用，再由你确认。": "Review trends and risks, and build a strategy you can revisit. For live trades, review the quote, amount and fees before confirming.",
   "例如：分析 ETH 最近的走势，哪些信号值得等？": "For example: Analyze ETH’s recent trend. Which signals are worth waiting for?",
