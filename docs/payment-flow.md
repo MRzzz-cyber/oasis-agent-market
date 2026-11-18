@@ -44,7 +44,6 @@ The token address must be checked against Circle's official contract list before
 
 The repository currently contains a Base Sepolia/USDC configuration and integer amount helper in packages/evm. The full x402 EVM client/server and payment settlement path are not yet implemented.
 
-The old Hedera/Blocky402 payment flow remains in packages/hedera only to keep the hackathon demo and regression tests available during migration.
 
 ## Official references
 

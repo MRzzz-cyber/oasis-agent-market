@@ -1,7 +1,7 @@
 import { createBudgetLedger, defaultUserPolicy, normalizeUserPolicy } from "../../../../packages/policy/src/index.mjs";
-import { createRequestId, hbarToTinybar, tinybarToHbar } from "../../../../packages/shared/src/index.mjs";
+import { createRequestId, usdcToAtomic, atomicToUsdc } from "../../../../packages/shared/src/index.mjs";
 import { listPaidAgentQuotes } from "../../../../packages/shared/src/pricing.mjs";
-import { getHederaConfig } from "../../../../packages/hedera/src/index.mjs";
+import { SIMULATION_RECIPIENT } from "../../../../packages/evm/src/simulation.mjs";
 import { ExecutionAgent } from "../execution/ExecutionAgent.mjs";
 import { MarketResearchAgent } from "../market/MarketResearchAgent.mjs";
 import { RiskAgent } from "../risk/RiskAgent.mjs";
@@ -40,7 +40,7 @@ export class StrategyAgent {
     observability = new Observability(),
     locale = "zh-CN"
   } = {}) {
-    this.policy = withCurrentHederaAccounts(policy);
+    this.policy = withSimulationAccounts(policy);
     this.locale = locale;
     this.marketContextBuilder = marketContextBuilder;
     this.reasoner = reasoner;
@@ -68,49 +68,49 @@ export class StrategyAgent {
     if (intent.riskPreference !== "aggressive") {
       allowedPaidAgents.push("risk-challenge");
     }
-    const sessionBudgetTinybar = intent.sessionBudgetTinybar ?? intent.dailyResearchBudgetTinybar;
-    const maxPaidAgentCallTinybar = intent.maxPaidAgentCallTinybar ?? intent.maxPaymentPerCallTinybar;
+    const sessionBudgetAtomic = intent.sessionBudgetAtomic ?? intent.dailyResearchBudgetAtomic;
+    const maxPaidAgentCallAtomic = intent.maxPaidAgentCallAtomic ?? intent.maxPaymentPerCallAtomic;
 
     return {
       ...defaultUserPolicy,
       id: `policy_${intent.asset.toLowerCase()}_${intent.timeframe}_${intent.strategyType}`,
       targetAsset: intent.asset,
-      sessionBudgetTinybar,
-      maxPaidAgentCallTinybar,
+      sessionBudgetAtomic,
+      maxPaidAgentCallAtomic,
       allowedPaidAgents,
-      paidAgentBudgetsTinybar: {
-        "market-signal": Math.floor(sessionBudgetTinybar * 0.6),
-        "risk-challenge": Math.floor(sessionBudgetTinybar * 0.3)
+      paidAgentBudgetsAtomic: {
+        "market-signal": Math.floor(sessionBudgetAtomic * 0.6),
+        "risk-challenge": Math.floor(sessionBudgetAtomic * 0.3)
       },
       autoPayEnabled: true,
       allowance: {
         ...defaultUserPolicy.allowance,
         ...currentPolicyAccounts(),
-        allowanceTinybar: sessionBudgetTinybar
+        allowanceAtomic: sessionBudgetAtomic
       },
       sessionEscrow: {
         ...defaultUserPolicy.sessionEscrow,
         sessionId: null,
         payerAccountId: currentPolicyAccounts().ownerAccountId,
-        authorizedBudgetTinybar: 0,
-        availableBalanceTinybar: 0,
-        spentTinybar: 0,
+        authorizedBudgetAtomic: 0,
+        availableBalanceAtomic: 0,
+        spentAtomic: 0,
         fundingReference: null,
         authorizedAt: null,
         status: "not_authorized"
       },
-      dailyBudgetTinybar: sessionBudgetTinybar,
-      maxPaymentPerCallTinybar: maxPaidAgentCallTinybar,
+      dailyBudgetAtomic: sessionBudgetAtomic,
+      maxPaymentPerCallAtomic: maxPaidAgentCallAtomic,
       allowedServices: allowedPaidAgents,
-      serviceBudgetsTinybar: {
-        "market-signal": Math.floor(sessionBudgetTinybar * 0.6),
-        "risk-challenge": Math.floor(sessionBudgetTinybar * 0.3)
+      serviceBudgetsAtomic: {
+        "market-signal": Math.floor(sessionBudgetAtomic * 0.6),
+        "risk-challenge": Math.floor(sessionBudgetAtomic * 0.3)
       },
       executionMode: intent.executionMode === "simulation" ? "simulation" : "simulation",
       riskRules: [
         `${intent.riskPreference}_risk_profile`,
         "user_policy_required_before_paid_agent_billing",
-        "hedera_allowance_required_for_auto_pay",
+        "session_budget_required_for_auto_pay",
         "risk_guard_required_before_execution",
         "execution_agent_simulation_only"
       ],
@@ -155,7 +155,7 @@ export class StrategyAgent {
         reason: toolPlan.reason,
         plannedToolCalls: toolPlan.toolCalls.map((call) => ({
           ...call,
-          quotedPriceTinybar: call.quotedTinybar,
+          quotedPriceAtomic: call.quotedAtomic,
           expectedDecisionImpact: estimateDecisionImpact(hypothesis, call.service),
           recommended: call.required ? true : "optional"
         }))
@@ -280,8 +280,8 @@ export class StrategyAgent {
       service: message.type === "ResearchRequest" ? "market-signal" : "risk-challenge",
       paidAgent: message.type === "ResearchRequest" ? "Market Agent" : "Risk Agent",
       reasoningTier: message.reasoningTier,
-      quotedTinybar: message.quotedTinybar,
-      maxFeeTinybar: message.maxFeeTinybar,
+      quotedAtomic: message.quotedAtomic,
+      maxFeeAtomic: message.maxFeeAtomic,
       reason: message.reason
     })));
 
@@ -404,13 +404,13 @@ export class StrategyAgent {
       service: result.service,
       paidAgent: result.service === "market-signal" ? "Market Agent" : "Risk Agent",
       reasoningTier: result.quote.reasoningTier,
-      price: `${tinybarToHbar(result.quote.quotedTinybar)} HBAR`,
+      price: `${atomicToUsdc(result.quote.quotedAtomic)} USDC`,
       quoteId: result.quote.quoteId,
       reason: result.quote.reason,
       usage: result.quote.usage,
       pricingModel: result.quote.pricingModel,
-      settlementRail: "x402/hedera",
-      x402Version: result.paymentRequired.x402Version
+      settlementRail: "base-sepolia-usdc-simulation",
+      paymentMode: result.paymentRequired.mode
     });
 
     state.policyChecks.push(result.policyCheck);
@@ -421,16 +421,16 @@ export class StrategyAgent {
       paidAgent: result.service === "market-signal" ? "Market Agent" : "Risk Agent",
       quoteId: result.policyCheck.quoteId,
       reasoningTier: result.policyCheck.reasoningTier,
-      amountTinybar: result.policyCheck.requestedTinybar,
+      amountAtomic: result.policyCheck.requestedAtomic,
       usage: result.quote.usage,
       pricingModel: result.quote.pricingModel,
-      remainingTinybar: result.policyCheck.remainingTinybar,
+      remainingAtomic: result.policyCheck.remainingAtomic,
       reasons: result.policyCheck.reasons
     });
     state.timeline.push({
       step: "budget_check",
       allowed: result.policyCheck.allowed,
-      remainingBudget: `${tinybarToHbar(result.policyCheck.remainingTinybar)} HBAR`,
+      remainingBudget: `${atomicToUsdc(result.policyCheck.remainingAtomic)} USDC`,
       budgetBoundary: result.policyCheck.budgetBoundary,
       reasons: result.policyCheck.reasons
     });
@@ -446,7 +446,7 @@ export class StrategyAgent {
       spender: result.paymentPayload.spender,
       facilitator: result.paymentPayload.facilitatorUrl,
       mode: result.paymentPayload.mode,
-      x402Version: result.paymentPayload.x402Version
+      paymentMode: result.paymentPayload.mode
     });
 
     state.payments.push({
@@ -455,7 +455,7 @@ export class StrategyAgent {
       quoteId: result.quote.quoteId,
       agent: result.quote.agent,
       reasoningTier: result.quote.reasoningTier,
-      amountTinybar: Number(result.quote.quotedTinybar),
+      amountAtomic: Number(result.quote.quotedAtomic),
       payment: result.payment,
       charge: result.charge
     });
@@ -464,7 +464,7 @@ export class StrategyAgent {
       step: "agent_charge_settled",
       service: result.service,
       quoteId: result.quote.quoteId,
-      amountTinybar: result.quote.quotedTinybar,
+      amountAtomic: result.quote.quotedAtomic,
       transactionId: result.payment.transactionId,
       settledAt: result.payment.settledAt
     });
@@ -491,13 +491,13 @@ export class StrategyAgent {
       reason: state.decision.reason,
       policy: normalizedPolicy,
       budget: {
-        spentTinybar: state.ledger.spentTinybar,
-        spentHbar: tinybarToHbar(state.ledger.spentTinybar),
-        remainingHbar: tinybarToHbar(normalizedPolicy.sessionBudgetTinybar - state.ledger.spentTinybar),
-        sessionBudgetTinybar: normalizedPolicy.sessionBudgetTinybar,
-        sessionBudgetHbar: tinybarToHbar(normalizedPolicy.sessionBudgetTinybar),
-        maxPaidAgentCallTinybar: normalizedPolicy.maxPaidAgentCallTinybar,
-        maxPaidAgentCallHbar: tinybarToHbar(normalizedPolicy.maxPaidAgentCallTinybar),
+        spentAtomic: state.ledger.spentAtomic,
+        spentUsdc: atomicToUsdc(state.ledger.spentAtomic),
+        remainingUsdc: atomicToUsdc(normalizedPolicy.sessionBudgetAtomic - state.ledger.spentAtomic),
+        sessionBudgetAtomic: normalizedPolicy.sessionBudgetAtomic,
+        sessionBudgetUsdc: atomicToUsdc(normalizedPolicy.sessionBudgetAtomic),
+        maxPaidAgentCallAtomic: normalizedPolicy.maxPaidAgentCallAtomic,
+        maxPaidAgentCallUsdc: atomicToUsdc(normalizedPolicy.maxPaidAgentCallAtomic),
         allowedPaidAgents: normalizedPolicy.allowedPaidAgents,
         charges: state.ledger.charges
       },
@@ -522,7 +522,7 @@ export class StrategyAgent {
   }
 }
 
-function withCurrentHederaAccounts(policy) {
+function withSimulationAccounts(policy) {
   const normalized = normalizeUserPolicy(policy);
   return {
     ...normalized,
@@ -538,11 +538,10 @@ function withCurrentHederaAccounts(policy) {
 }
 
 function currentPolicyAccounts() {
-  const config = getHederaConfig();
   return {
-    ownerAccountId: config.userPayerAccountId,
-    spenderAccountId: config.spenderAccountId,
-    merchantAccountId: config.merchantAccountId
+    ownerAccountId: "local-session",
+    spenderAccountId: "simulation-policy",
+    merchantAccountId: SIMULATION_RECIPIENT
   };
 }
 
@@ -558,12 +557,12 @@ function parseStrategyIntent(message, { locale = "zh-CN" } = {}) {
   }
 
   const upper = text.toUpperCase();
-  const asset = upper.match(/\b(BTC|ETH|SOL|HBAR|LINK|AVAX|BNB|XRP)\b/)?.[1] ?? null;
+  const asset = upper.match(/\b(BTC|ETH|SOL|LINK|AVAX|BNB|XRP)\b/)?.[1] ?? null;
   const timeframe = upper.match(/\b(15M|30M|1H|4H|1D|1W)\b/)?.[1]?.toLowerCase() ?? inferTimeframe(text);
   const strategyType = inferStrategyType(text);
   const riskPreference = inferRiskPreference(text);
-  const budgetHbar = extractBudgetHbar(text, ["总预算", "预算", "最多花", "daily", "budget"]) ?? 0.2;
-  const maxPaymentHbar = extractBudgetHbar(text, ["单次", "单项", "每次", "per call"], { allowGeneric: false }) ?? Math.min(0.05, budgetHbar);
+  const budgetUsdc = extractBudgetUsdc(text, ["总预算", "预算", "最多花", "daily", "budget"]) ?? 0.2;
+  const maxPaymentUsdc = extractBudgetUsdc(text, ["单次", "单项", "每次", "per call"], { allowGeneric: false }) ?? Math.min(0.05, budgetUsdc);
   const executionMode = /真实|live|mainnet|实盘/i.test(text) ? "requires_manual_approval" : "simulation";
   const missingFields = [];
 
@@ -577,10 +576,10 @@ function parseStrategyIntent(message, { locale = "zh-CN" } = {}) {
     timeframe: timeframe ?? "4h",
     strategyType,
     riskPreference,
-    dailyResearchBudgetTinybar: hbarToTinybar(budgetHbar),
-    sessionBudgetTinybar: hbarToTinybar(budgetHbar),
-    maxPaymentPerCallTinybar: hbarToTinybar(maxPaymentHbar),
-    maxPaidAgentCallTinybar: hbarToTinybar(maxPaymentHbar),
+    dailyResearchBudgetAtomic: usdcToAtomic(budgetUsdc),
+    sessionBudgetAtomic: usdcToAtomic(budgetUsdc),
+    maxPaymentPerCallAtomic: usdcToAtomic(maxPaymentUsdc),
+    maxPaidAgentCallAtomic: usdcToAtomic(maxPaymentUsdc),
     executionMode,
     missingFields,
     questions: buildClarifyingQuestions(missingFields, { locale })
@@ -625,13 +624,13 @@ function buildStrategyDraft({ intent, policy, locale = "zh-CN" }) {
         ],
     riskControls: isZh
       ? [
-          `单次策略付费 Agent 预算 ${tinybarToHbar(policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar)} HBAR`,
-          `单次付费 Agent 调用上限 ${tinybarToHbar(policy.maxPaidAgentCallTinybar ?? policy.maxPaymentPerCallTinybar)} HBAR`,
+          `单次策略付费 Agent 预算 ${atomicToUsdc(policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic)} USDC`,
+          `单次付费 Agent 调用上限 ${atomicToUsdc(policy.maxPaidAgentCallAtomic ?? policy.maxPaymentPerCallAtomic)} USDC`,
           "仅允许模拟执行"
         ]
       : [
-          `per-analysis paid agent budget ${tinybarToHbar(policy.sessionBudgetTinybar ?? policy.dailyBudgetTinybar)} HBAR`,
-          `single paid agent call limit ${tinybarToHbar(policy.maxPaidAgentCallTinybar ?? policy.maxPaymentPerCallTinybar)} HBAR`,
+          `per-analysis paid agent budget ${atomicToUsdc(policy.sessionBudgetAtomic ?? policy.dailyBudgetAtomic)} USDC`,
+          `single paid agent call limit ${atomicToUsdc(policy.maxPaidAgentCallAtomic ?? policy.maxPaymentPerCallAtomic)} USDC`,
           "simulation-only execution boundary"
         ],
     requiredEvidence: intent.riskPreference === "conservative"
@@ -668,12 +667,12 @@ async function parseIntentWithModel(message, { modelConfig, locale = "zh-CN" } =
         timeframe: "4h",
         strategyType: "breakout",
         riskPreference: "balanced",
-        dailyResearchBudgetTinybar: 20_000_000,
-        maxPaymentPerCallTinybar: 5_000_000,
-        maxPaidAgentCallTinybar: 5_000_000,
+        dailyResearchBudgetAtomic: 200000,
+        maxPaymentPerCallAtomic: 50000,
+        maxPaidAgentCallAtomic: 50000,
         executionMode: "simulation"
       },
-      supportedAssets: ["BTC", "ETH", "SOL", "HBAR", "LINK", "AVAX", "BNB", "XRP"],
+      supportedAssets: ["BTC", "ETH", "SOL", "LINK", "AVAX", "BNB", "XRP"],
       supportedTimeframes: ["15m", "30m", "1h", "4h", "1d", "1w"],
       supportedStrategyTypes: ["breakout", "momentum", "mean_reversion", "range", "event_driven", "scalping"],
       safety: "Live or mainnet trading requests must still map to requires_manual_approval; this MVP executes simulation only."
@@ -688,9 +687,9 @@ async function parseIntentWithModel(message, { modelConfig, locale = "zh-CN" } =
         timeframe: { type: "string", enum: ["15m", "30m", "1h", "4h", "1d", "1w"] },
         strategyType: { type: "string", enum: ["breakout", "momentum", "mean_reversion", "range", "event_driven", "scalping"] },
         riskPreference: { type: "string", enum: ["conservative", "balanced", "aggressive"] },
-        dailyResearchBudgetTinybar: { type: "integer" },
-        maxPaymentPerCallTinybar: { type: "integer" },
-        maxPaidAgentCallTinybar: { type: "integer" },
+        dailyResearchBudgetAtomic: { type: "integer" },
+        maxPaymentPerCallAtomic: { type: "integer" },
+        maxPaidAgentCallAtomic: { type: "integer" },
         executionMode: { type: "string", enum: ["simulation", "requires_manual_approval"] },
         missingFields: { type: "array", items: { type: "string" } },
         questions: { type: "array", items: { type: "string" } }
@@ -702,8 +701,8 @@ async function parseIntentWithModel(message, { modelConfig, locale = "zh-CN" } =
         "timeframe",
         "strategyType",
         "riskPreference",
-        "dailyResearchBudgetTinybar",
-        "maxPaymentPerCallTinybar",
+        "dailyResearchBudgetAtomic",
+        "maxPaymentPerCallAtomic",
         "executionMode",
         "missingFields",
         "questions"
@@ -800,9 +799,9 @@ async function buildStrategyDraftWithModel({ intent, policy, modelConfig, locale
   }
 }
 
-function quoteFor(service, maxTinybar) {
+function quoteFor(service, maxAtomic) {
   const quotes = SERVICE_QUOTES[service] ?? [];
-  return quotes.find((quote) => quote.priceTinybar <= maxTinybar) ?? quotes[0];
+  return quotes.find((quote) => quote.priceAtomic <= maxAtomic) ?? quotes[0];
 }
 
 function estimateDecisionImpact(hypothesis, service) {
@@ -831,31 +830,31 @@ function inferRiskPreference(text) {
   return "balanced";
 }
 
-function extractBudgetHbar(text, keywords, { allowGeneric = true } = {}) {
+function extractBudgetUsdc(text, keywords, { allowGeneric = true } = {}) {
   for (const keyword of keywords) {
     const index = text.toLowerCase().indexOf(keyword.toLowerCase());
     if (index < 0) continue;
     const nearby = text.slice(index, index + 48);
-    const amount = nearby.match(/(\d+(?:\.\d+)?)\s*HBAR/i)?.[1] ?? nearby.match(/(\d+(?:\.\d+)?)/)?.[1];
+    const amount = nearby.match(/(\d+(?:\.\d+)?)\s*USDC/i)?.[1] ?? nearby.match(/(\d+(?:\.\d+)?)/)?.[1];
     if (amount) return Number(amount);
   }
 
   if (!allowGeneric) return null;
 
-  const generic = text.match(/(\d+(?:\.\d+)?)\s*HBAR/i)?.[1];
+  const generic = text.match(/(\d+(?:\.\d+)?)\s*USDC/i)?.[1];
   return generic ? Number(generic) : null;
 }
 
 function buildClarifyingQuestions(missingFields, { locale = "zh-CN" } = {}) {
   if (locale !== "zh-CN") {
     const questions = [];
-    if (missingFields.includes("asset")) questions.push("Which asset do you want to analyze? For example ETH, BTC, or HBAR.");
+    if (missingFields.includes("asset")) questions.push("Which asset do you want to analyze? For example ETH, BTC, or SOL.");
     if (missingFields.includes("timeframe")) questions.push("Which trading timeframe should I use? For example 1h, 4h, or 1d.");
     return questions;
   }
 
   const questions = [];
-  if (missingFields.includes("asset")) questions.push("你想分析哪个资产？例如 ETH、BTC 或 HBAR。");
+  if (missingFields.includes("asset")) questions.push("你想分析哪个资产？例如 ETH、BTC 或 SOL。");
   if (missingFields.includes("timeframe")) questions.push("你希望使用哪个交易周期？例如 1h、4h 或 1d。");
   return questions;
 }

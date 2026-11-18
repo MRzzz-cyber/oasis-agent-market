@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { writeAuditRecord } from "../../../../packages/hedera/src/index.mjs";
+import { writeAuditRecord } from "../../../../packages/evm/src/audit.mjs";
 
 export class AuditLogger {
   async write({ state }) {
@@ -27,7 +27,7 @@ export class AuditLogger {
         status: "failed",
         messageHash: hashJson({ requestId: state.runId, decision: state.decision, payment }),
         error: error.message,
-        note: "Decision completed, but HCS audit submission failed."
+        note: "Decision completed, but local audit recording failed."
       };
     }
 

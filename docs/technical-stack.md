@@ -1,6 +1,5 @@
 # Oasis 技术选型（MVP）
 
-> 当前目标架构。Base Sepolia 支付适配器尚未接入完整 x402 客户端/服务端；旧 Hedera Demo 暂时保留用于回归。
 
 ## 决策原则
 
@@ -33,7 +32,6 @@
 - packages/policy：唯一支付授权决策入口。
 - packages/evm：Base 网络、USDC 单位和 EVM/x402 支付适配。
 - packages/shared：通用 ID、时间、价格和共享结构。
-- packages/hedera：旧黑客松实现；迁移完成后归档，不再作为新流程依赖。
 
 ## 支付安全规则
 
@@ -55,11 +53,9 @@
 - [x] 建立 Base Sepolia 网络与 USDC 常量。
 - [x] 建立无浮点金额换算与基础支付校验。
 - [ ] 接入官方 x402 v2 EVM client。
-- [ ] 将 Policy Engine 从 tinybar/HBAR 迁移为 USDC atomic units。
 - [ ] 完成预算预留、幂等和结算对账。
 - [ ] 将 Market/Risk 服务接入 x402 v2。
 - [ ] 通过 Base Sepolia 测试网端到端付款。
-- [ ] 移除 Hedera 运行时依赖和过时配置。
 
 ## 官方依据
 

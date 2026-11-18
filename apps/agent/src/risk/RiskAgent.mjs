@@ -10,10 +10,10 @@ export class RiskAgent {
       service: "risk-challenge",
       paidAgent: "Risk Agent",
       reasoningTier: plannedCall.reasoningTier,
-      quotedTinybar: plannedCall.quotedTinybar,
+      quotedAtomic: plannedCall.quotedAtomic,
       usage: plannedCall.usage,
       pricingModel: plannedCall.pricingModel,
-      maxFeeTinybar: plannedCall.maxWillingToPayTinybar,
+      maxFeeAtomic: plannedCall.maxWillingToPayAtomic,
       reason: plannedCall.reason
     };
 
@@ -37,7 +37,7 @@ export class RiskAgent {
           service: "risk-challenge",
           paidAgent: "Risk Agent",
           reasoningTier: result.quote?.reasoningTier,
-          quotedTinybar: result.quote?.quotedTinybar,
+          quotedAtomic: result.quote?.quotedAtomic,
           usage: result.quote?.usage,
           pricingModel: result.quote?.pricingModel,
           status: result.status,

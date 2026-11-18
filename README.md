@@ -67,7 +67,6 @@ packages/
   evm/                   Base Sepolia and USDC primitives (new)
   policy/                Deterministic budget and permission checks
   shared/                Shared utilities and pricing
-  hedera/                Legacy hackathon adapter; migration only
 docs/
   technical-stack.md     Technology decisions and boundaries
   roadmap.md             MVP milestones and acceptance criteria
@@ -75,34 +74,20 @@ docs/
   payment-flow.md        Current/target payment flow
 ```
 
-## Quick start (current legacy demo)
+## Quick start
 
-The currently runnable end-to-end demo still uses the original Hedera adapter. The Base Sepolia payment migration is in progress and must not be mistaken for a completed integration.
+Run `pnpm install --frozen-lockfile`, then `pnpm demo:web`.
+Open http://127.0.0.1:4173 for the strategy workspace or
+http://127.0.0.1:4173/research.html for the procurement demo.
 
-```bash
-pnpm install
-HEDERA_PAYMENT_MODE=mock OASIS_MARKET_DATA_MODE=fixture OASIS_LLM_MODE=rule pnpm demo:web
-```
-
-Run tests:
-
-```bash
-pnpm test
-```
+Run `pnpm test` to validate the strategy, policy, simulations, and replay.
 
 ## Configuration
 
-Copy .env.example to .env. Do not commit private keys, seed phrases, API keys or funded wallet credentials.
-
-The Base Sepolia variables are target configuration; they are not yet consumed by the legacy payment runtime.
-
-## Development status
-
-- Existing Agent runtime, model adapters, market/risk agents and simulation flow are retained.
-- Base Sepolia / USDC integer amount primitives are added under packages/evm.
-- Full x402 EVM payment integration, policy migration and end-to-end testnet payment are still pending.
-
-See Technical Stack (docs/technical-stack.md) and Roadmap (docs/roadmap.md).
+Copy .env.example to .env for the isolated payment smoke test.
+Strategy and procurement demos use simulated Base Sepolia USDC payments and local audit records.
+The smoke runner uses the official x402 v2 SDK and a dedicated, funded Base Sepolia test wallet.
+An actual testnet settlement must be confirmed separately.
 
 ## License
 

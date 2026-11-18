@@ -74,13 +74,13 @@ export function assertToolPlan(value) {
     assertString(call.reason, `toolCalls[${index}].reason`);
     assertString(call.agent, `toolCalls[${index}].agent`);
     assertString(call.reasoningTier, `toolCalls[${index}].reasoningTier`);
-    assertInteger(call.quotedTinybar, `toolCalls[${index}].quotedTinybar`);
-    assertInteger(call.maxWillingToPayTinybar, `toolCalls[${index}].maxWillingToPayTinybar`);
-    if (call.quotedTinybar < 0) {
-      throw new Error(`toolCalls[${index}].quotedTinybar must be >= 0`);
+    assertInteger(call.quotedAtomic, `toolCalls[${index}].quotedAtomic`);
+    assertInteger(call.maxWillingToPayAtomic, `toolCalls[${index}].maxWillingToPayAtomic`);
+    if (call.quotedAtomic < 0) {
+      throw new Error(`toolCalls[${index}].quotedAtomic must be >= 0`);
     }
-    if (call.maxWillingToPayTinybar < 0) {
-      throw new Error(`toolCalls[${index}].maxWillingToPayTinybar must be >= 0`);
+    if (call.maxWillingToPayAtomic < 0) {
+      throw new Error(`toolCalls[${index}].maxWillingToPayAtomic must be >= 0`);
     }
     if (typeof call.required !== "boolean") {
       throw new Error(`toolCalls[${index}].required must be a boolean`);

@@ -44,7 +44,6 @@ User goal + budget
 
 ## Important migration note
 
-The currently runnable Agent and payment client still depend on Hedera/HBAR. The new packages/evm module currently contains Base Sepolia and USDC primitives only. The x402 EVM client/server, USDC Policy migration and settlement ledger are the next implementation steps. Do not treat the target flow as production-ready or testnet-complete yet.
 
 ## Design rules
 

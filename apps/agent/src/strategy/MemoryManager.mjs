@@ -37,7 +37,7 @@ export class MemoryManager {
       evidenceScore: state.evidence.evidenceScore,
       conflictLevel: state.evidence.conflictLevel,
       paidServices: state.payments.map((payment) => payment.service),
-      totalCostTinybar: state.payments.reduce((sum, payment) => sum + Number(payment.amountTinybar ?? 0), 0),
+      totalCostAtomic: state.payments.reduce((sum, payment) => sum + Number(payment.amountAtomic ?? 0), 0),
       executionStatus: state.executionResult?.status,
       simulatedOrderId: state.executionResult?.simulatedOrder?.orderId,
       reason: decision.reason,

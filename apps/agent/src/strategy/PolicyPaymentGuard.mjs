@@ -9,7 +9,7 @@ export class PolicyPaymentGuard {
       service
     });
     const reasons = [...policyDecision.reasons];
-    const requestedTinybar = Number(agentQuote.quotedTinybar);
+    const requestedAtomic = Number(agentQuote.quotedAtomic);
 
     if (!plannedCall) {
       reasons.push(`service ${service} was not planned by Strategy Agent`);
@@ -20,11 +20,11 @@ export class PolicyPaymentGuard {
       if (plannedCall.reasoningTier !== agentQuote.reasoningTier) {
         reasons.push(`quoted reasoning tier ${agentQuote.reasoningTier} does not match Strategy Agent plan ${plannedCall.reasoningTier}`);
       }
-      if (requestedTinybar !== plannedCall.quotedTinybar) {
-        reasons.push(`quote ${requestedTinybar} tinybar does not match Strategy Agent planned quote ${plannedCall.quotedTinybar}`);
+      if (requestedAtomic !== plannedCall.quotedAtomic) {
+        reasons.push(`quote ${requestedAtomic} USDC atomic units does not match Strategy Agent planned quote ${plannedCall.quotedAtomic}`);
       }
-      if (requestedTinybar > plannedCall.maxWillingToPayTinybar) {
-        reasons.push(`quote ${requestedTinybar} tinybar exceeds Strategy Agent willingness ${plannedCall.maxWillingToPayTinybar}`);
+      if (requestedAtomic > plannedCall.maxWillingToPayAtomic) {
+        reasons.push(`quote ${requestedAtomic} USDC atomic units exceeds Strategy Agent willingness ${plannedCall.maxWillingToPayAtomic}`);
       }
     }
 
@@ -45,12 +45,12 @@ export class PolicyPaymentGuard {
       service
     });
     const reasons = [...policyDecision.reasons];
-    const requestedTinybar = Number(paymentRequirement.amount);
+    const requestedAtomic = Number(paymentRequirement.amount);
 
     if (!plannedCall) {
       reasons.push(`service ${service} was not planned by Strategy Agent`);
-    } else if (requestedTinybar > plannedCall.maxWillingToPayTinybar) {
-      reasons.push(`price ${requestedTinybar} tinybar exceeds Strategy Agent willingness ${plannedCall.maxWillingToPayTinybar}`);
+    } else if (requestedAtomic > plannedCall.maxWillingToPayAtomic) {
+      reasons.push(`price ${requestedAtomic} USDC atomic units exceeds Strategy Agent willingness ${plannedCall.maxWillingToPayAtomic}`);
     }
 
     return {
