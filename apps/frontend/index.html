@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="theme-color" content="#101312"/>
   <link rel="icon" href="/brand/favicon.svg?v=native-mainnet-v15-20261116" type="image/svg+xml"/>
-  <title>Oasis · 把你的判断变成行动</title>
+  <title>Oasis · AI 交易助手</title>
   <link rel="stylesheet" href="/styles.css?v=native-mainnet-v15-20261116"/>
-  <link rel="stylesheet" href="/workbench.css?v=polymarket-focus-v1"/>
+  <link rel="stylesheet" href="/workbench.css?v=assistant-home-v1"/>
 </head>
-<body class="polymarket-home">
+<body class="assistant-home">
   <div id="workspace" class="workspace workbench-shell">
     <aside class="tool-rail" aria-label="工作台工具"><a href="/" class="rail-logo" aria-label="Oasis 首页"><span data-oasis-eye></span></a><button type="button" data-tab="overview" title="AI 工作台" aria-label="AI 工作台">◈</button><button type="button" data-tab="market" title="行情图表" aria-label="行情图表">⌁</button><button type="button" id="wallet-open" title="钱包与资金" aria-label="钱包与资金">▣</button><button type="button" data-tab="strategies" title="对话与策略记录" aria-label="对话与策略记录">◷</button><span class="rail-bottom">MAINNET</span></aside>
     <header class="app-header"><div class="header-inner">
       <a class="wordmark" href="/" aria-label="Oasis 首页"><span data-oasis-eye></span>Oasis</a>
-      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">发现与对话</button><button data-tab="market">行情</button><button data-tab="strategies">对话与策略</button><a id="research-procurement-link" href="/research.html">研究采购</a></nav>
+      <div id="ticker-strip" class="ticker-strip" aria-label="主流币行情"></div><nav aria-label="主导航"><button data-tab="overview" class="selected" aria-current="page">AI 交易助手</button><button data-tab="market">行情</button><button data-tab="strategies">对话与策略</button><a id="research-procurement-link" href="/research.html">研究采购</a></nav>
       <div class="header-actions"><button type="button" class="header-wallet" id="header-wallet-open" aria-label="钱包与资金" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M19 7H5a2 2 0 0 1 0-4h13v4M3 5v14a2 2 0 0 0 2 2h15V7M20 11h-5a2 2 0 0 0 0 4h5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15.5" cy="13" r=".6" fill="currentColor" stroke="none"/></svg><span class="wallet-label-wide">钱包与资金</span><span class="wallet-label-narrow">钱包</span></button><button class="ghost account-chip" id="account-button" hidden>登录</button></div>
     </div></header>
     <aside class="market-sidebar" aria-label="实时市场行情">
@@ -24,15 +24,20 @@
       <div class="watch-columns"><span>资产 / 永续</span><span>价格 / 24h</span></div><div id="watchlist" class="watchlist"></div>
       <div class="watch-foot"><span id="watch-count">—</span><button type="button" id="watch-refresh" aria-label="刷新侧栏行情">↻ 刷新</button><small id="watch-status" role="status">正在连接 Hyperliquid…</small><small>主网永续行情 · 现货订单需单独核对</small></div>
     </aside>
-    <div class="content"><div class="workbench-bar"><button type="button" id="toggle-watch" aria-label="显示市场列表">☰</button><span>Oasis <span class="bar-divider">/</span> <b>预测市场</b><b id="workbench-asset" hidden>ETH</b></span><span class="environment-badge">Polymarket · 站内买入</span></div>
+    <div class="content"><div class="workbench-bar"><button type="button" id="toggle-watch" aria-label="显示市场列表">☰</button><span>Oasis <span class="bar-divider">/</span> <b>AI 交易助手</b><b id="workbench-asset" hidden>ETH</b></span><span class="environment-badge">AI 工作台</span></div>
       <main>
         <section id="page-overview" class="app-page"><div class="direct-test-link"><button type="button" class="ghost" id="direct-test">10 USDC 起，准备 ETH 买入 ↗</button></div>
-          <div class="welcome"><div class="assistant-emblem"><span data-oasis-eye></span></div><span class="eyebrow">YOUR TAKE. YOUR TRADE.</span><h1>世界正在发生什么，<br/>你怎么看？</h1><p>和 Oasis 聊聊你的判断，发现 Polymarket 盘口。准备资金、核对价格，再由你确认买入。</p></div>
+          <div class="welcome"><div class="assistant-emblem"><span data-oasis-eye></span></div><h1>AI 交易助手</h1><p class="assistant-subtitle">读懂行情，制定你的交易计划</p><p>查看趋势与风险，整理可复盘的策略。涉及真实交易时，先核对报价、金额和费用，再由你确认。</p></div>
           <div class="selected-quote"><span class="coin-symbol" data-coin="ETH">E</span><strong id="selected-market">ETH</strong><b id="selected-market-price">行情读取中</b><span id="selected-market-change">—</span><small>主网永续 / 实时参考</small></div>
           <div id="prompt-guides" class="prompt-guides" aria-label="引导问题"></div>
 
-          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">你的想法</label><textarea id="goal" rows="2" required maxlength="2000" placeholder="例如：找几个有趣的预测盘口，我想先用 10 pUSD 试试"></textarea><small id="question-context" role="status"></small><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">和 Oasis 聊聊 ↗</button></div></form>
-          <div class="home-shortcuts" aria-label="快速开始"><button type="button" data-prediction-prompt="帮我找几个有趣的 Polymarket 预测盘口，先了解事件再决定。">找点有趣的盘口 ↗</button><button type="button" data-prediction-prompt="我想用 10 pUSD 体验 Polymarket 预测市场，请让我先选一个事件，再核对资金与价格，不要自动下单。">从 10 pUSD 开始 ↗</button><button type="button" id="home-eth-trade">买入 ETH ↗</button></div><div id="home-predictions"></div><details class="research-extras"><summary>行情研究与更多问题</summary><section class="starters" aria-labelledby="quick-heading">
+          <form id="goal-form" class="prompt"><label for="goal" class="sr-only">你的想法</label><textarea id="goal" rows="2" required maxlength="2000" placeholder="例如：分析 ETH 最近的走势，哪些信号值得等？"></textarea><small id="question-context" role="status"></small><div class="prompt-foot"><div class="compact-picker"><select id="model-primary" aria-label="策略顾问模型" disabled><option>加载模型中…</option></select><small id="model-status" role="status"></small></div><button class="primary" type="submit">问 Oasis ↗</button></div></form>
+          <div class="assistant-shortcuts" aria-label="助手快捷任务">
+            <button type="button" data-assistant-task="analysis"><strong>分析 ETH 行情</strong><small>解读趋势、成交量与失效条件</small></button>
+            <button type="button" data-assistant-task="risk"><strong>检查交易风险</strong><small>找出反例和应该暂停的情形</small></button>
+            <button type="button" data-assistant-task="strategy"><strong>制定策略草案</strong><small>明确触发条件、预算和退出规则</small></button>
+          </div>
+          <div class="assistant-tools" aria-label="更多研究工具"><button type="button" data-tab="predictions">预测市场 ↗</button><a href="/research.html">研究采购 ↗</a></div><details class="research-extras"><summary>行情研究与更多问题</summary><section class="starters" aria-labelledby="quick-heading">
             <div class="starter-head"><h2 id="quick-heading">快捷问题</h2><button type="button" id="more-questions">换一组 ↻</button></div>
             <div id="question-list" class="question-list"></div>
           </section>
@@ -41,17 +46,21 @@
             <details class="replay-method"><summary>计算口径</summary><p>固定展示 BTC、ETH 各两条均线规则，另列各自持续持有等额空头 24 小时的对照。收盘高于 20 小时均线时做多，低于均线时偏空做空；各模型在自己的条件失效时空仓。下一小时开盘模拟成交，期末按收盘价结算。每次进出各计 0.05% 成本，未计资金费、实际滑点和盘中波动。按本窗口模拟收益排序。</p></details></section>
           <section class="starters" aria-labelledby="template-heading"><div class="starter-head"><h2 id="template-heading">探索策略模板</h2><button type="button" id="more-templates">下一组模板 ↻</button></div><div class="template-list" id="template-list"></div></section></details>
         </section>
+        <section id="page-predictions" class="app-page hidden" aria-label="预测市场工具">
+          <div class="page-heading"><div><h2>预测市场</h2><p>查看 Polymarket 事件、规则与实时报价。</p></div><button type="button" class="ghost" data-tab="overview">AI 交易助手</button></div>
+          <div id="prediction-workspace"></div>
+        </section>
         <section id="page-market" class="app-page hidden"><div class="page-heading"><div><h2>行情分析</h2><p>Hyperliquid 市场成交行情 · 股票类永续跟踪标的价格</p></div></div>
           <div class="panel"><div class="market-controls"><label>市场 <select id="market-group"><option>常用</option><option>加密永续</option><option>美股永续</option><option>指数与宏观</option><option>其他永续</option><option>现货</option><option>全部</option></select></label><label>标的 <select id="market-coin"><option>BTC</option><option>ETH</option><option>XRP</option><option>HYPE</option></select></label>
           <label>周期 <select id="market-interval"><option>15m</option><option>1h</option><option>4h</option><option>1d</option></select></label><strong id="market-price">—</strong></div>
           <small id="market-count" role="status"></small><p id="market-detail" class="note"></p><canvas id="market-chart" aria-label="市场 K 线及成交量"></canvas>
           <div id="market-insights" class="market-insights" aria-label="已收盘 K 线指标"></div><div class="market-controls"><button type="button" class="ghost" id="market-reload">刷新行情</button><small id="market-status" role="status"></small><button id="market-analyze" class="primary" disabled>让 AI 分析这张图</button></div></div></section>
         <section id="page-create" class="app-page hidden">
-          <div class="page-heading"><div><h2>和 Oasis 聊聊</h2><p>发现事件、准备资金、确认买入，都在这里完成。</p></div><button class="ghost" id="new-idea">新对话</button></div>
+          <div class="page-heading"><div><h2>和 Oasis 聊聊</h2><p>先分析，再决定是否制定计划或预览交易。</p></div><button class="ghost" id="new-idea">新对话</button></div>
           <div class="conversation panel">
             <div class="conversation-top"><div><strong>Oasis · 交易助手</strong><span class="note">当前模型：<b id="active-model-label">免费模型</b> · <span id="ai-runtime-status">检查 API 状态中</span></span></div><label class="ghost inline-model-picker"><span aria-hidden="true">更换模型 ▾</span><select id="change-model" aria-label="更换模型" disabled></select></label></div><div class="access-row" id="legacy-access"><label for="ai-access-code">私人体验码</label><input type="password" id="ai-access-code" autocomplete="off" placeholder="输入体验码"/><button class="ghost" type="button" id="ai-retry">连接并重试</button></div>
             <div id="chat-messages" class="chat-messages" aria-live="polite"></div><div id="chat-next-actions" class="chat-next-actions" aria-label="对话下一步"></div><div id="chat-funding-card"></div><div id="chat-trade-plan" class="chat-trade-plan" aria-live="polite"></div>
-            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="继续聊聊，例如：这个事件看哪些信息？我想买入 10 pUSD"></textarea><button class="primary" id="chat-submit" type="submit">发送</button></form><p id="ai-usage" class="note"></p>
+            <form id="chat-form" class="chat-composer"><textarea id="chat-input" rows="2" maxlength="2000" placeholder="继续聊聊，例如：什么情况会推翻这个判断？"></textarea><button class="primary" id="chat-submit" type="submit">发送</button></form><p id="ai-usage" class="note"></p>
           </div>
           <details id="draft-panel" class="panel draft-panel hidden"><summary>查看完整策略 · 可选</summary><div class="draft-content">
             <div class="draft-head"><div><h3>策略草案</h3></div><span class="status-pill">等待你确认</span></div>
@@ -91,6 +100,6 @@
     </div>
   </div>
   <script type="module" src="/i18n.js"></script>
-  <script src="/app.js?v=polymarket-focus-v1" type="module"></script>
+  <script src="/app.js?v=assistant-home-v1" type="module"></script>
 </body>
 </html>

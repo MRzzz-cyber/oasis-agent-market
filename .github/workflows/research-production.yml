@@ -5,6 +5,7 @@ on:
     paths:
       - "apps/frontend/research*"
       - "apps/frontend/worker.js"
+      - "apps/frontend/index.html"
       - ".github/workflows/research-production.yml"
   workflow_dispatch:
 permissions:
@@ -34,7 +35,13 @@ jobs:
               };
               const release = await (await get('/api/release')).json();
               assert.equal(release.researchProcurement, version);
-              assert.match(await (await get('/')).text(), /id="research-procurement-link"/);
+              assert.equal(release.assistantHome, 'assistant-home-v1');
+              const home = await (await get('/')).text();
+              assert.match(home, /id="research-procurement-link"/);
+              assert.match(home, /data-assistant-task="analysis"/);
+              assert.match(home, /data-assistant-task="risk"/);
+              assert.match(home, /data-assistant-task="strategy"/);
+              assert.doesNotMatch(home, /id="home-predictions"/);
               assert.match(await (await get('/research.html')).text(), /<title>Oasis 研究采购<\/title>/);
               const demo = await (await get('/api/research/demo')).json();
               assert.equal(demo.mode, 'simulation');
