@@ -1,0 +1,67 @@
+name: Prediction search recovery
+on:
+  push:
+    branches: [fix/prediction-search-resilience, refactor/simple-base-mvp]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Public production diagnostics
+        run: node scripts/diagnose-prediction-network.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Tests and bundles
+        run: |
+          node --check apps/frontend/prediction-cards.js
+          node --check scripts/check-prediction-recovery-ui.mjs
+          if npm test > "$RUNNER_TEMP/prediction-recovery-tests.txt" 2>&1; then tail -n 12 "$RUNNER_TEMP/prediction-recovery-tests.txt"; else rg -A 24 'not ok|error:|failureType:' "$RUNNER_TEMP/prediction-recovery-tests.txt"; exit 1; fi
+          npm run build:wallet
+          node --input-type=module -e "import {build} from 'esbuild';await build({entryPoints:['apps/frontend/worker.js'],bundle:true,format:'esm',platform:'browser',target:['es2022'],write:false});"
+      - name: Actual Worker runtime
+        run: |
+          npm install --prefix "$RUNNER_TEMP/prediction-read-worker" --no-audit --no-fund miniflare@4
+          node scripts/check-prediction-read-worker.mjs
+      - name: Chinese fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk
+      - name: Browser regression and recovery fixtures
+        run: |
+          failures=0
+          node scripts/check-prediction-recovery-ui.mjs || failures=1
+          node scripts/check-prediction-ui.mjs || failures=1
+          node scripts/check-prediction-conversation.mjs || failures=1
+          node scripts/check-bilingual-ui.mjs || failures=1
+          exit $failures
+      - name: Live official public reads
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';import {searchPredictions,discoverPredictions} from './apps/frontend/prediction-markets.js';
+          for(const query of ['Bitcoin','NBA','Fed']){const p=await searchPredictions(query,{fetchImpl:async(url,init)=>{const r=await fetch(url,init);if(String(url).includes('/public-search')){const d=await r.clone().json();console.log('LIVE search shape',JSON.stringify({status:r.status,keys:Object.keys(d),eventKeys:Object.keys(d.events?.[0]||{}),marketKeys:Object.keys(d.events?.[0]?.markets?.[0]||{}),sample:d.events?.[0]?.markets?.[0]&&(({id,closed,active,archived,acceptingOrders,endDate,outcomes,bestAsk})=>({id,closed,active,archived,acceptingOrders,endDate,outcomes,bestAsk}))(d.events[0].markets[0])}));}return r;}});console.log('LIVE Gamma search',query,JSON.stringify(p.providers.map(v=>({provider:v.provider,count:v.markets.length,errorCode:v.errorCode}))));assert.ok(p.providers[0].markets.length);assert.ok(!p.stale);}
+          const feed=await discoverPredictions();assert.ok(feed.markets.length);console.log('LIVE Gamma feed',feed.markets.length,'public metadata only; no wallet actions');
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prediction-recovery-fixtures
+          path: |
+            ${{ runner.temp }}/prediction-recovery-ui/*.png
+            ${{ runner.temp }}/prediction-recovery-tests.txt
+          if-no-files-found: ignore
+  production:
+    if: github.ref == 'refs/heads/refactor/simple-base-mvp'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-prediction-read-production.mjs
