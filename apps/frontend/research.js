@@ -53,7 +53,7 @@ async function showScenarios() {
 
 replayButton.addEventListener("click", async () => {
   replayButton.disabled = true;
-  results.textContent = "正在获取历史日线…";
+  results.textContent = "正在运行历史回放…";
   try {
     const data = await getJson("/api/research/replay");
     const table = element("table");

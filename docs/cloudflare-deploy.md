@@ -53,5 +53,7 @@ npx wrangler dev --config apps/frontend/wrangler.jsonc
 
 - `/research.html` 展示 Base Sepolia USDC 的模拟采购、主动拒购和策略拦截。
 - `/api/research/demo` 返回采购案例，`/api/research/replay` 使用历史 ETH-USD 日线比较三种策略。
-- `/api/release` 的 `researchProcurement` 应为 `base-sepolia-usdc-v2`。
+- `/api/release` 的 `researchProcurement` 应为 `base-sepolia-usdc-v3`。
 - 此页面仅运行模拟。真实测试网结算由独立的 `npm run smoke:x402` 执行。
+
+生产回放使用仓库中的 181 根 Coinbase ETH-USD 日线收盘价快照，覆盖 2025-01-01 至 2025-06-30（UTC）。数据来源是 [Coinbase Exchange candles](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles)，日线粒度为 86400 秒。Worker 直接使用该快照运行回放。

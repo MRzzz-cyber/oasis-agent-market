@@ -15,16 +15,14 @@ test("the Worker serves the three procurement scenarios under the production API
   assert.equal(scenarios.policyBlock.evaluations[0].reason, "quote_mismatch");
 });
 
-test("the replay route returns three strategies and handles upstream failure", async () => {
+test("the live Worker uses the pinned historical candle window for all three strategies", async () => {
   const request = new Request("https://oasistrade.app/api/research/replay");
-  const start = Date.parse("2025-01-01T00:00:00Z") / 1000;
-  const fetchImpl = async () => Response.json(Array.from({ length: 10 }, (_, index) =>
-    [start + index * 86400, 0, 0, 0, 100 + index]));
-  const response = await researchRoute(request, { fetchImpl });
+  const response = await worker.fetch(request, {}, {});
   assert.equal(response.status, 200);
-  assert.deepEqual(Object.keys((await response.json()).strategies), ["noBuy", "buyAll", "oasis"]);
-  const failure = await researchRoute(request, { fetchImpl: async () => new Response(null, { status: 503 }) });
-  assert.equal(failure.status, 502);
-  const write = await researchRoute(new Request(request.url, { method: "POST" }), { fetchImpl });
+  const result = await response.json();
+  assert.equal(result.cases, 174);
+  assert.deepEqual(Object.keys(result.strategies), ["noBuy", "buyAll", "oasis"]);
+  assert.equal(result.strategies.oasis.spendAtomic, "1920000");
+  const write = await researchRoute(new Request(request.url, { method: "POST" }));
   assert.equal(write.status, 405);
 });

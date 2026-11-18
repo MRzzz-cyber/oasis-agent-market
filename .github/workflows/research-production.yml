@@ -23,7 +23,7 @@ jobs:
           import assert from 'node:assert/strict';
           import { setTimeout as delay } from 'node:timers/promises';
           const origin = 'https://oasistrade.app';
-          const version = 'base-sepolia-usdc-v2';
+          const version = 'base-sepolia-usdc-v3';
           let lastError;
           for (let attempt = 0; attempt < 24; attempt++) {
             try {
@@ -45,7 +45,7 @@ jobs:
               assert.equal(demo.scenarios.policyBlock.evaluations[0].reason, 'quote_mismatch');
               const replay = await (await get('/api/research/replay')).json();
               assert.deepEqual(Object.keys(replay.strategies), ['noBuy', 'buyAll', 'oasis']);
-              assert.ok(replay.cases > 100);
+              assert.equal(replay.cases, 174);
               console.log(JSON.stringify({ origin, version, historicalWindows: replay.cases }));
               process.exit(0);
             } catch (error) {
