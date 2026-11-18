@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oasis 研究采购</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0c1514; color: #e9f4ef; font: 16px/1.55 system-ui, sans-serif; }
+    main { width: min(940px, calc(100% - 32px)); margin: 72px auto; }
+    h1 { font-size: clamp(2rem, 7vw, 4rem); line-height: 1.05; margin: 16px 0; }
+    p { color: #b2c8c1; }
+    section { margin: 36px 0; }
+    article { border: 1px solid #2c4640; border-radius: 12px; padding: 16px; margin-block: 12px; }
+    article h3 { margin: 0 0 8px; }
+    ul { margin-block: 8px 0; padding-inline-start: 20px; }
+    a { color: #a8ebce; }
+    button { font: inherit; padding: 8px 16px; border: 0; border-radius: 6px; background: #a8ebce; color: #10231e; cursor: pointer; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 540px; width: 100%; }
+    td, th { text-align: left; padding: 10px; border-bottom: 1px solid #2c4640; }
+  </style>
+  <script type="module" src="/research.js"></script>
+</head>
+<body>
+  <main>
+    <a href="/">Oasis</a>
+    <h1>研究采购</h1>
+    <p>比较三个模拟研究供应商的预估信息价值和报价。演示以 Base Sepolia USDC 计价。</p>
+    <section aria-labelledby="scenario-heading">
+      <h2 id="scenario-heading">采购决策</h2>
+      <div id="scenarios" aria-live="polite">正在加载采购案例…</div>
+    </section>
+    <section aria-labelledby="replay-heading">
+      <h2 id="replay-heading">历史回放</h2>
+      <p>用 Coinbase 2025 年 1–6 月的 ETH-USD 日线对比三种采购策略。供应商信号为模拟数据。</p>
+      <button id="replay" type="button">运行回放</button>
+      <div id="results" class="table-wrap" aria-live="polite"></div>
+    </section>
+  </main>
+</body>
+</html>

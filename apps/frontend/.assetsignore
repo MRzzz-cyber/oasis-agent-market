@@ -3,3 +3,5 @@ worker.js
 .dev.vars
 
 auth.js
+
+research-service.js

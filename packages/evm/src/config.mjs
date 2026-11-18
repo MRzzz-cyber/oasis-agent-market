@@ -2,7 +2,7 @@ export const BASE_SEPOLIA = Object.freeze({
   chainId: 84532,
   network: "eip155:84532",
   name: "Base Sepolia",
-  rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
+  rpcUrl: globalThis.process?.env?.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
   explorerUrl: "https://sepolia.basescan.org"
 });
 
