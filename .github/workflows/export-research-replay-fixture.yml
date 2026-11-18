@@ -1,0 +1,23 @@
+name: Export public research replay fixture
+on:
+  push:
+    branches: [feat/oasis-research-cloudflare]
+    paths: [".github/workflows/export-research-replay-fixture.yml"]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          node --input-type=module <<'JS'
+          import { fetchHistoricalCandles, replayResearch } from './apps/agent/src/strategy/ResearchReplay.mjs';
+          const candles = (await fetchHistoricalCandles()).sort((a, b) => a.timestamp - b.timestamp);
+          const result = replayResearch(candles);
+          if (result.cases !== 174) throw Error('Unexpected replay window count: ' + result.cases);
+          console.log('OASIS_CANDLES ' + JSON.stringify(candles.map(({timestamp, close}) => [timestamp, close])));
+          JS
