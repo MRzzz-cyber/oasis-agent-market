@@ -1,4 +1,6 @@
 import http from "node:http";
+import { fetchHistoricalCandles, replayResearch } from "../../agent/src/strategy/ResearchReplay.mjs";
+import { runResearchDemo } from "../../agent/src/strategy/ResearchPlanner.mjs";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +24,16 @@ export async function createDemoApiServer({ port = 4173, host = "127.0.0.1" } = 
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url, `http://${request.headers.host}`);
+
+      if (request.method === "GET" && url.pathname === "/research/replay") {
+        sendJson(response, 200, replayResearch(await fetchHistoricalCandles()));
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/research/demo") {
+        sendJson(response, 200, runResearchDemo());
+        return;
+      }
 
       if (request.method === "GET" && url.pathname === "/health") {
         sendJson(response, 200, { ok: true, service: "oasis-demo-api" });

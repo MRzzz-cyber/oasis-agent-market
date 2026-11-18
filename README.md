@@ -15,6 +15,18 @@ MVP target: Base Sepolia + USDC + x402 v2. Agent payments are policy-controlled;
 7. Risk Engine reviews the proposal.
 8. User confirms; Oasis creates a simulated order only.
 
+## Research procurement preview
+
+Start the demo server, then open `/research/demo` to compare three simulated
+providers and inspect the buy, decline and blocked-quote scenarios. Quotes use
+Base Sepolia USDC atomic units. The simulator does not sign or settle payments.
+
+Open `/research/replay` to fetch and replay Coinbase Exchange ETH-USD daily candles
+from January through June 2025. All three strategies predict the same next-day
+direction using data available at the decision time. The replay reports accuracy,
+purchase count, USDC spend and a modeled utility. The provider scores and the
+USDC reward for a correct prediction are simulation assumptions.
+
 ## Architecture
 
 | Area | Choice |
