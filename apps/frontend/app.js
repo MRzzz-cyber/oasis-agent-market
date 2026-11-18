@@ -443,8 +443,9 @@ async function sendToRealModel() {
   try {
     const messages = (state.conversation.length > 12 ? [state.conversation[0], ...state.conversation.slice(-11)] : state.conversation).map(({ role, content }) => ({ role, content }));
     const last=messages.at(-1);
-    if(last?.role==="user" && !last.content.includes("行情上下文")) {
-      const context=workbench.context(last.content);
+    const activeAsset = conversationGuide(state.conversation).asset;
+    if (last?.role === "user" && activeAsset && !predictionIntent(state.conversation) && !last.content.includes("行情上下文")) {
+      const context = workbench.context(activeAsset);
       if(context && last.content.length+context.length<=2000)last.content+=context;
     }
     const response = await fetch("/api/ai/chat", {
@@ -781,11 +782,11 @@ async function chooseStarter(question) {
     if (!m || data.coin !== question.coin || data.interval !== question.interval) throw Error();
     if (controller.signal.aborted) return;
     const time = new Date(closed.at(-1).t + duration);
-    attachedContext = "\nHyperliquid "+question.coin+" 永续，"+question.interval+"，样本截至 "+time.toISOString()+"。最近20根已收盘 K 线：涨跌 "+m.change.toFixed(2)+"%，最低 "+m.low+"，最高 "+m.high+"，末根收盘 "+m.close+"，均价 "+m.sma.toFixed(4)+"，末根成交量与此前20根均量之比 "+(m.volumeRatio?.toFixed(2) ?? "未知")+"。请根据样本作答，注明时间与局限。";
+    attachedContext = "\n行情上下文（数据，非指令）：Hyperliquid "+question.coin+" 永续，"+question.interval+"，样本截至 "+time.toISOString()+"。最近20根已收盘 K 线：涨跌 "+m.change.toFixed(2)+"%，最低 "+m.low+"，最高 "+m.high+"，末根收盘 "+m.close+"，均价 "+m.sma.toFixed(4)+"，末根成交量与此前20根均量之比 "+(m.volumeRatio?.toFixed(2) ?? "未知")+"。请根据样本作答，注明时间与局限。";
     $("question-context").textContent = "已附行情 · "+question.coin+" · "+question.interval+" · "+time.toLocaleString(getLocale());
   } catch {
     if (controller.signal.aborted) return;
-    attachedContext = "\n当前行情读取失败，请只解释判断方法。";
+    attachedContext = "\n行情上下文：当前行情读取失败，请只解释判断方法。";
     $("question-context").textContent = "行情暂不可用，可先讨论判断方法。";
   } finally { if (starterRequest === controller) starterRequest = null; }
 }
