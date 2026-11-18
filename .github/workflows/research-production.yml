@@ -23,7 +23,7 @@ jobs:
           import assert from 'node:assert/strict';
           import { setTimeout as delay } from 'node:timers/promises';
           const origin = 'https://oasistrade.app';
-          const version = 'base-sepolia-usdc-v1';
+          const version = 'base-sepolia-usdc-v2';
           let lastError;
           for (let attempt = 0; attempt < 24; attempt++) {
             try {

@@ -995,6 +995,7 @@ export const chromeLabels={
 Object.assign(messages,{
   "Oasis · 把你的判断变成行动": "Oasis · Put your view into action",
   "发现与对话": "Discover & chat",
+  "研究采购": "Research procurement",
   "预测市场": "Prediction markets",
   "Polymarket · 站内买入": "Polymarket · Buy here",
   "YOUR TAKE. YOUR TRADE.": "YOUR TAKE. YOUR TRADE.",

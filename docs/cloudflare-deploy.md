@@ -53,5 +53,5 @@ npx wrangler dev --config apps/frontend/wrangler.jsonc
 
 - `/research.html` 展示 Base Sepolia USDC 的模拟采购、主动拒购和策略拦截。
 - `/api/research/demo` 返回采购案例，`/api/research/replay` 使用历史 ETH-USD 日线比较三种策略。
-- `/api/release` 的 `researchProcurement` 应为 `base-sepolia-usdc-v1`。
+- `/api/release` 的 `researchProcurement` 应为 `base-sepolia-usdc-v2`。
 - 此页面仅运行模拟。真实测试网结算由独立的 `npm run smoke:x402` 执行。
